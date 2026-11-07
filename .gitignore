@@ -1,20 +1,44 @@
-node_modules/
-.env
-# Build and Release Folders
-bin-debug/
-bin-release/
-[Oo]bj/
+## Visual Studio / .NET
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
 [Bb]in/
+[Oo]bj/
+*.log
+*.binlog
 
-# Other files and folders
-.settings/
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rms/
+[Aa]rm64/
 
-# Executables
-*.swf
-*.air
-*.ipa
-*.apk
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.useroptions
 
-# Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
-# should NOT be excluded as they contain compiler settings and other important
-# information for Eclipse / Flash Builder.
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Node & Frontend
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+
+# OS generated
+.DS_Store
+Thumbs.db
