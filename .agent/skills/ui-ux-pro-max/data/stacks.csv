@@ -1,0 +1,7 @@
+stack_name,libraries,guidelines
+react,"React 18/19, Tailwind CSS v3/v4, Lucide React, Radix UI Primitives / Shadcn UI, TanStack Query","Use functional components with explicit props interfaces. Encapsulate state with custom hooks. Prefer composition over prop drilling."
+nextjs,"Next.js App Router, Tailwind CSS, Shadcn UI, Next-Themes, Lucide React","Leverage React Server Components (RSC) for initial page renders and SEO. Mark interactive client widgets with 'use client'. Use Next Image with blur placeholders."
+vue,"Vue 3, Script Setup (Composition API), Tailwind CSS, Lucide Vue, Radix Vue / Shadcn-Vue, Pinia","Use <script setup lang='ts'>. Leverage defineProps and defineEmits. Group state logically inside Pinia stores."
+tailwind,"Tailwind CSS, clsx, tailwind-merge (cn helper), tailwindcss-animate","Never write inline style objects when Tailwind classes are available. Use the cn() helper to merge conditional classes cleanly."
+shadcn,"Shadcn UI, Radix UI Primitives, Lucide React, class-variance-authority (cva)","Do not treat Shadcn as an external black-box npm package; customize component code directly in your components/ui folder to fit your DESIGN.md tokens."
+
