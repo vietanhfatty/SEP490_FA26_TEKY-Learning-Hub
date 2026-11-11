@@ -1,0 +1,12 @@
+rule_name,category,guideline
+Contrast Ratio Compliance,Accessibility,"Body text must meet at least 4.5:1 contrast ratio against its background. Large text (>=18pt or >=14pt bold) must meet at least 3:1."
+Touch Target Sizing,Mobile / Kids,"All interactive touch targets on touchscreens or for young students must measure at least 44x44px (or 48x48px) with at least 8px spacing between adjacent targets."
+Heading Proximity Ratio,Visual Rhythm,"Headings must always carry at least 2x more whitespace above them than below them to unambiguously bind to the section they introduce."
+Line Measure Bounding,Readability,"Paragraph text reading widths must be constrained between 65 and 75 characters (max-w-prose or max-width: 68ch) to prevent ocular fatigue."
+Tabular Numbers in Data,Tables / Timetable,"All columns containing numbers, prices, times, dates, or student codes must use tabular numerals (font-variant-numeric: tabular-nums) for vertical alignment."
+Zero Layout Shift Loading,Performance,"Always use skeleton screens or pre-allocated bounding dimensions for images/cards to achieve Cumulative Layout Shift (CLS) = 0."
+Empty State Recovery,Interaction,"Never show a blank white page when a list is empty. Provide an icon, friendly explanation, and a direct primary action (e.g. 'Create your first course')."
+Actionable Error Messages,Form UX,"Validation errors must sit directly below the offending input field, highlighted with a red border, an error icon, and specific plain-language guidance to resolve the issue."
+Secondary Text Surface Tinting,Color Harmonies,"Never use unstyled raw gray (#888) text on a colored or tinted surface. The secondary text must be tinted with the surface hue to prevent dirty optical artifacts."
+Keyboard Navigation & Focus,Accessibility,"Every interactive control must display a visible, high-contrast focus ring when focused via keyboard (focus-visible:ring-2 focus-visible:ring-offset-2)."
+

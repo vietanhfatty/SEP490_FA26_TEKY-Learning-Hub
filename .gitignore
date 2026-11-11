@@ -42,3 +42,5 @@ build/
 # OS generated
 .DS_Store
 Thumbs.db
+# Local docs
+PROJECT_STRUCTURE.md
