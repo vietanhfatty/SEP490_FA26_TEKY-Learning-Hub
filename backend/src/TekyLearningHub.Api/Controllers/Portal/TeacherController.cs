@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using TekyLearningHub.Application.DTOs;
 using TekyLearningHub.Application.Interfaces;
@@ -30,7 +33,7 @@ public class TeacherController : ControllerBase
     /// SCR-TEA-01: Lấy thông tin Bàn làm việc giáo viên, thời khóa biểu tuần & cảnh báo vắng mặt
     /// </summary>
     [HttpGet("workspace")]
-    public async Task<ActionResult<TeacherWorkspaceDto>> GetWorkspace([FromQuery] Guid teacherId, CancellationToken ct)
+    public async Task<ActionResult<TeacherWorkspaceDto>> GetWorkspace([FromQuery] int teacherId, CancellationToken ct)
     {
         var result = await _teacherService.GetTeacherWorkspaceAsync(teacherId, ct);
         return Ok(result);
@@ -39,8 +42,8 @@ public class TeacherController : ControllerBase
     /// <summary>
     /// SCR-TEA-02: Lấy danh sách điểm danh 1-chạm của buổi học
     /// </summary>
-    [HttpGet("attendance/{sessionId:guid}")]
-    public async Task<ActionResult<ClassAttendanceSessionDto>> GetSessionAttendance([FromRoute] Guid sessionId, CancellationToken ct)
+    [HttpGet("attendance/{sessionId:int}")]
+    public async Task<ActionResult<ClassAttendanceSessionDto>> GetSessionAttendance([FromRoute] int sessionId, CancellationToken ct)
     {
         var result = await _teacherService.GetSessionAttendanceAsync(sessionId, ct);
         return Ok(result);
@@ -50,7 +53,7 @@ public class TeacherController : ControllerBase
     /// SCR-TEA-02: Cập nhật điểm danh 1-chạm (Có mặt / Muộn / Vắng)
     /// </summary>
     [HttpPost("attendance/update")]
-    public async Task<ActionResult> UpdateAttendance([FromBody] UpdateClassAttendanceRequest request, [FromQuery] Guid teacherId, CancellationToken ct)
+    public async Task<ActionResult> UpdateAttendance([FromBody] UpdateClassAttendanceRequest request, [FromQuery] int teacherId, CancellationToken ct)
     {
         var success = await _teacherService.UpdateSessionAttendanceAsync(request, teacherId, ct);
         return Ok(new { success, message = "Cập nhật điểm danh thành công." });
@@ -60,9 +63,9 @@ public class TeacherController : ControllerBase
     /// SCR-TEA-02: Đồng bộ check-in tự động khi học sinh đăng nhập vào máy trạm phòng Lab
     /// </summary>
     [HttpPost("attendance/sync-workstation")]
-    public async Task<ActionResult> SyncWorkstationCheckIn([FromQuery] Guid classSessionId, [FromQuery] Guid studentId, [FromQuery] string workstationIp, CancellationToken ct)
+    public async Task<ActionResult> SyncWorkstationCheckIn([FromQuery] int sessionId, [FromQuery] int studentId, [FromQuery] string workstationIp, CancellationToken ct)
     {
-        var success = await _teacherService.SyncWorkstationCheckInAsync(classSessionId, studentId, workstationIp, ct);
+        var success = await _teacherService.SyncWorkstationCheckInAsync(sessionId, studentId, workstationIp, ct);
         return Ok(new { success, message = "Đã đồng bộ máy trạm thành công." });
     }
 
@@ -70,7 +73,7 @@ public class TeacherController : ControllerBase
     /// SCR-TEA-02: Duyệt đơn xin học bù của học sinh
     /// </summary>
     [HttpPost("makeup/review")]
-    public async Task<ActionResult> ReviewMakeupRequest([FromBody] ReviewMakeupRequestDto request, [FromQuery] Guid teacherId, CancellationToken ct)
+    public async Task<ActionResult> ReviewMakeupRequest([FromBody] ReviewMakeupRequestDto request, [FromQuery] int teacherId, CancellationToken ct)
     {
         var success = await _teacherService.ReviewMakeupRequestAsync(request, teacherId, ct);
         return Ok(new { success, message = "Đã xử lý đơn học bù thành công." });
@@ -79,20 +82,20 @@ public class TeacherController : ControllerBase
     /// <summary>
     /// SCR-TEA-03: Kích hoạt Chế độ tập trung phòng Lab (Khóa / Mở màn hình học sinh qua SignalR)
     /// </summary>
-    [HttpPost("classroom/{classroomId:guid}/focus-mode")]
-    public async Task<ActionResult> ToggleFocusMode([FromRoute] Guid classroomId, [FromQuery] bool isLocked, [FromQuery] string? message, CancellationToken ct)
+    [HttpPost("classroom/{classId:int}/focus-mode")]
+    public async Task<ActionResult> ToggleFocusMode([FromRoute] int classId, [FromQuery] bool isLocked, [FromQuery] string? message, CancellationToken ct)
     {
-        await _realtimeService.BroadcastFocusModeLockAsync(classroomId, isLocked, message, ct);
+        await _realtimeService.BroadcastFocusModeLockAsync(classId, isLocked, message, ct);
         return Ok(new { success = true, isLocked, message = isLocked ? "Đã khóa màn hình phòng Lab." : "Đã mở khóa màn hình phòng Lab." });
     }
 
     /// <summary>
     /// SCR-TEA-03: Chiếu sáng / Spotlight bài làm xuất sắc của học sinh lên toàn bộ phòng Lab
     /// </summary>
-    [HttpPost("classroom/{classroomId:guid}/spotlight")]
-    public async Task<ActionResult> BroadcastSpotlight([FromRoute] Guid classroomId, [FromQuery] Guid studentId, [FromQuery] string studentName, [FromBody] string screenPayload, CancellationToken ct)
+    [HttpPost("classroom/{classId:int}/spotlight")]
+    public async Task<ActionResult> BroadcastSpotlight([FromRoute] int classId, [FromQuery] int studentId, [FromQuery] string studentName, [FromBody] string screenPayload, CancellationToken ct)
     {
-        await _realtimeService.BroadcastSpotlightAsync(classroomId, studentId, studentName, screenPayload, ct);
+        await _realtimeService.BroadcastSpotlightAsync(classId, studentId, studentName, screenPayload, ct);
         return Ok(new { success = true, message = $"Đã phát sóng bài làm của {studentName} lên máy chiếu và máy trạm phòng Lab." });
     }
 
@@ -100,7 +103,7 @@ public class TeacherController : ControllerBase
     /// SCR-TEA-04: Tạo sa bàn bản đồ thử thách STEM mới
     /// </summary>
     [HttpPost("maps")]
-    public async Task<ActionResult<Guid>> CreateStemMap([FromBody] CreateStemMapRequest request, [FromQuery] Guid teacherId, CancellationToken ct)
+    public async Task<ActionResult<int>> CreateStemMap([FromBody] CreateStemMapRequest request, [FromQuery] int teacherId, CancellationToken ct)
     {
         var mapId = await _teacherService.CreateStemMapAsync(request, teacherId, ct);
         return Ok(new { mapId, message = "Tạo bản đồ sa bàn thành công." });
@@ -120,7 +123,7 @@ public class TeacherController : ControllerBase
     /// SCR-TEA-05: Chấm điểm Hybrid 60/40 (AST 60% + Rubric Quick-Pills 40% + Voice memo nhận xét)
     /// </summary>
     [HttpPost("grade")]
-    public async Task<ActionResult<SubmissionGradingResultDto>> GradeSubmission([FromBody] GradeSubmissionRequest request, [FromQuery] Guid teacherId, CancellationToken ct)
+    public async Task<ActionResult<SubmissionGradingResultDto>> GradeSubmission([FromBody] GradeSubmissionRequest request, [FromQuery] int teacherId, CancellationToken ct)
     {
         var result = await _teacherService.GradeSubmissionAsync(request, teacherId, ct);
         return Ok(result);
@@ -129,20 +132,20 @@ public class TeacherController : ControllerBase
     /// <summary>
     /// SCR-TEA-06: Phân tích hiệu suất lớp học & biểu đồ phân phối điểm số
     /// </summary>
-    [HttpGet("analytics/{classroomId:guid}")]
-    public async Task<ActionResult<ClassPerformanceAnalyticsDto>> GetClassAnalytics([FromRoute] Guid classroomId, CancellationToken ct)
+    [HttpGet("analytics/{classId:int}")]
+    public async Task<ActionResult<ClassPerformanceAnalyticsDto>> GetClassAnalytics([FromRoute] int classId, CancellationToken ct)
     {
-        var result = await _teacherService.GetClassPerformanceAnalyticsAsync(classroomId, ct);
+        var result = await _teacherService.GetClassPerformanceAnalyticsAsync(classId, ct);
         return Ok(result);
     }
 
     /// <summary>
     /// SCR-TEA-06: Xuất toàn bộ sổ điểm ra file Excel ClosedXML chuẩn TEKY
     /// </summary>
-    [HttpGet("export-excel/{classroomId:guid}")]
-    public async Task<IActionResult> ExportGradebookExcel([FromRoute] Guid classroomId, CancellationToken ct)
+    [HttpGet("export-excel/{classId:int}")]
+    public async Task<IActionResult> ExportGradebookExcel([FromRoute] int classId, CancellationToken ct)
     {
-        var fileBytes = await _excelExportService.ExportClassGradebookAsync(classroomId, ct);
+        var fileBytes = await _excelExportService.ExportClassGradebookAsync(classId, ct);
         var fileName = $"Bang_Diem_TEKY_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }

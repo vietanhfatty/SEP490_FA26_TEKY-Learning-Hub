@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using TekyLearningHub.Application.DTOs;
 using TekyLearningHub.Application.Interfaces;
@@ -24,19 +28,19 @@ public class ParentController : ControllerBase
     /// SCR-PAR-01: Bảng điều khiển phụ huynh & Chuyển đổi nhanh giữa các con (Multi-Child Switcher)
     /// </summary>
     [HttpGet("dashboard")]
-    public async Task<ActionResult<ParentDashboardDto>> GetDashboard([FromQuery] Guid parentId, CancellationToken ct)
+    public async Task<ActionResult<ParentDashboardDto>> GetDashboard([FromQuery] int parentId, CancellationToken ct)
     {
         var result = await _parentService.GetParentDashboardAsync(parentId, ct);
         return Ok(result);
     }
 
     /// <summary>
-    /// SCR-PAR-02: Xem sổ liên lạc điện tử & tiến độ học tập (Hybrid Progress 60/40, Voice Memo GV)
+    /// SCR-PAR-02: Xem sổ liên lạc điện tử & tiến độ học tập (Hybrid Progress 60/40)
     /// </summary>
     [HttpGet("contact-book")]
     public async Task<ActionResult<List<EContactBookItemDto>>> GetContactBook(
-        [FromQuery] Guid studentId,
-        [FromQuery] Guid parentId,
+        [FromQuery] int studentId,
+        [FromQuery] int parentId,
         CancellationToken ct)
     {
         var result = await _parentService.GetChildContactBookHistoryAsync(studentId, parentId, ct);
@@ -49,7 +53,7 @@ public class ParentController : ControllerBase
     [HttpPost("feedback")]
     public async Task<ActionResult> SubmitFeedback(
         [FromBody] SubmitParentFeedbackRequest request,
-        [FromQuery] Guid parentId,
+        [FromQuery] int parentId,
         CancellationToken ct)
     {
         var success = await _parentService.SubmitParentFeedbackAsync(request, parentId, ct);
@@ -61,11 +65,11 @@ public class ParentController : ControllerBase
     /// </summary>
     [HttpGet("audio-digest")]
     public async Task<ActionResult> GetAudioDigestText(
-        [FromQuery] Guid classSessionId,
-        [FromQuery] Guid studentId,
+        [FromQuery] int sessionId,
+        [FromQuery] int studentId,
         CancellationToken ct)
     {
-        var summaryText = await _aiAssistantService.GenerateParentAudioDigestTextAsync(classSessionId, studentId, ct);
+        var summaryText = await _aiAssistantService.GenerateParentAudioDigestTextAsync(sessionId, studentId, ct);
         return Ok(new { summaryText });
     }
 
@@ -84,9 +88,9 @@ public class ParentController : ControllerBase
     /// <summary>
     /// SCR-PAR-03: Xem danh sách sản phẩm STEM số hóa của con
     /// </summary>
-    [HttpGet("portfolios/{studentId:guid}")]
+    [HttpGet("portfolios/{studentId:int}")]
     public async Task<ActionResult<List<StudentPortfolioDetailDto>>> GetPortfolios(
-        [FromRoute] Guid studentId,
+        [FromRoute] int studentId,
         CancellationToken ct)
     {
         var result = await _parentService.GetStudentPortfoliosAsync(studentId, ct);
@@ -96,12 +100,12 @@ public class ParentController : ControllerBase
     /// <summary>
     /// CRON-03: Xem Bảng xếp hạng Top 10 của lớp tuần này
     /// </summary>
-    [HttpGet("leaderboard/{classroomId:guid}")]
+    [HttpGet("leaderboard/{classId:int}")]
     public async Task<ActionResult<ClassLeaderboardDto>> GetLeaderboard(
-        [FromRoute] Guid classroomId,
+        [FromRoute] int classId,
         CancellationToken ct)
     {
-        var result = await _parentService.GetClassLeaderboardAsync(classroomId, ct);
+        var result = await _parentService.GetClassLeaderboardAsync(classId, ct);
         return Ok(result);
     }
 }

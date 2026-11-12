@@ -47,7 +47,7 @@ public class AstAnalysisServiceTests
         var score = _service.CalculateTreeEditDistanceScore(json, json);
 
         // Assert
-        Assert.Equal(10.0, score);
+        Assert.Equal(10.0m, score);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class AstAnalysisServiceTests
         var score = _service.CalculateTreeEditDistanceScore(jsonStudent, jsonMaster);
 
         // Assert
-        Assert.True(score >= 0.0 && score <= 10.0);
+        Assert.True(score >= 0.0m && score <= 10.0m);
     }
 
     [Theory]
@@ -78,9 +78,9 @@ public class AstAnalysisServiceTests
     public void HybridScore_Calculates60AstAnd40Rubric_Accurately(double astScore, double rubricScore, double expected)
     {
         // Act
-        var result = _service.ComputeHybridScore(astScore, rubricScore);
+        var result = _service.ComputeHybridScore((decimal)astScore, (decimal)rubricScore);
 
         // Assert
-        Assert.Equal(expected, result);
+        Assert.Equal((decimal)expected, result);
     }
 }

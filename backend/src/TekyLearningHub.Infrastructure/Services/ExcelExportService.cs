@@ -1,7 +1,11 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.Interfaces;
-using TekyLearningHub.Domain.Enums;
 
 namespace TekyLearningHub.Infrastructure.Services;
 
@@ -14,17 +18,19 @@ public class ExcelExportService : IExcelExportService
         _context = context;
     }
 
-    public async Task<byte[]> ExportClassGradebookAsync(Guid classId, CancellationToken cancellationToken = default)
+    public async Task<byte[]> ExportClassGradebookAsync(int classId, CancellationToken cancellationToken = default)
     {
-        var classroom = await _context.Classrooms
+        var classroom = await _context.Classes
             .AsNoTracking()
             .Include(c => c.Teacher)
-            .Include(c => c.Students)
-                .ThenInclude(cs => cs.Student)
+                .ThenInclude(t => t!.User)
+            .Include(c => c.Enrollments)
+                .ThenInclude(e => e.Student)
+                    .ThenInclude(s => s.User)
             .Include(c => c.Assignments)
                 .ThenInclude(a => a.Submissions)
-                    .ThenInclude(s => s.RubricDetail)
-            .FirstOrDefaultAsync(c => c.Id == classId, cancellationToken)
+                    .ThenInclude(s => s.Grade)
+            .FirstOrDefaultAsync(c => c.ClassId == classId, cancellationToken)
             ?? throw new KeyNotFoundException("Không tìm thấy thông tin lớp học.");
 
         using var workbook = new XLWorkbook();
@@ -32,15 +38,15 @@ public class ExcelExportService : IExcelExportService
 
         // Brand Title Header
         worksheet.Cell(1, 1).Value = "HỌC VIỆN SÁNG TẠO CÔNG NGHỆ TEKY - BẢNG ĐIỂM THỰC HÀNH STEM & AST";
-        worksheet.Range(1, 1, 1, 8).Merge().Style
+        worksheet.Range(1, 1, 1, 7).Merge().Style
             .Font.SetBold(true)
             .Font.SetFontSize(14)
             .Font.SetFontColor(XLColor.White)
             .Fill.SetBackgroundColor(XLColor.FromHtml("#2563EB"))
             .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
 
-        worksheet.Cell(2, 1).Value = $"Lớp: {classroom.Name} ({classroom.ClassCode}) | Giáo viên: {classroom.Teacher.FullName} | Xuất ngày: {DateTime.Now:dd/MM/yyyy HH:mm}";
-        worksheet.Range(2, 1, 2, 8).Merge().Style
+        worksheet.Cell(2, 1).Value = $"Lớp: {classroom.Name} ({classroom.ClassCode}) | Giáo viên: {classroom.Teacher?.User.FullName ?? "Chưa phân công"} | Xuất ngày: {DateTime.Now:dd/MM/yyyy HH:mm}";
+        worksheet.Range(2, 1, 2, 7).Merge().Style
             .Font.SetItalic(true)
             .Font.SetFontSize(10)
             .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
@@ -48,7 +54,7 @@ public class ExcelExportService : IExcelExportService
         // Column Headers
         var headers = new[]
         {
-            "STT", "Mã Học Sinh", "Họ và Tên", "Điểm AST (60%)", "Lắp ráp", "Giải thích", "Teamwork", "Tổng kết (60/40)"
+            "STT", "Mã Học Sinh", "Họ và Tên", "Điểm AST (60%)", "Điểm Phần Cứng (40%)", "Tổng Kết (60/40)", "Trạng Thái"
         };
 
         for (int i = 0; i < headers.Length; i++)
@@ -65,33 +71,31 @@ public class ExcelExportService : IExcelExportService
         int row = 5;
         int stt = 1;
 
-        var activeStudents = classroom.Students.Where(cs => cs.IsActive).OrderBy(cs => cs.Student.FullName).ToList();
+        var activeStudents = classroom.Enrollments.Where(e => e.Status == "Enrolled").OrderBy(e => e.Student.User.FullName).ToList();
         foreach (var item in activeStudents)
         {
             var student = item.Student;
-            // Get latest graded submission
+            // Latest graded submission
             var submission = classroom.Assignments
                 .SelectMany(a => a.Submissions)
-                .Where(s => s.StudentId == student.Id && s.Status == SubmissionStatus.Graded)
+                .Where(s => s.StudentId == student.UserId && s.Grade != null)
                 .OrderByDescending(s => s.SubmittedAt)
                 .FirstOrDefault();
 
             worksheet.Cell(row, 1).Value = stt++;
             worksheet.Cell(row, 2).Value = student.StudentCode;
-            worksheet.Cell(row, 3).Value = student.FullName;
+            worksheet.Cell(row, 3).Value = student.User.FullName;
 
-            if (submission != null)
+            if (submission?.Grade != null)
             {
-                worksheet.Cell(row, 4).Value = submission.AstAutoScore;
-                worksheet.Cell(row, 5).Value = submission.RubricDetail?.AssemblyScore ?? 0;
-                worksheet.Cell(row, 6).Value = submission.RubricDetail?.AlgorithmExplainScore ?? 0;
-                worksheet.Cell(row, 7).Value = submission.RubricDetail?.TeamworkScore ?? 0;
-                worksheet.Cell(row, 8).Value = submission.TotalScore;
+                worksheet.Cell(row, 4).Value = submission.Grade.AutoAstScore ?? 0m;
+                worksheet.Cell(row, 5).Value = submission.Grade.HardwareScore ?? 0m;
+                worksheet.Cell(row, 6).Value = submission.Grade.FinalScore ?? 0m;
+                worksheet.Cell(row, 7).Value = submission.Grade.FinalScore >= 8.5m ? "Xuất sắc" : submission.Grade.FinalScore >= 7.0m ? "Khá" : "Đạt";
 
-                // Highlight high achievers
-                if (submission.TotalScore >= 8.5)
+                if (submission.Grade.FinalScore >= 8.5m)
                 {
-                    worksheet.Cell(row, 8).Style.Font.SetBold(true).Font.SetFontColor(XLColor.FromHtml("#16A34A"));
+                    worksheet.Cell(row, 6).Style.Font.SetBold(true).Font.SetFontColor(XLColor.FromHtml("#16A34A"));
                 }
             }
             else
@@ -99,11 +103,10 @@ public class ExcelExportService : IExcelExportService
                 worksheet.Cell(row, 4).Value = "-";
                 worksheet.Cell(row, 5).Value = "-";
                 worksheet.Cell(row, 6).Value = "-";
-                worksheet.Cell(row, 7).Value = "-";
-                worksheet.Cell(row, 8).Value = "Chưa nộp";
+                worksheet.Cell(row, 7).Value = "Chưa hoàn thành";
             }
 
-            for (int col = 1; col <= 8; col++)
+            for (int col = 1; col <= 7; col++)
             {
                 worksheet.Cell(row, col).Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
                 if (col != 3)

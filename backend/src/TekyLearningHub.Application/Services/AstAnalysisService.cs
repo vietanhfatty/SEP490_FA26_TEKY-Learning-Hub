@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Xml.Linq;
 using TekyLearningHub.Application.Interfaces;
@@ -104,11 +107,11 @@ public class AstAnalysisService : IAstAnalysisService
         });
     }
 
-    public double CalculateTreeEditDistanceScore(string studentAstJson, string masterAstJson)
+    public decimal CalculateTreeEditDistanceScore(string studentAstJson, string masterAstJson)
     {
         if (string.IsNullOrWhiteSpace(studentAstJson) || string.IsNullOrWhiteSpace(masterAstJson))
         {
-            return 0.0;
+            return 0.0m;
         }
 
         try
@@ -118,7 +121,7 @@ public class AstAnalysisService : IAstAnalysisService
 
             if (studentAst == null || masterAst == null)
             {
-                return 0.0;
+                return 0.0m;
             }
 
             // Zhang-Shasha Algorithm
@@ -129,24 +132,24 @@ public class AstAnalysisService : IAstAnalysisService
             int masterSize = CountNodes(masterAst);
             int maxSize = Math.Max(studentSize, masterSize);
 
-            if (maxSize == 0) return 10.0;
+            if (maxSize == 0) return 10.0m;
 
             double ratio = 1.0 - (double)distance / maxSize;
             if (ratio < 0) ratio = 0;
 
-            return Math.Round(ratio * 10.0, 2);
+            return Math.Round((decimal)ratio * 10.0m, 2);
         }
         catch
         {
-            return 5.0; // Fallback median score on parse anomaly
+            return 5.0m;
         }
     }
 
-    public double ComputeHybridScore(double astAutoScore, double rubricScore)
+    public decimal ComputeHybridScore(decimal astAutoScore, decimal rubricScore)
     {
         // 60% AST Auto Score + 40% Qualitative Rubric
-        var total = (astAutoScore * 0.6) + (rubricScore * 0.4);
-        return Math.Round(Math.Clamp(total, 0.0, 10.0), 2);
+        var total = (astAutoScore * 0.6m) + (rubricScore * 0.4m);
+        return Math.Round(Math.Clamp(total, 0.0m, 10.0m), 2);
     }
 
     private int CountNodes(AstNode node)
@@ -159,7 +162,6 @@ public class AstAnalysisService : IAstAnalysisService
         return count;
     }
 
-    // Zhang-Shasha Algorithm Implementation
     private class ZhangShashaMatcher
     {
         private class FlattenedNode
@@ -220,7 +222,6 @@ public class AstAnalysisService : IAstAnalysisService
             var keyRoots = new HashSet<int>();
             for (int i = 0; i < list.Count; i++)
             {
-                int l = list[i].LeftmostLeaf;
                 keyRoots.Add(i + 1);
             }
             return keyRoots.OrderBy(x => x).ToList();
@@ -235,12 +236,12 @@ public class AstAnalysisService : IAstAnalysisService
 
             for (int x = 1; x <= i - l1 + 1; x++)
             {
-                fd[x, 0] = fd[x - 1, 0] + 1; // deletion cost = 1
+                fd[x, 0] = fd[x - 1, 0] + 1;
             }
 
             for (int y = 1; y <= j - l2 + 1; y++)
             {
-                fd[0, y] = fd[0, y - 1] + 1; // insertion cost = 1
+                fd[0, y] = fd[0, y - 1] + 1;
             }
 
             for (int x = 1; x <= i - l1 + 1; x++)

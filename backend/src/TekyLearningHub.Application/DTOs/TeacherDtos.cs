@@ -1,10 +1,11 @@
-using TekyLearningHub.Domain.Enums;
+using System;
+using System.Collections.Generic;
 
 namespace TekyLearningHub.Application.DTOs;
 
 public class TeacherWorkspaceDto
 {
-    public Guid TeacherId { get; set; }
+    public int TeacherId { get; set; }
     public string TeacherName { get; set; } = string.Empty;
     public int PendingTaskCount { get; set; }
     public int ActiveClassesCount { get; set; }
@@ -14,128 +15,123 @@ public class TeacherWorkspaceDto
 
 public class TeacherScheduleSessionDto
 {
-    public Guid SessionId { get; set; }
-    public Guid ClassroomId { get; set; }
+    public int SessionId { get; set; }
+    public int ClassId { get; set; }
     public string ClassCode { get; set; } = string.Empty;
     public string ClassName { get; set; } = string.Empty;
     public int SessionNumber { get; set; }
     public string Title { get; set; } = string.Empty;
-    public DateTime ScheduledDate { get; set; }
+    public DateOnly SessionDate { get; set; }
     public string StartTime { get; set; } = string.Empty;
     public string EndTime { get; set; } = string.Empty;
     public string RoomName { get; set; } = string.Empty;
-    public ClassSessionStatus Status { get; set; }
+    public string Status { get; set; } = string.Empty;
     public int EnrolledStudentsCount { get; set; }
     public int PresentCount { get; set; }
 }
 
 public class AbsentAlertDto
 {
-    public Guid StudentId { get; set; }
+    public int StudentId { get; set; }
     public string StudentName { get; set; } = string.Empty;
     public string ClassCode { get; set; } = string.Empty;
-    public DateTime Date { get; set; }
+    public DateOnly Date { get; set; }
     public string Reason { get; set; } = "Chưa có mặt";
 }
 
 public class ClassAttendanceSessionDto
 {
-    public Guid SessionId { get; set; }
+    public int SessionId { get; set; }
     public string ClassName { get; set; } = string.Empty;
-    public DateTime Date { get; set; }
+    public DateOnly Date { get; set; }
     public List<StudentAttendanceItemDto> Students { get; set; } = new();
 }
 
 public class StudentAttendanceItemDto
 {
-    public Guid AttendanceId { get; set; }
-    public Guid StudentId { get; set; }
+    public long AttendanceId { get; set; }
+    public int StudentId { get; set; }
     public string StudentCode { get; set; } = string.Empty;
     public string StudentName { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
-    public AttendanceStatus Status { get; set; }
-    public AttendanceSource Source { get; set; }
-    public DateTime? CheckInTime { get; set; }
-    public string? WorkstationIp { get; set; }
-    public string? Notes { get; set; }
+    public string Status { get; set; } = "Absent"; // Present, Late, Absent, Excused
+    public string? AbsenceReason { get; set; }
+    public DateTime? MarkedAt { get; set; }
 }
 
 public class UpdateAttendanceItemRequest
 {
-    public Guid StudentId { get; set; }
-    public AttendanceStatus Status { get; set; }
-    public string? Notes { get; set; }
+    public int StudentId { get; set; }
+    public string Status { get; set; } = "Present";
+    public string? Reason { get; set; }
 }
 
 public class UpdateClassAttendanceRequest
 {
-    public Guid SessionId { get; set; }
+    public int SessionId { get; set; }
     public List<UpdateAttendanceItemRequest> AttendanceList { get; set; } = new();
 }
 
 public class ReviewMakeupRequestDto
 {
-    public Guid RequestId { get; set; }
+    public int MakeupId { get; set; }
     public bool IsApproved { get; set; }
     public string? TeacherNote { get; set; }
 }
 
 public class CreateStemMapRequest
 {
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public string ImageUrl { get; set; } = string.Empty;
-    public int GridWidth { get; set; } = 10;
-    public int GridHeight { get; set; } = 10;
-    public int ParTimeSeconds { get; set; } = 60;
+    public string Name { get; set; } = string.Empty;
+    public string? Theme { get; set; }
+    public string LayoutJson { get; set; } = "{}";
+    public int StartX { get; set; } = 0;
+    public int StartY { get; set; } = 0;
     public List<CreateMapCheckpointDto> Checkpoints { get; set; } = new();
 }
 
 public class CreateMapCheckpointDto
 {
-    public int OrderIndex { get; set; }
-    public double CoordinateX { get; set; }
-    public double CoordinateY { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string? QuestionPrompt { get; set; }
+    public int SeqNo { get; set; }
+    public int X { get; set; }
+    public int Y { get; set; }
+    public string? UnlockMessage { get; set; }
+    public bool IsFinish { get; set; } = false;
 }
 
 public class GradeSubmissionRequest
 {
-    public Guid SubmissionId { get; set; }
-    public double AssemblyScore { get; set; }         // 0 - 10
-    public double AlgorithmExplainScore { get; set; } // 0 - 10
-    public double TeamworkScore { get; set; }         // 0 - 10
-    public string? TeacherNote { get; set; }
-    public string? VoiceMemoUrl { get; set; }
-    public string? VoiceMemoTranscript { get; set; }
+    public long SubmissionId { get; set; }
+    public decimal AssemblyScore { get; set; }         // 0 - 10
+    public decimal AlgorithmExplainScore { get; set; } // 0 - 10
+    public decimal TeamworkScore { get; set; }         // 0 - 10
+    public string? RemarkText { get; set; }
+    public string? RemarkSource { get; set; }          // "Text", "Voice"
 }
 
 public class SubmissionGradingResultDto
 {
-    public Guid SubmissionId { get; set; }
-    public double AstAutoScore { get; set; }
-    public double RubricScore { get; set; }
-    public double TotalScore { get; set; }
+    public long SubmissionId { get; set; }
+    public decimal AutoAstScore { get; set; }
+    public decimal HardwareScore { get; set; }
+    public decimal FinalScore { get; set; }
     public string Status { get; set; } = string.Empty;
 }
 
 public class ClassPerformanceAnalyticsDto
 {
-    public Guid ClassroomId { get; set; }
+    public int ClassId { get; set; }
     public string ClassName { get; set; } = string.Empty;
     public int TotalStudents { get; set; }
-    public double AverageScore { get; set; }
-    public double MinScore { get; set; }
-    public double MaxScore { get; set; }
-    public double AssemblyAverage { get; set; }
-    public double AlgorithmAverage { get; set; }
-    public double TeamworkAverage { get; set; }
+    public decimal AverageScore { get; set; }
+    public decimal MinScore { get; set; }
+    public decimal MaxScore { get; set; }
+    public decimal HardwareAverage { get; set; }
+    public decimal AstAverage { get; set; }
     public List<ScoreDistributionBucketDto> ScoreBuckets { get; set; } = new();
 }
 
 public class ScoreDistributionBucketDto
 {
-    public string Range { get; set; } = string.Empty; // "0-5", "5-7", "7-8.5", "8.5-10"
+    public string Range { get; set; } = string.Empty;
     public int Count { get; set; }
 }

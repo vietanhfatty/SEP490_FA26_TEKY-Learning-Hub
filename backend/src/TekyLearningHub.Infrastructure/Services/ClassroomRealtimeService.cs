@@ -1,6 +1,8 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
 using TekyLearningHub.Application.Interfaces;
-using TekyLearningHub.Domain.Enums;
 using TekyLearningHub.Infrastructure.Hubs;
 
 namespace TekyLearningHub.Infrastructure.Services;
@@ -18,7 +20,7 @@ public class ClassroomRealtimeService : IClassroomRealtimeService
         _cheerHub = cheerHub;
     }
 
-    public async Task BroadcastFocusModeLockAsync(Guid classId, bool isLocked, string? message, CancellationToken cancellationToken = default)
+    public async Task BroadcastFocusModeLockAsync(int classId, bool isLocked, string? message, CancellationToken cancellationToken = default)
     {
         await _classroomHub.Clients.Group($"class_{classId}").SendAsync("OnFocusModeChanged", new
         {
@@ -28,7 +30,7 @@ public class ClassroomRealtimeService : IClassroomRealtimeService
         }, cancellationToken);
     }
 
-    public async Task BroadcastSpotlightAsync(Guid classId, Guid studentId, string studentName, string screenPayload, CancellationToken cancellationToken = default)
+    public async Task BroadcastSpotlightAsync(int classId, int studentId, string studentName, string screenPayload, CancellationToken cancellationToken = default)
     {
         await _classroomHub.Clients.Group($"class_{classId}").SendAsync("OnScreenSpotlight", new
         {
@@ -39,7 +41,7 @@ public class ClassroomRealtimeService : IClassroomRealtimeService
         }, cancellationToken);
     }
 
-    public async Task NotifyWorkstationCheckInAsync(Guid classId, Guid studentId, string studentName, string workstationIp, CancellationToken cancellationToken = default)
+    public async Task NotifyWorkstationCheckInAsync(int classId, int studentId, string studentName, string workstationIp, CancellationToken cancellationToken = default)
     {
         await _classroomHub.Clients.Group($"class_{classId}").SendAsync("OnWorkstationCheckIn", new
         {
@@ -50,13 +52,12 @@ public class ClassroomRealtimeService : IClassroomRealtimeService
         }, cancellationToken);
     }
 
-    public async Task SendCheerConfettiAsync(Guid classId, Guid studentId, CheerStickerType stickerType, string message, CancellationToken cancellationToken = default)
+    public async Task SendCheerConfettiAsync(int classId, int studentId, string stickerCode, string message, CancellationToken cancellationToken = default)
     {
-        // Broadcast to student specific channel and class room
         await _cheerHub.Clients.Group($"student_{studentId}").SendAsync("OnCheerConfettiExplosion", new
         {
             StudentId = studentId,
-            Sticker = stickerType.ToString(),
+            Sticker = stickerCode,
             Message = message,
             TriggerConfetti = true,
             Timestamp = DateTime.UtcNow
@@ -65,7 +66,7 @@ public class ClassroomRealtimeService : IClassroomRealtimeService
         await _classroomHub.Clients.Group($"class_{classId}").SendAsync("OnStudentCheered", new
         {
             StudentId = studentId,
-            Sticker = stickerType.ToString(),
+            Sticker = stickerCode,
             Timestamp = DateTime.UtcNow
         }, cancellationToken);
     }

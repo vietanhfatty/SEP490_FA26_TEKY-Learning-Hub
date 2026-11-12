@@ -1,7 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
-using TekyLearningHub.Domain.Enums;
 
 namespace TekyLearningHub.Infrastructure.Services;
 
@@ -16,22 +20,20 @@ public class AiAssistantService : IAiAssistantService
 
     public Task<GeneratedMapResultDto> GenerateStemMapAndQuestAsync(string teacherPrompt, CancellationToken cancellationToken = default)
     {
-        // High-fidelity structured STEM map generation
-        // Supports generative AI fallback with intelligent procedural generation
-        var cleanPrompt = string.IsNullOrWhiteSpace(teacherPrompt) ? "Thử thách lập trình vượt chướng ngại vật cơ bản" : teacherPrompt;
+        var cleanPrompt = string.IsNullOrWhiteSpace(teacherPrompt) ? "Thử thách lập trình xe robot vượt mê cung cơ bản" : teacherPrompt;
 
         var result = new GeneratedMapResultDto
         {
-            Title = $"Sa bàn AI: {cleanPrompt}",
-            Description = $"Nhiệm vụ được tạo tự động bởi TEKY AI Engine dựa trên yêu cầu: '{cleanPrompt}'",
-            GridWidth = 12,
-            GridHeight = 12,
-            ParTimeSeconds = 75,
+            Name = $"Sa bàn AI: {cleanPrompt}",
+            Theme = "SpaceMission",
+            LayoutJson = "{\"gridWidth\":12,\"gridHeight\":12,\"obstacles\":[{\"x\":3,\"y\":4},{\"x\":7,\"y\":8}]}",
+            StartX = 1,
+            StartY = 1,
             Checkpoints = new List<GeneratedCheckpointDto>
             {
-                new() { OrderIndex = 1, X = 2, Y = 3, Name = "Trạm Khởi Động Alpha", QuestionPrompt = "Điều khiển Robot vượt qua đoạn cua gắt đầu tiên bằng lệnh quay 90 độ." },
-                new() { OrderIndex = 2, X = 6, Y = 7, Name = "Trạm Cảm Biến Beta", QuestionPrompt = "Sử dụng cảm biến siêu âm phát hiện vật cản ở cự ly dưới 15cm." },
-                new() { OrderIndex = 3, X = 10, Y = 10, Name = "Vạch Đích Omega", QuestionPrompt = "Kích hoạt đèn LED báo hiệu hoàn thành thử thách và dừng động cơ." }
+                new() { SeqNo = 1, X = 3, Y = 5, UnlockMessage = "Trạm 1: Khởi động cảm biến siêu âm thành công!", IsFinish = false },
+                new() { SeqNo = 2, X = 7, Y = 9, UnlockMessage = "Trạm 2: Vượt chướng ngại vật ma trận!", IsFinish = false },
+                new() { SeqNo = 3, X = 11, Y = 11, UnlockMessage = "Vạch đích: Chúc mừng bạn đã hoàn thành xuất sắc!", IsFinish = true }
             },
             MasterBlocklyXml = "<xml><block type=\"robot_start\"><next><block type=\"robot_move_forward\"><field name=\"STEPS\">5</field><next><block type=\"robot_turn_right\"></block></next></block></next></block></xml>"
         };
@@ -39,29 +41,30 @@ public class AiAssistantService : IAiAssistantService
         return Task.FromResult(result);
     }
 
-    public async Task<string> GenerateParentAudioDigestTextAsync(Guid classSessionId, Guid studentId, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateParentAudioDigestTextAsync(int sessionId, int studentId, CancellationToken cancellationToken = default)
     {
         var session = await _context.ClassSessions
             .AsNoTracking()
-            .Include(s => s.Classroom)
-            .FirstOrDefaultAsync(s => s.Id == classSessionId, cancellationToken);
+            .Include(s => s.Class)
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
 
-        var student = await _context.Students
+        var student = await _context.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == studentId, cancellationToken);
+            .FirstOrDefaultAsync(u => u.UserId == studentId, cancellationToken);
 
-        var submission = await _context.StudentSubmissions
+        var grade = await _context.Grades
             .AsNoTracking()
-            .Where(s => s.StudentId == studentId && s.ClassSessionId == classSessionId)
-            .OrderByDescending(s => s.SubmittedAt)
+            .Include(g => g.Submission)
+            .Where(g => g.Submission.StudentId == studentId && g.Submission.Assignment.ClassId == (session != null ? session.ClassId : 0))
+            .OrderByDescending(g => g.FinalizedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
         var studentName = student?.FullName ?? "con";
-        var className = session?.Classroom.Name ?? "lớp STEM";
-        var score = submission?.TotalScore ?? 9.0;
+        var className = session?.Class.Name ?? "lớp STEM";
+        var score = grade?.FinalScore ?? 9.0m;
 
         return $"Chào phụ huynh của {studentName}! Hôm nay tại {className}, {studentName} đã học tập rất tích cực. " +
-               $"Con đã hoàn thành xuất sắc thử thách lập trình sa bàn thực hành với số điểm ấn tượng {score:F1}/10. " +
+               $"Con đã hoàn thành thử thách lập trình sa bàn thực hành với số điểm ấn tượng {score:F1}/10. " +
                $"Giáo viên đánh giá cao khả năng tư duy thuật toán và sự sáng tạo của con. Cảm ơn bố mẹ đã luôn đồng hành cùng TEKY!";
     }
 }
@@ -75,22 +78,21 @@ public class NotificationService : INotificationService
         _context = context;
     }
 
-    public async Task SendMultiChannelNotificationAsync(string recipientUserId, NotificationType type, string title, string body, string? payloadJson = null, CancellationToken cancellationToken = default)
+    public async Task SendNotificationAsync(int recipientUserId, string type, string title, string body, string? refType = null, long? refId = null, CancellationToken cancellationToken = default)
     {
-        var log = new NotificationLog
+        var notification = new Notification
         {
-            Id = Guid.NewGuid(),
-            RecipientUserId = recipientUserId,
+            RecipientId = recipientUserId,
             Type = type,
-            Channel = NotificationChannel.InAppSignalR,
             Title = title,
             Body = body,
-            PayloadJson = payloadJson,
-            IsSent = true,
-            SentAt = DateTime.UtcNow
+            RefType = refType,
+            RefId = refId,
+            IsRead = false,
+            CreatedAt = DateTime.UtcNow
         };
 
-        await _context.NotificationLogs.AddAsync(log, cancellationToken);
+        await _context.Notifications.AddAsync(notification, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
 }

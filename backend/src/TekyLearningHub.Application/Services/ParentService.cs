@@ -1,20 +1,24 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.DTOs;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
-using TekyLearningHub.Domain.Enums;
 
 namespace TekyLearningHub.Application.Services;
 
 public interface IParentService
 {
-    Task<ParentDashboardDto> GetParentDashboardAsync(Guid parentId, CancellationToken ct = default);
-    Task<List<EContactBookItemDto>> GetChildContactBookHistoryAsync(Guid studentId, Guid parentId, CancellationToken ct = default);
-    Task<bool> SubmitParentFeedbackAsync(SubmitParentFeedbackRequest request, Guid parentId, CancellationToken ct = default);
+    Task<ParentDashboardDto> GetParentDashboardAsync(int parentId, CancellationToken ct = default);
+    Task<List<EContactBookItemDto>> GetChildContactBookHistoryAsync(int studentId, int parentId, CancellationToken ct = default);
+    Task<bool> SubmitParentFeedbackAsync(SubmitParentFeedbackRequest request, int parentId, CancellationToken ct = default);
     Task<bool> SendCheerMessageAsync(SendCheerMessageRequest request, CancellationToken ct = default);
-    Task<List<StudentPortfolioDetailDto>> GetStudentPortfoliosAsync(Guid studentId, CancellationToken ct = default);
-    Task<StudentPortfolioDetailDto> GetPublicPortfolioByQrKeyAsync(string qrKey, CancellationToken ct = default);
-    Task<ClassLeaderboardDto> GetClassLeaderboardAsync(Guid classroomId, CancellationToken ct = default);
+    Task<List<StudentPortfolioDetailDto>> GetStudentPortfoliosAsync(int studentId, CancellationToken ct = default);
+    Task<StudentPortfolioDetailDto> GetPublicPortfolioByQrTokenAsync(Guid qrToken, CancellationToken ct = default);
+    Task<ClassLeaderboardDto> GetClassLeaderboardAsync(int classId, CancellationToken ct = default);
 }
 
 public class ParentService : IParentService
@@ -30,107 +34,125 @@ public class ParentService : IParentService
         _realtimeService = realtimeService;
     }
 
-    public async Task<ParentDashboardDto> GetParentDashboardAsync(Guid parentId, CancellationToken ct = default)
+    public async Task<ParentDashboardDto> GetParentDashboardAsync(int parentId, CancellationToken ct = default)
     {
-        var parent = await _context.Parents
+        var parentUser = await _context.Users
             .AsNoTracking()
-            .Include(p => p.StudentRelations)
-                .ThenInclude(r => r.Student)
-                    .ThenInclude(s => s.ClassEnrollments)
-                        .ThenInclude(ce => ce.Classroom)
-            .FirstOrDefaultAsync(p => p.Id == parentId, ct)
+            .FirstOrDefaultAsync(u => u.UserId == parentId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy thông tin phụ huynh.");
 
+        var links = await _context.ParentStudentLinks
+            .AsNoTracking()
+            .Where(l => l.ParentId == parentId && l.Status == "Active")
+            .Include(l => l.Student)
+                .ThenInclude(s => s.User)
+            .Include(l => l.Student)
+                .ThenInclude(s => s.Enrollments)
+                    .ThenInclude(e => e.Class)
+                        .ThenInclude(c => c.Sessions)
+                            .ThenInclude(ses => ses.Room)
+            .ToListAsync(ct);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var childrenList = new List<ChildOverviewDto>();
-        var today = DateTime.UtcNow.Date;
 
-        foreach (var rel in parent.StudentRelations)
+        foreach (var link in links)
         {
-            var student = rel.Student;
-            var activeClass = student.ClassEnrollments.FirstOrDefault(ce => ce.IsActive)?.Classroom;
+            var student = link.Student;
+            var activeClass = student.Enrollments.FirstOrDefault(e => e.Status == "Enrolled")?.Class;
 
-            var todayAttendance = await _context.Attendances
+            var todayAttendance = await _context.AttendanceRecords
                 .AsNoTracking()
-                .Include(a => a.ClassSession)
-                .Where(a => a.StudentId == student.Id && a.ClassSession.ScheduledDate.Date == today)
+                .Include(a => a.Session)
+                .Where(a => a.StudentId == student.UserId && a.Session.SessionDate == today)
                 .FirstOrDefaultAsync(ct);
 
-            bool isInActive = todayAttendance?.ClassSession?.Status == ClassSessionStatus.InProgress;
+            var todaySession = activeClass?.Sessions.FirstOrDefault(s => s.SessionDate == today);
+            bool isInActive = todaySession?.Status == "InProgress";
 
             childrenList.Add(new ChildOverviewDto
             {
-                StudentId = student.Id,
+                StudentId = student.UserId,
                 StudentCode = student.StudentCode,
-                FullName = student.FullName,
-                AvatarUrl = student.AvatarUrl,
-                Level = student.CurrentLevel,
+                FullName = student.User.FullName,
+                AvatarUrl = student.User.AvatarUrl,
                 TotalXp = student.TotalXp,
-                StreakDays = student.CurrentStreakDays,
+                StemPoints = student.StemPoints,
                 CurrentClassName = activeClass?.Name ?? "Chưa xếp lớp",
-                CurrentLabRoom = activeClass?.RoomName ?? "Lab STEM",
-                TodayAttendanceStatus = todayAttendance?.Status ?? AttendanceStatus.Absent,
-                TodayCheckInTime = todayAttendance?.CheckInTime,
+                CurrentLabRoom = todaySession?.Room?.RoomName ?? "Phòng Lab STEM",
+                TodayAttendanceStatus = todayAttendance?.Status ?? "Absent",
+                TodayMarkedAt = todayAttendance?.MarkedAt,
                 IsInActiveSession = isInActive
             });
         }
 
         return new ParentDashboardDto
         {
-            ParentId = parent.Id,
-            ParentName = parent.FullName,
+            ParentId = parentId,
+            ParentName = parentUser.FullName,
             Children = childrenList
         };
     }
 
-    public async Task<List<EContactBookItemDto>> GetChildContactBookHistoryAsync(Guid studentId, Guid parentId, CancellationToken ct = default)
+    public async Task<List<EContactBookItemDto>> GetChildContactBookHistoryAsync(int studentId, int parentId, CancellationToken ct = default)
     {
-        // Verify relationship
-        var hasRelation = await _context.ParentStudentRelations
-            .AnyAsync(r => r.ParentId == parentId && r.StudentId == studentId, ct);
+        var hasRelation = await _context.ParentStudentLinks
+            .AnyAsync(r => r.ParentId == parentId && r.StudentId == studentId && r.Status == "Active", ct);
 
         if (!hasRelation)
         {
             throw new UnauthorizedAccessException("Bạn không có quyền truy cập hồ sơ học sinh này.");
         }
 
-        var contactBooks = await _context.EContactBooks
+        var attendances = await _context.AttendanceRecords
             .AsNoTracking()
-            .Where(cb => cb.StudentId == studentId)
-            .Include(cb => cb.ClassSession)
-            .OrderByDescending(cb => cb.ClassSession.ScheduledDate)
+            .Where(a => a.StudentId == studentId)
+            .Include(a => a.Session)
+            .OrderByDescending(a => a.Session.SessionDate)
             .ToListAsync(ct);
 
-        var submissions = await _context.StudentSubmissions
+        var grades = await _context.Grades
             .AsNoTracking()
-            .Where(s => s.StudentId == studentId && s.ClassSessionId.HasValue)
-            .ToDictionaryAsync(s => s.ClassSessionId!.Value, s => s.TotalScore, ct);
+            .Include(g => g.Submission)
+            .Where(g => g.Submission.StudentId == studentId)
+            .ToListAsync(ct);
 
-        return contactBooks.Select(cb => new EContactBookItemDto
+        var result = new List<EContactBookItemDto>();
+        foreach (var att in attendances)
         {
-            ContactBookId = cb.Id,
-            ClassSessionId = cb.ClassSessionId,
-            SessionTitle = cb.ClassSession.Title,
-            Date = cb.ClassSession.ScheduledDate,
-            AttendanceStatus = cb.AttendanceStatus,
-            SummaryNote = cb.SummaryNote,
-            TeacherVoiceMemoUrl = cb.TeacherVoiceMemoUrl,
-            TeacherTranscript = cb.TeacherTranscript,
-            TotalScore = submissions.TryGetValue(cb.ClassSessionId, out var score) ? score : null,
-            ParentStarRating = cb.ParentStarRating,
-            ParentFeedbackNote = cb.ParentFeedbackNote
-        }).ToList();
+            var grade = grades.FirstOrDefault(g => g.Submission.Assignment.ClassId == att.Session.ClassId);
+
+            result.Add(new EContactBookItemDto
+            {
+                SessionId = att.SessionId,
+                SessionTitle = $"Buổi học ngày {att.Session.SessionDate:dd/MM/yyyy}",
+                Date = att.Session.SessionDate,
+                AttendanceStatus = att.Status,
+                AbsenceReason = att.AbsenceReason,
+                AutoAstScore = grade?.AutoAstScore,
+                HardwareScore = grade?.HardwareScore,
+                FinalScore = grade?.FinalScore,
+                RemarkText = grade?.RemarkText ?? (att.Status == "Present" ? "Con học tập chăm chỉ và hoàn thành bài tốt." : "Con vắng mặt."),
+                RemarkSource = grade?.RemarkSource ?? "Text"
+            });
+        }
+
+        return result;
     }
 
-    public async Task<bool> SubmitParentFeedbackAsync(SubmitParentFeedbackRequest request, Guid parentId, CancellationToken ct = default)
+    public async Task<bool> SubmitParentFeedbackAsync(SubmitParentFeedbackRequest request, int parentId, CancellationToken ct = default)
     {
-        var contactBook = await _context.EContactBooks
-            .FirstOrDefaultAsync(cb => cb.Id == request.ContactBookId, ct)
-            ?? throw new KeyNotFoundException("Không tìm thấy sổ liên lạc buổi học.");
+        // Log feedback into CheerMessages or Notification
+        var cheer = new CheerMessage
+        {
+            ParentId = parentId,
+            StudentId = request.StudentId,
+            SessionId = request.SessionId,
+            Message = $"[Đánh giá {request.StarRating} sao]: {request.FeedbackNote}",
+            SentAt = DateTime.UtcNow
+        };
 
-        contactBook.ParentStarRating = Math.Clamp(request.StarRating, 1, 5);
-        contactBook.ParentFeedbackNote = request.FeedbackNote;
-        contactBook.ParentReviewedAt = DateTime.UtcNow;
-
+        await _context.CheerMessages.AddAsync(cheer, ct);
         await _context.SaveChangesAsync(ct);
         return true;
     }
@@ -139,107 +161,126 @@ public class ParentService : IParentService
     {
         var cheer = new CheerMessage
         {
-            Id = Guid.NewGuid(),
             ParentId = request.ParentId,
             StudentId = request.StudentId,
-            ClassSessionId = request.ClassSessionId,
-            StickerType = request.StickerType,
-            MessageText = request.MessageText,
-            SentAt = DateTime.UtcNow,
-            IsDeliveredToWorkstation = true
+            StickerId = request.StickerId,
+            SessionId = request.SessionId,
+            Message = request.Message,
+            SentAt = DateTime.UtcNow
         };
 
         await _context.CheerMessages.AddAsync(cheer, ct);
 
-        var session = await _context.ClassSessions.FindAsync([request.ClassSessionId], ct);
-        if (session != null)
-        {
-            // Realtime SignalR trigger -> Explode Confetti on student's lab screen!
-            await _realtimeService.SendCheerConfettiAsync(session.ClassroomId, request.StudentId, request.StickerType, request.MessageText, ct);
-        }
+        // SignalR trigger
+        var studentClass = await _context.Enrollments
+            .Where(e => e.StudentId == request.StudentId && e.Status == "Enrolled")
+            .Select(e => e.ClassId)
+            .FirstOrDefaultAsync(ct);
+
+        await _realtimeService.SendCheerConfettiAsync(studentClass, request.StudentId, request.StickerId?.ToString() ?? "PROUD", request.Message, ct);
 
         await _context.SaveChangesAsync(ct);
         return true;
     }
 
-    public async Task<List<StudentPortfolioDetailDto>> GetStudentPortfoliosAsync(Guid studentId, CancellationToken ct = default)
+    public async Task<List<StudentPortfolioDetailDto>> GetStudentPortfoliosAsync(int studentId, CancellationToken ct = default)
     {
-        return await _context.StudentPortfolios
+        var items = await _context.PortfolioItems
             .AsNoTracking()
             .Where(p => p.StudentId == studentId)
-            .OrderByDescending(p => p.CreatedAt)
-            .Select(p => new StudentPortfolioDetailDto
-            {
-                PortfolioId = p.Id,
-                Title = p.Title,
-                Description = p.Description,
-                BlocklyXml = p.BlocklyXml,
-                CanvasThumbnailUrl = p.CanvasThumbnailUrl,
-                QrCodeKey = p.QrCodeKey,
-                QrCodeShareUrl = $"/portfolio/verify/{p.QrCodeKey}",
-                ViewsCount = p.ViewsCount,
-                CreatedAt = p.CreatedAt
-            })
+            .Include(p => p.Cards)
+            .OrderByDescending(p => p.CompletedAt)
             .ToListAsync(ct);
+
+        return items.Select(p =>
+        {
+            var card = p.Cards.FirstOrDefault();
+            return new StudentPortfolioDetailDto
+            {
+                ItemId = p.ItemId,
+                StudentId = p.StudentId,
+                SubmissionId = p.SubmissionId,
+                Title = p.Title,
+                Summary = p.Summary,
+                ThumbnailUrl = p.ThumbnailUrl,
+                FinalScore = p.FinalScore,
+                QrToken = card?.QrToken ?? Guid.Empty,
+                QrCodeShareUrl = card != null ? $"/portfolio/verify/{card.QrToken}" : "",
+                ViewCount = card?.ViewCount ?? 0,
+                CompletedAt = p.CompletedAt
+            };
+        }).ToList();
     }
 
-    public async Task<StudentPortfolioDetailDto> GetPublicPortfolioByQrKeyAsync(string qrKey, CancellationToken ct = default)
+    public async Task<StudentPortfolioDetailDto> GetPublicPortfolioByQrTokenAsync(Guid qrToken, CancellationToken ct = default)
     {
-        var portfolio = await _context.StudentPortfolios
-            .FirstOrDefaultAsync(p => p.QrCodeKey == qrKey && p.IsPublic, ct)
+        var card = await _context.AchievementCards
+            .Include(ac => ac.Item)
+            .FirstOrDefaultAsync(ac => ac.QrToken == qrToken && ac.IsPublic, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy sản phẩm STEM hợp lệ.");
 
-        portfolio.ViewsCount++;
+        card.ViewCount++;
         await _context.SaveChangesAsync(ct);
 
+        var item = card.Item;
         return new StudentPortfolioDetailDto
         {
-            PortfolioId = portfolio.Id,
-            Title = portfolio.Title,
-            Description = portfolio.Description,
-            BlocklyXml = portfolio.BlocklyXml,
-            CanvasThumbnailUrl = portfolio.CanvasThumbnailUrl,
-            QrCodeKey = portfolio.QrCodeKey,
-            QrCodeShareUrl = $"/portfolio/verify/{portfolio.QrCodeKey}",
-            ViewsCount = portfolio.ViewsCount,
-            CreatedAt = portfolio.CreatedAt
+            ItemId = card.CardId,
+            StudentId = card.StudentId,
+            SubmissionId = item?.SubmissionId ?? 0,
+            Title = card.Title,
+            Summary = item?.Summary,
+            ThumbnailUrl = item?.ThumbnailUrl ?? card.CardImageUrl,
+            FinalScore = item?.FinalScore,
+            QrToken = card.QrToken,
+            QrCodeShareUrl = $"/portfolio/verify/{card.QrToken}",
+            ViewCount = card.ViewCount,
+            CompletedAt = card.CreatedAt
         };
     }
 
-    public async Task<ClassLeaderboardDto> GetClassLeaderboardAsync(Guid classroomId, CancellationToken ct = default)
+    public async Task<ClassLeaderboardDto> GetClassLeaderboardAsync(int classId, CancellationToken ct = default)
     {
-        var classroom = await _context.Classrooms
+        var classroom = await _context.Classes
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == classroomId, ct)
+            .FirstOrDefaultAsync(c => c.ClassId == classId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy lớp học.");
 
-        var today = DateTime.UtcNow.Date;
-        var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
-        var endOfWeek = startOfWeek.AddDays(7);
-
-        var rankings = await _context.WeeklyLeaderboards
+        var activeCycle = await _context.LeaderboardCycles
             .AsNoTracking()
-            .Where(w => w.ClassroomId == classroomId && w.WeekStartDate >= startOfWeek.AddDays(-7))
-            .Include(w => w.Student)
-            .OrderBy(w => w.Rank)
+            .OrderByDescending(c => c.WeekStart)
+            .FirstOrDefaultAsync(ct);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var weekStart = activeCycle?.WeekStart ?? today.AddDays(-(int)today.DayOfWeek);
+        var weekEnd = activeCycle?.WeekEnd ?? weekStart.AddDays(7);
+
+        var entries = await _context.LeaderboardEntries
+            .AsNoTracking()
+            .Where(e => activeCycle != null && e.CycleId == activeCycle.CycleId)
+            .Include(e => e.Student)
+                .ThenInclude(s => s.User)
+            .OrderBy(e => e.RankNo)
             .Take(10)
-            .Select(w => new LeaderboardRankItemDto
+            .Select(e => new LeaderboardRankItemDto
             {
-                Rank = w.Rank,
-                StudentId = w.StudentId,
-                StudentName = w.Student.FullName,
-                AvatarUrl = w.Student.AvatarUrl,
-                WeeklyXp = w.WeeklyXpEarned
+                Rank = e.RankNo,
+                StudentId = e.StudentId,
+                StudentName = e.Student.User.FullName,
+                AvatarUrl = e.Student.User.AvatarUrl,
+                XpEarned = e.XpEarned,
+                BestTimeMs = e.BestTimeMs,
+                BestBlockCount = e.BestBlockCount
             })
             .ToListAsync(ct);
 
         return new ClassLeaderboardDto
         {
-            ClassroomId = classroomId,
+            ClassId = classId,
             ClassName = classroom.Name,
-            WeekStartDate = startOfWeek,
-            WeekEndDate = endOfWeek,
-            TopRankings = rankings
+            WeekStartDate = weekStart,
+            WeekEndDate = weekEnd,
+            TopRankings = entries
         };
     }
 }
