@@ -54,11 +54,11 @@ interface SessionUser {
  * Vai trò luôn được suy ra từ CLAIM trong JWT, fallback về `localStorage` cho token demo.
  */
 function readSession(): { isLoggedIn: boolean; role: UserRole; user: SessionUser | null } {
-  const token = localStorage.getItem('teky_access_token') || localStorage.getItem('teky_token');
+  const token = localStorage.getItem('teky_access_token') || sessionStorage.getItem('teky_access_token') || localStorage.getItem('teky_token') || sessionStorage.getItem('teky_token');
 
   let user: SessionUser | null = null;
   try {
-    const raw = localStorage.getItem('teky_user');
+    const raw = localStorage.getItem('teky_user') || sessionStorage.getItem('teky_user');
     if (raw) {
       user = JSON.parse(raw) as SessionUser;
     }
@@ -67,7 +67,7 @@ function readSession(): { isLoggedIn: boolean; role: UserRole; user: SessionUser
   }
 
   const claimRole = roleFromClaims(decodeJwtClaims(token));
-  const storedRole = localStorage.getItem('teky_role') as UserRole | null;
+  const storedRole = (localStorage.getItem('teky_role') || sessionStorage.getItem('teky_role')) as UserRole | null;
 
   return {
     isLoggedIn: !!token,

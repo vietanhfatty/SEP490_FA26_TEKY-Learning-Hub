@@ -1,0 +1,12 @@
+Account security deployment
+
+1. Back up and run 20261113_account_security.sql on the intended SQL Server database before starting the updated API. This script does not unlock existing Locked accounts: their administrative status needs review.
+2. Configure Smtp__Host, Smtp__Port, Smtp__EnableSsl, Smtp__Username, Smtp__Password and Smtp__From using environment variables or .NET user-secrets. account-settings.example.json is an example, not automatically loaded.
+3. Persist the ASP.NET Data Protection key ring and AccountAvatars directory across deployments. Email bodies are protected with Data Protection; losing its keys makes queued messages unreadable.
+4. The email worker retries failed delivery. Run a single email worker instance; SMTP delivery is at-least-once, not guaranteed exactly-once after process failures.
+5. Recovery codes expire in five minutes; email delays do not extend validity. SMTP credentials must be configured to test delivery.
+6. Existing access tokens without security_version require a fresh login after this release. Reset/change password invalidates all access tokens and refresh sessions for that account.
+7. Avatar support is PNG only, <=2 MB and <=2048 pixels per dimension. Files are private and fetched through the authenticated avatar endpoint.
+8. Run dotnet test backend/tests/TekyLearningHub.Application.Tests/TekyLearningHub.Application.Tests.csproj and pnpm --filter @teky/portal --filter @teky/backoffice build.
+
+Verification limits: InMemory tests do not establish SQL Server concurrency behavior. Exercise concurrent failed logins, OTP reset races, and duplicate phone updates against a disposable SQL Server database before release. Cross-app handoff uses a 30-second single-use code and destination-held PKCE verifier. Configure Shells__PortalOrigin and Shells__BackofficeOrigin alongside frontend VITE_PORTAL_ORIGIN and VITE_BACKOFFICE_ORIGIN and CORS origins. The handoff ticket store is process-local: use one API instance or sticky routing until replaced with a distributed ticket store. Use HTTPS outside localhost.

@@ -29,6 +29,7 @@ export interface AuthContextType {
   ) => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<boolean>;
+  updateUser: (user: Partial<AuthUser>) => void;
 }
 
 /**
@@ -45,6 +46,7 @@ export const AuthContext = createContext<AuthContextType>({
   login: () => {},
   logout: async () => {},
   refreshSession: async () => false,
+  updateUser: () => {},
 });
 
 /** Hook truy cập phiên đăng nhập hiện tại. */

@@ -61,13 +61,16 @@ export async function loginApi(
     const data = await response.json().catch(() => null);
 
     if (response.ok && data?.success && data?.data) {
+      for (const target of [localStorage, sessionStorage]) {
+        for (const key of ['teky_access_token', 'teky_refresh_token', 'teky_user', 'teky_role', 'teky_token']) target.removeItem(key);
+      }
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem('teky_access_token', data.data.accessToken);
       storage.setItem('teky_refresh_token', data.data.refreshToken);
       storage.setItem('teky_user', JSON.stringify(data.data.user));
       const clientRole = normalizeRole(data.data.user.role);
       storage.setItem('teky_role', clientRole);
-      localStorage.setItem('teky_token', data.data.accessToken);
+      storage.setItem('teky_token', data.data.accessToken);
       return data;
     }
 

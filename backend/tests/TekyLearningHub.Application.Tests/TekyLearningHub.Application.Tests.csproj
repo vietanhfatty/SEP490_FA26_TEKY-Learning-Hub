@@ -14,9 +14,11 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.2" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\TekyLearningHub.Api\TekyLearningHub.Api.csproj" />
     <ProjectReference Include="..\..\src\TekyLearningHub.Domain\TekyLearningHub.Domain.csproj" />
     <ProjectReference Include="..\..\src\TekyLearningHub.Application\TekyLearningHub.Application.csproj" />
     <ProjectReference Include="..\..\src\TekyLearningHub.Infrastructure\TekyLearningHub.Infrastructure.csproj" />

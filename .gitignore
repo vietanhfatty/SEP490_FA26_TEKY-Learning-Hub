@@ -51,3 +51,5 @@ docs/
 # Tooling artifacts
 .ua/
 **/.turbo/
+# Codex
+.work
