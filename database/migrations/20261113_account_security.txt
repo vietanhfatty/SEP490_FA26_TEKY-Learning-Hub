@@ -1,6 +1,6 @@
 Account security deployment
 
-1. Back up and run 20261113_account_security.sql on the intended SQL Server database before starting the updated API. This script does not unlock existing Locked accounts: their administrative status needs review.
+1. Development startup now applies pending SQL automatically and journals them in dbo.__TekySchemaMigrations. See README.txt in this directory. Manual execution is no longer required for Development. For controlled non-Development deployment, review and run 20261113_account_security.sql explicitly. Existing Locked accounts are never unlocked automatically.
 2. Configure Smtp__Host, Smtp__Port, Smtp__EnableSsl, Smtp__Username, Smtp__Password and Smtp__From using environment variables or .NET user-secrets. account-settings.example.json is an example, not automatically loaded.
 3. Persist the ASP.NET Data Protection key ring and AccountAvatars directory across deployments. Email bodies are protected with Data Protection; losing its keys makes queued messages unreadable.
 4. The email worker retries failed delivery. Run a single email worker instance; SMTP delivery is at-least-once, not guaranteed exactly-once after process failures.

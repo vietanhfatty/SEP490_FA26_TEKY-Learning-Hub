@@ -7,6 +7,7 @@ using TekyLearningHub.Application;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Infrastructure;
 using TekyLearningHub.Infrastructure.Data;
+using TekyLearningHub.Infrastructure.Data.Migrations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,17 +86,23 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 // 6. Automatic Data Seeding on Startup (Roles & Demo Accounts)
+// Development updates the schema before querying entities. Production performs no automatic migration or demo seeding.
+if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     try
     {
+        var connectionString = app.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
+        await DevelopmentDatabaseMigrator.ApplyAsync(connectionString, app.Logger);
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         await DbInitializer.SeedAsync(context, passwordHasher);
     }
     catch (Exception ex)
     {
-        app.Logger.LogWarning(ex, "Không thể kết nối hoặc khởi tạo dữ liệu mẫu trong DB. Đang sử dụng chế độ dự phòng.");
+        app.Logger.LogCritical(ex, "Không thể cập nhật database Development. Backend dừng để tránh chạy với schema không tương thích.");
+        throw;
     }
 }
 
