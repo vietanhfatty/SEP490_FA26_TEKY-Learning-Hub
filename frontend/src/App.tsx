@@ -15,21 +15,21 @@ import { StaffDashboard } from './components/pages/StaffDashboard';
 import { AdminDashboard } from './components/pages/AdminDashboard';
 
 export function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'login' | 'dashboard'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'login' | 'dashboard'>(() => window.location.pathname.startsWith('/dashboard/timetable') ? 'dashboard' : 'home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // RBAC State: Persistent authentication & Role binding
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return !!(localStorage.getItem('teky_access_token') || localStorage.getItem('teky_token'));
+    return !!(sessionStorage.getItem('teky_access_token') || localStorage.getItem('teky_access_token') || localStorage.getItem('teky_token'));
   });
 
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
-    return (localStorage.getItem('teky_role') as UserRole) || 'student';
+    return ((sessionStorage.getItem('teky_role') || localStorage.getItem('teky_role')) as UserRole) || 'student';
   });
 
   const [currentUser, setCurrentUser] = useState<{ fullName?: string; email?: string } | null>(() => {
     try {
-      const saved = localStorage.getItem('teky_user');
+      const saved = (sessionStorage.getItem('teky_user') || localStorage.getItem('teky_user'));
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -75,13 +75,29 @@ export function App() {
     setCurrentRole(role);
     setIsLoggedIn(true);
     try {
-      const saved = localStorage.getItem('teky_user');
+      const saved = (sessionStorage.getItem('teky_user') || localStorage.getItem('teky_user'));
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {
       // ignore
     }
     setCurrentView('dashboard');
   };
+
+  useEffect(() => {
+    if (currentView === 'home' && window.location.pathname.startsWith('/dashboard/timetable')) {
+      window.history.replaceState({}, '', '/');
+    }
+    if (currentView === 'dashboard' && isLoggedIn && currentRole === 'student'
+      && !window.location.pathname.startsWith('/dashboard/timetable')) {
+      window.history.replaceState({}, '', '/dashboard/timetable');
+    }
+  }, [currentView, isLoggedIn, currentRole]);
+
+  useEffect(() => {
+    const onPopState = () => setCurrentView(window.location.pathname.startsWith('/dashboard/timetable') ? 'dashboard' : 'home');
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const handleLogout = async () => {
     await logoutApi();
