@@ -44,3 +44,10 @@ build/
 Thumbs.db
 # Local docs
 PROJECT_STRUCTURE.md
+
+# Generated documentation (local-only, không commit)
+docs/
+
+# Tooling artifacts
+.ua/
+**/.turbo/

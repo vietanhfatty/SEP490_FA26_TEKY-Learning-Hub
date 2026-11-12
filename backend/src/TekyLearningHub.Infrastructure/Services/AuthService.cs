@@ -5,6 +5,7 @@ using TekyLearningHub.Application.DTOs.Auth;
 using TekyLearningHub.Application.DTOs.Common;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
+using TekyLearningHub.Infrastructure.Security;
 
 namespace TekyLearningHub.Infrastructure.Services;
 
@@ -202,7 +203,7 @@ public class AuthService : IAuthService
 
     private static UserDto MapToUserDto(User user)
     {
-        var roleName = user.Role?.RoleName?.ToLowerInvariant() ?? GetRoleNameFromId(user.RoleId);
+        var roleName = RoleNameNormalizer.Normalize(user.Role?.RoleName) ?? RoleNameNormalizer.FromRoleId(user.RoleId);
 
         return new UserDto
         {
@@ -220,16 +221,7 @@ public class AuthService : IAuthService
 
     private static string GetRoleNameFromId(byte roleId)
     {
-        return roleId switch
-        {
-            1 => "student",
-            2 => "teacher",
-            3 => "admin",
-            4 => "parent",
-            5 => "staff",
-            6 => "academic_manager",
-            _ => "student"
-        };
+        return RoleNameNormalizer.FromRoleId(roleId);
     }
 
     private static string HashToken(string token)

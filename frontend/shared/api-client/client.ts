@@ -1,5 +1,7 @@
 // Base HTTP Client for calling backend endpoints
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://localhost:7001/api';
+const API_BASE_URL =
+  (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
+  '/api';
 
 export async function apiClient<T>(
   endpoint: string,

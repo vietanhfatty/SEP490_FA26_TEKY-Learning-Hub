@@ -3,9 +3,10 @@ import type { UserRole } from '../../types';
 import { IconGraduationCap, IconShieldCheck, IconCheckCircle, IconArrowRight, IconLock } from '../common/Icons';
 import { Badge } from '../common/Badge';
 import { loginApi, normalizeRole } from '../../services/auth';
+import { decodeJwtClaims, roleFromClaims } from '@teky/shared/auth/jwt';
 
 interface LoginPageProps {
-  onLoginSuccess: (role: UserRole) => void;
+  onLoginSuccess: (role: UserRole, accessToken?: string) => void;
   onNavigateHome: () => void;
 }
 
@@ -52,10 +53,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
       const response = await loginApi(email, password, rememberMe);
 
       if (response.success && response.data) {
-        const resolvedRole = normalizeRole(response.data.user.role);
+        // Ưu tiên giải mã CLAIM trong JWT Access Token (role_id > role_name > role).
+        const claims = decodeJwtClaims(response.data.accessToken);
+        const claimRole = roleFromClaims(claims);
+        const resolvedRole = claimRole ?? normalizeRole(response.data.user.role);
         setTokenIssuedNotice(`Đã xác thực BCrypt thành công! Cấp phát Access Token (${response.data.accessToken.substring(0, 16)}...) & Refresh Token.`);
+        const accessToken = response.data?.accessToken;
         setTimeout(() => {
-          onLoginSuccess(resolvedRole);
+          onLoginSuccess(resolvedRole, accessToken);
         }, 600);
       } else {
         const isNetworkError = response.errors?.some(
@@ -89,15 +94,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
 
           setTokenIssuedNotice(`[Xác thực Demo] Danh tính vai trò '${matchedDemo.roleLabel}' đã được kiểm chứng.`);
           setTimeout(() => {
-            onLoginSuccess(matchedDemo.role);
+            onLoginSuccess(matchedDemo.role, 'jwt-demo-token-bcrypt-verified');
           }, 400);
         } else {
           // Lỗi từ phía Backend API (sai mật khẩu, tài khoản bị khóa, v.v.)
           setErrorMessage(response.message || 'Tài khoản hoặc mật khẩu không chính xác.');
         }
       }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Đã xảy ra lỗi trong quá trình xác thực.');
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Đã xảy ra lỗi trong quá trình xác thực.'
+      );
     } finally {
       setIsLoading(false);
     }
