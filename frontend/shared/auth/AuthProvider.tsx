@@ -6,6 +6,8 @@ import { decodeJwtClaims, roleFromClaims, isTokenExpired } from './jwt';
 import type { JwtClaims } from './jwt';
 import type { UserRole } from '../types';
 import { consumeSsoPayload } from './shellTransfer';
+import { processShellHandshake, shellHandshakePending } from './shellHandshake';
+let handshakeStarted = false;
 
 /**
  * Đọc token từ localStorage trước, sau đó tới sessionStorage.
@@ -47,6 +49,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
+  const [handshakeError, setHandshakeError] = useState('');
+  useEffect(() => {
+    if (!shellHandshakePending() || handshakeStarted) return;
+    handshakeStarted = true;
+    processShellHandshake().catch(error => setHandshakeError(error instanceof Error ? error.message : 'Không thể chuyển phiên.'));
+  }, []);
 
   /**
    * Vai trò luôn được suy ra từ CLAIM trong JWT (ưu tiên `role_id`),
@@ -61,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const stored = localStorage.getItem('teky_role') || sessionStorage.getItem('teky_role');
-    return (stored as AuthContextType['role']) || null;
+    return import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH === 'true' ? (stored as AuthContextType['role']) || null : null;
   });
 
   const login = (
@@ -72,7 +80,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     const decoded = decodeJwtClaims(newAccessToken);
     const claimRole = roleFromClaims(decoded);
-    const finalRole = claimRole ?? normalizeRole(newRole);
+    const finalRole = claimRole ?? (import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH === 'true' ? normalizeRole(newRole) : null);
+    if (!finalRole) throw new Error('Vai trò không hợp lệ.');
+    const storage = sessionStorage.getItem('teky_access_token') === newAccessToken ? sessionStorage : localStorage;
 
     setRole(finalRole);
     setAccessToken(newAccessToken);
@@ -82,13 +92,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (newUser) {
       const merged = { ...(user ?? {}), ...newUser } as AuthUser;
       setUser(merged);
-      localStorage.setItem('teky_user', JSON.stringify(merged));
+      storage.setItem('teky_user', JSON.stringify(merged));
     }
 
-    localStorage.setItem('teky_role', finalRole);
-    localStorage.setItem('teky_access_token', newAccessToken);
-    localStorage.setItem('teky_refresh_token', newRefreshToken);
-    localStorage.setItem('teky_token', newAccessToken);
+    storage.setItem('teky_role', finalRole);
+    storage.setItem('teky_access_token', newAccessToken);
+    storage.setItem('teky_refresh_token', newRefreshToken);
+    storage.setItem('teky_token', newAccessToken);
   };
 
   const logout = useCallback(async () => {
@@ -103,10 +113,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshSession = useCallback(async (): Promise<boolean> => {
     const success = await refreshTokenApi();
     if (success) {
-      const newToken = localStorage.getItem('teky_access_token') || localStorage.getItem('teky_token');
+      const newToken = readStoredToken('teky_access_token') || readStoredToken('teky_token');
       setAccessToken(newToken);
-      setRefreshToken(localStorage.getItem('teky_refresh_token'));
+      setRefreshToken(readStoredToken('teky_refresh_token'));
+      setUser(readStoredUser());
       setClaims(decodeJwtClaims(newToken));
+      setRole(roleFromClaims(decodeJwtClaims(newToken)));
     } else {
       await logout();
     }
@@ -180,13 +192,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role,
     user,
     claims,
-    isLoggedIn: !!accessToken,
+    isLoggedIn: !!accessToken && !!role,
     accessToken,
     refreshToken,
     login,
     logout,
     refreshSession,
+    updateUser: (profile) => {
+      setUser(previous => previous ? { ...previous, ...profile } : previous);
+      for (const storage of [localStorage, sessionStorage]) {
+        const raw=storage.getItem('teky_user');
+        if (raw) { try { storage.setItem('teky_user',JSON.stringify({...JSON.parse(raw),...profile})); } catch { storage.removeItem('teky_user'); } }
+      }
+    },
   };
 
+  if (shellHandshakePending()) return <main className="p-8" role="status">{handshakeError || "Đang chuyển đến giao diện của bạn…"}{handshakeError && <a href="/login"> Đăng nhập lại</a>}</main>;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

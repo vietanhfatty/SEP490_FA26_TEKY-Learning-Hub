@@ -12,20 +12,30 @@ namespace TekyLearningHub.Infrastructure.Services;
 public class AuthService : IAuthService
 {
     private readonly IApplicationDbContext _context;
+    private readonly Microsoft.AspNetCore.DataProtection.IDataProtectionProvider? _protection;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
 
     public AuthService(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
-        IJwtTokenGenerator jwtTokenGenerator)
+        IJwtTokenGenerator jwtTokenGenerator, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider? protection = null)
     {
         _context = context;
+        _protection = protection;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
     }
 
     public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginRequestDto request, string? ipAddress, string? userAgent)
+    {
+        for (var attempt=0; ; attempt++) {
+            try { return await LoginCoreAsync(request,ipAddress,userAgent); }
+            catch (DbUpdateConcurrencyException) when (attempt<7 && _context is TekyLearningHub.Infrastructure.Data.ApplicationDbContext db) { db.ChangeTracker.Clear(); }
+        }
+    }
+
+    private async Task<ApiResponse<AuthResponseDto>> LoginCoreAsync(LoginRequestDto request, string? ipAddress, string? userAgent)
     {
         var identifier = request.EmailOrUsername.Trim();
         var isEmail = identifier.Contains('@');
@@ -54,13 +64,21 @@ public class AuthService : IAuthService
             return ApiResponse<AuthResponseDto>.FailureResult($"Tài khoản hiện đang ở trạng thái '{user.Status}'. Vui lòng liên hệ ban đào tạo.");
         }
 
+        if (user.LockoutEndAt > DateTime.UtcNow)
+            return ApiResponse<AuthResponseDto>.FailureResult("Tài khoản hoặc mật khẩu không chính xác, hoặc tài khoản đang tạm khóa.");
+        if (user.LockoutEndAt != null) {user.LockoutEndAt=null;user.FailedLoginCount=0;}
         var isPasswordValid = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
         if (!isPasswordValid)
         {
             user.FailedLoginCount++;
-            if (user.FailedLoginCount >= 5)
+            if (user.FailedLoginCount > 5)
             {
-                user.Status = "Locked";
+                user.LockoutEndAt = DateTime.UtcNow.AddMinutes(15);
+                if (_context is TekyLearningHub.Infrastructure.Data.ApplicationDbContext db) {
+                    // Queue delivery independently of SMTP availability.
+                    var provider = _protection ?? throw new InvalidOperationException("Data protection is required for email.");
+                    AccountEmailWorker.Enqueue(db, provider, user.Email, "TEKY - Cảnh báo đăng nhập", "Tài khoản tạm khóa trong 15 phút do nhập sai mật khẩu quá 5 lần.");
+                }
             }
             await _context.SaveChangesAsync();
 
@@ -173,16 +191,71 @@ public class AuthService : IAuthService
             return ApiResponse<bool>.FailureResult("Refresh token không hợp lệ.");
         }
 
-        var tokenHash = HashToken(refreshToken);
-        var session = await _context.UserSessions
-            .FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.IsActive);
+        return await LogoutAsync(refreshToken, null, ipAddress, false);
+    }
 
-        if (session != null)
+    public async Task<ApiResponse<bool>> LogoutAsync(string? refreshToken, int? userId, string? ipAddress, bool allDevices = false)
+    {
+        int? effectiveUserId = userId;
+        string? roleName = null;
+
+        // 1. Thu hồi phiên đăng nhập tương ứng với Refresh Token (nếu có)
+        if (!string.IsNullOrWhiteSpace(refreshToken))
         {
-            session.IsActive = false;
-            session.LogoutAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            var tokenHash = HashToken(refreshToken);
+            var session = await _context.UserSessions
+                .Include(s => s.User)
+                .ThenInclude(u => u.Role)
+                .FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.IsActive);
+
+            if (session != null)
+            {
+                session.IsActive = false;
+                session.LogoutAt = DateTime.UtcNow;
+                effectiveUserId ??= session.UserId;
+                roleName ??= session.User?.Role?.RoleName;
+            }
         }
+
+        // 2. Thu hồi toàn bộ phiên hoạt động nếu allDevices == true
+        if (allDevices && effectiveUserId.HasValue)
+        {
+            var activeSessions = await _context.UserSessions
+                .Where(s => s.UserId == effectiveUserId.Value && s.IsActive)
+                .ToListAsync();
+
+            foreach (var s in activeSessions)
+            {
+                s.IsActive = false;
+                s.LogoutAt = DateTime.UtcNow;
+            }
+        }
+
+        // 3. Ghi nhận nhật ký bảo mật AuditLog nếu xác định được người dùng
+        if (effectiveUserId.HasValue)
+        {
+            if (string.IsNullOrEmpty(roleName))
+            {
+                var user = await _context.Users
+                    .Include(u => u.Role)
+                    .FirstOrDefaultAsync(u => u.UserId == effectiveUserId.Value);
+                roleName = user?.Role?.RoleName;
+            }
+
+            var auditLog = new AuditLog
+            {
+                ActorUserId = effectiveUserId.Value,
+                ActorType = roleName ?? "User",
+                Action = allDevices ? "USER_LOGOUT_ALL_DEVICES" : "USER_LOGOUT",
+                EntityType = "UserSession",
+                IpAddress = ipAddress,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.AuditLogs.Add(auditLog);
+        }
+
+        await _context.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResult(true, "Thu hồi token và đăng xuất thành công.");
     }
@@ -214,6 +287,7 @@ public class AuthService : IAuthService
             RoleId = user.RoleId,
             AvatarUrl = user.AvatarUrl,
             Phone = user.Phone,
+            Bio = user.Bio,
             Status = user.Status,
             ThemeMode = user.ThemeMode
         };

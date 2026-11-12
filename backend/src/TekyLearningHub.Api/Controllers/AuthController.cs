@@ -22,6 +22,7 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Đăng nhập tập trung đa vai trò (Học sinh, Phụ huynh, Giáo viên, QL Học thuật, Quản trị viên)
     /// </summary>
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("account")]
     [HttpPost("login")]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status400BadRequest)]
@@ -76,7 +77,29 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Thu hồi Refresh Token khi người dùng chủ động đăng xuất
+    /// Đăng xuất an toàn và thu hồi Refresh Token trên server
+    /// </summary>
+    [HttpPost("logout")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Logout([FromBody] LogoutRequestDto? request)
+    {
+        var refreshToken = request?.RefreshToken;
+        var allDevices = request?.AllDevices ?? false;
+        var ipAddress = GetClientIpAddress();
+
+        int? userId = null;
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (int.TryParse(userIdClaim, out var parsedId))
+        {
+            userId = parsedId;
+        }
+
+        var result = await _authService.LogoutAsync(refreshToken, userId, ipAddress, allDevices);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Thu hồi Refresh Token khi người dùng chủ động đăng xuất (Tương thích ngược)
     /// </summary>
     [HttpPost("revoke-token")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
@@ -113,10 +136,6 @@ public class AuthController : ControllerBase
 
     private string? GetClientIpAddress()
     {
-        if (Request.Headers.TryGetValue("X-Forwarded-For", out var forwarded))
-        {
-            return forwarded.ToString().Split(',')[0].Trim();
-        }
         return HttpContext.Connection.RemoteIpAddress?.ToString();
     }
 }

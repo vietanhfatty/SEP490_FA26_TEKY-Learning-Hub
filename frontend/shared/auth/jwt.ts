@@ -87,10 +87,10 @@ export function decodeJwtClaims(token: string | null | undefined): JwtClaims | n
     const payload = JSON.parse(base64UrlDecode(segments[1])) as Record<string, unknown>;
 
     const roleIdRaw = readClaim(payload, 'role_id');
-    const parsedRoleId = roleIdRaw !== undefined ? Number.parseInt(roleIdRaw, 10) : Number.NaN;
+    const parsedRoleId = roleIdRaw !== undefined ? Number(roleIdRaw) : typeof payload.role_id === 'number' ? payload.role_id : Number.NaN;
 
     const expRaw = readClaim(payload, 'exp');
-    const parsedExp = expRaw !== undefined ? Number.parseInt(expRaw, 10) : Number.NaN;
+    const parsedExp = expRaw !== undefined ? Number(expRaw) : typeof payload.exp === 'number' ? payload.exp : Number.NaN;
 
     return {
       userId: readClaim(payload, 'nameid', 'user_id', NAME_ID_CLAIM_URI),

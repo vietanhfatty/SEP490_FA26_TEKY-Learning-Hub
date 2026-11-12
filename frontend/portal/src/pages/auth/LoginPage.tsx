@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { UserRole } from '@teky/shared';
 import { IconGraduationCap, IconShieldCheck, IconCheckCircle, IconArrowRight, IconLock } from '@teky/shared';
 import { Badge } from '@teky/shared';
-import { loginApi, normalizeRole } from '@teky/shared';
+import { loginApi } from '@teky/shared';
 import { decodeJwtClaims, roleFromClaims } from '@teky/shared/auth/jwt';
 import { useAuth } from '@teky/shared/auth/authContext';
 
@@ -59,12 +59,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
         // Chỉ fallback về body response khi token không phải JWT hợp lệ.
         const claims = decodeJwtClaims(response.data.accessToken);
         const claimRole = roleFromClaims(claims);
-        const resolvedRole = claimRole ?? normalizeRole(response.data.user.role);
+        const resolvedRole = claimRole;
+        if (!resolvedRole) throw new Error('Vai trò trong phiên đăng nhập không hợp lệ.');
 
-        const roleSource = claimRole ? 'từ claim JWT' : 'từ phản hồi API';
-        setTokenIssuedNotice(
-          `Đã xác thực BCrypt thành công! Cấp phát Access Token (${response.data.accessToken.substring(0, 16)}...) & Refresh Token. Vai trò nhận diện ${roleSource}: ${resolvedRole}.`
-        );
+        setTokenIssuedNotice('Đăng nhập thành công. Đang mở trang của bạn…');
         const accessToken = response.data?.accessToken;
         // Đồng bộ phiên vào AuthProvider để RoleGuard nhận đúng vai trò ngay lập tức.
         syncSession(resolvedRole, accessToken ?? '', response.data?.refreshToken, {
@@ -77,7 +75,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
           onLoginSuccess(resolvedRole, accessToken);
         }, 600);
       } else {
-        if (response.errors?.some((err) => err.includes('Network error') || err.includes('Failed to fetch') || err.includes('kết nối'))) {
+        if (import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH === 'true' && response.errors?.some((err) => err.includes('Network error') || err.includes('Failed to fetch') || err.includes('kết nối'))) {
           // Backend không chạy: chỉ dùng fallback khi khớp đúng tài khoản demo + mật khẩu chuẩn.
           const matchedDemo = demoAccounts.find(
             (acc) => acc.email.toLowerCase() === email.trim().toLowerCase()
@@ -124,11 +122,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
 
   const handleForgotSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    window.location.assign('/forgot-password');
+    return;
     setForgotSent(true);
-    setTimeout(() => {
-      setShowForgotModal(false);
-      setForgotSent(false);
-    }, 2000);
+    setShowForgotModal(false);
+    setForgotSent(false);
   };
 
   return (

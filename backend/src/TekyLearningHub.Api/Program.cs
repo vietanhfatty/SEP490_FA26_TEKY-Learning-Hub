@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -6,6 +7,7 @@ using TekyLearningHub.Application;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Infrastructure;
 using TekyLearningHub.Infrastructure.Data;
+using TekyLearningHub.Infrastructure.Data.Migrations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +52,14 @@ builder.Services.AddAuthentication(options =>
 {
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
+    options.Events = new JwtBearerEvents { OnTokenValidated = async context => {
+        var id=context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var version=context.Principal?.FindFirst("security_version")?.Value;
+        var db=context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+        if(!int.TryParse(id,out var userId) || !int.TryParse(version,out var tokenVersion)) {context.Fail("Invalid session");return;}
+        var user=await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(db.Users, x=>x.UserId==userId);
+        if(user==null || user.Status!="Active" || user.SecurityVersion!=tokenVersion) context.Fail("Session revoked");
+    }};
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
@@ -64,6 +74,11 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options => {
+ options.RejectionStatusCode=429;
+ options.AddPolicy("account", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+ context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions {PermitLimit=10,Window=TimeSpan.FromMinutes(1),QueueLimit=0}));
+});
 
 // 5. OpenAPI & Scalar API Documentation
 builder.Services.AddOpenApi();
@@ -71,17 +86,23 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 // 6. Automatic Data Seeding on Startup (Roles & Demo Accounts)
+// Development updates the schema before querying entities. Production performs no automatic migration or demo seeding.
+if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     try
     {
+        var connectionString = app.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
+        await DevelopmentDatabaseMigrator.ApplyAsync(connectionString, app.Logger);
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         await DbInitializer.SeedAsync(context, passwordHasher);
     }
     catch (Exception ex)
     {
-        app.Logger.LogWarning(ex, "Không thể kết nối hoặc khởi tạo dữ liệu mẫu trong DB. Đang sử dụng chế độ dự phòng.");
+        app.Logger.LogCritical(ex, "Không thể cập nhật database Development. Backend dừng để tránh chạy với schema không tương thích.");
+        throw;
     }
 }
 
@@ -93,7 +114,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+app.Use(async (context, next) => {
+    try { await next(); }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException) {
+        context.Response.StatusCode=409;
+        await context.Response.WriteAsJsonAsync(new {message="Dữ liệu vừa thay đổi. Vui lòng tải lại hoặc thử lại."});
+    }
+});
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

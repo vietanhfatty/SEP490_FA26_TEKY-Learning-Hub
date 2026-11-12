@@ -56,9 +56,9 @@ export const BACKOFFICE_ORIGIN = readEnv('VITE_BACKOFFICE_ORIGIN') ?? 'http://lo
  */
 export function resolveShellForRole(role: UserRole | null | undefined): ShellTarget {
   if (!role) {
-    return SHELL_BY_ROLE.student;
+    return { app: 'portal', path: '/login', label: 'Đăng nhập', labelEn: 'Login' };
   }
-  return SHELL_BY_ROLE[role] ?? SHELL_BY_ROLE.student;
+  return SHELL_BY_ROLE[role] ?? { app: 'portal', path: '/login', label: 'Đăng nhập', labelEn: 'Login' };
 }
 
 /**

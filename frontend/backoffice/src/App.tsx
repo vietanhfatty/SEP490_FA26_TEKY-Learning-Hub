@@ -1,3 +1,5 @@
+import { AccountPage } from '@teky/shared/account/AccountPage';
+import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useCallback } from 'react';
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
@@ -24,6 +26,7 @@ function RoleRedirect() {
 
 export function App() {
   const navigate = useNavigate();
+  const isAccountVisible = useAuth().isLoggedIn;
   const { role, accessToken, refreshToken, user } = useAuth();
 
   /**
@@ -67,7 +70,10 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans">
+      {isAccountVisible && <a href="/account" className="fixed bottom-4 left-4 z-50 rounded-xl bg-blue-700 px-4 py-3 text-white shadow-md focus-visible:ring-2">Tài khoản</a>}
       <Routes>
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/forgot-password" element={<RecoveryPage />} />
         {/* Cổng đăng nhập Backoffice */}
         <Route
           path="/login"
