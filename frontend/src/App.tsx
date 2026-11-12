@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { UserRole } from './types';
+import { logoutApi } from './services/auth';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
 import { Badge } from './components/common/Badge';
@@ -10,13 +11,30 @@ import { StudentDashboard } from './components/pages/StudentDashboard';
 import { ParentDashboard } from './components/pages/ParentDashboard';
 import { TeacherDashboard } from './components/pages/TeacherDashboard';
 import { AcademicManagerDashboard } from './components/pages/AcademicManagerDashboard';
+import { StaffDashboard } from './components/pages/StaffDashboard';
 import { AdminDashboard } from './components/pages/AdminDashboard';
 
 export function App() {
   const [currentView, setCurrentView] = useState<'home' | 'login' | 'dashboard'>('home');
-  const [currentRole, setCurrentRole] = useState<UserRole>('student');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+
+  // RBAC State: Persistent authentication & Role binding
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return !!(localStorage.getItem('teky_access_token') || localStorage.getItem('teky_token'));
+  });
+
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    return (localStorage.getItem('teky_role') as UserRole) || 'student';
+  });
+
+  const [currentUser, setCurrentUser] = useState<{ fullName?: string; email?: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem('teky_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     if (isDarkMode) {
@@ -30,6 +48,7 @@ export function App() {
     student: 'Học sinh',
     parent: 'Phụ huynh',
     teacher: 'Giáo viên',
+    staff: 'Giáo vụ / Staff',
     academic_manager: 'Quản lý học thuật',
     admin: 'Quản trị hệ thống',
   };
@@ -38,6 +57,7 @@ export function App() {
     student: 'info',
     parent: 'accent',
     teacher: 'success',
+    staff: 'info',
     academic_manager: 'warning',
     admin: 'neutral',
   };
@@ -46,24 +66,27 @@ export function App() {
     student: { name: 'Nguyễn Minh Quân (9 tuổi)', email: 'student@teky.edu.vn' },
     parent: { name: 'Trần Thu Trang (Phụ huynh bé Quân)', email: 'parent@teky.edu.vn' },
     teacher: { name: 'Thầy Hoàng Văn Nam (Giảng viên STEAM)', email: 'teacher@teky.edu.vn' },
+    staff: { name: 'Nguyễn Thu Nga (Giáo vụ cơ sở)', email: 'staff@teky.edu.vn' },
     academic_manager: { name: 'Đỗ Thị Hồng (Trưởng ban Đào tạo)', email: 'manager@teky.edu.vn' },
     admin: { name: 'Admin Kỹ Thuật (System Admin)', email: 'admin@teky.edu.vn' },
-  };
-
-  const handleRoleChange = (role: UserRole) => {
-    setCurrentRole(role);
-    setIsLoggedIn(true);
-    setCurrentView('dashboard');
   };
 
   const handleLoginSuccess = (role: UserRole) => {
     setCurrentRole(role);
     setIsLoggedIn(true);
+    try {
+      const saved = localStorage.getItem('teky_user');
+      if (saved) setCurrentUser(JSON.parse(saved));
+    } catch {
+      // ignore
+    }
     setCurrentView('dashboard');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutApi();
     setIsLoggedIn(false);
+    setCurrentUser(null);
     setCurrentView('login');
   };
 
@@ -110,91 +133,68 @@ export function App() {
           />
         )}
 
-        {/* 3. Bảng điều khiển (Chỉ chia role ở Dashboard) */}
+        {/* 3. Bảng điều khiển (Được bảo vệ nghiêm ngặt theo phân quyền RBAC) */}
         {currentView === 'dashboard' && (
           <div className="space-y-6">
-            {/* RBAC Role Context Switcher Banner inside Dashboard */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                  <IconShieldCheck size={20} />
+            {!isLoggedIn ? (
+              <div className="max-w-md mx-auto my-16 p-8 text-center bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xl">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center mb-4">
+                  <IconShieldCheck size={32} />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Bảng điều khiển: {roleLabels[currentRole]}
-                    </h2>
-                    <Badge variant={roleBadges[currentRole]}>RBAC</Badge>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Bảo vệ quyền truy cập (RBAC Guard)</h3>
+                <p className="text-xs text-slate-500 mt-2 mb-6">
+                  Bạn cần đăng nhập bằng tài khoản được phân quyền hợp lệ để truy cập Bảng điều khiển nghiệp vụ.
+                </p>
+                <button
+                  onClick={() => setCurrentView('login')}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm"
+                >
+                  Đăng nhập tài khoản
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* RBAC Session Identification Banner */}
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                      <IconShieldCheck size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                          Bảng điều khiển {roleLabels[currentRole]}
+                        </h2>
+                        <Badge variant={roleBadges[currentRole]}>Phân quyền RBAC</Badge>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Phiên làm việc: <span className="font-semibold text-slate-700 dark:text-slate-300">{currentUser?.fullName || userInfo[currentRole].name}</span> ({currentUser?.email || userInfo[currentRole].email})
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Tài khoản: <span className="font-semibold text-slate-700 dark:text-slate-300">{userInfo[currentRole].name}</span> ({userInfo[currentRole].email})
-                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleLogout}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 transition"
+                    >
+                      Đăng xuất tài khoản
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Role Switcher specifically inside Dashboard */}
-              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl text-xs overflow-x-auto">
-                <span className="text-[11px] font-semibold text-slate-400 px-2 whitespace-nowrap">Chuyển vai trò:</span>
-                {(['student', 'parent', 'teacher', 'academic_manager', 'admin'] as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => handleRoleChange(r)}
-                    className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all font-medium ${
-                      currentRole === r
-                        ? 'bg-blue-600 text-white shadow-sm font-semibold'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {roleLabels[r]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Render the appropriate Dashboard component */}
-            {currentRole === 'student' && <StudentDashboard />}
-            {currentRole === 'parent' && <ParentDashboard />}
-            {currentRole === 'teacher' && <TeacherDashboard />}
-            {currentRole === 'academic_manager' && <AcademicManagerDashboard />}
-            {currentRole === 'admin' && <AdminDashboard />}
+                {/* Render the appropriate Dashboard component strictly bound to RBAC */}
+                {currentRole === 'student' && <StudentDashboard />}
+                {currentRole === 'parent' && <ParentDashboard />}
+                {currentRole === 'teacher' && <TeacherDashboard />}
+                {currentRole === 'staff' && <StaffDashboard />}
+                {currentRole === 'academic_manager' && <AcademicManagerDashboard />}
+                {currentRole === 'admin' && <AdminDashboard />}
+              </>
+            )}
           </div>
         )}
       </main>
-
-      {/* Persistent Quick Demo Floating Pill (Bottom Right) */}
-      <aside aria-label="Demo Navigation" className="fixed bottom-4 right-4 z-50 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl flex items-center gap-1.5 text-[11px] font-semibold">
-        <span className="text-slate-400 pl-2 pr-1">Chuyển nhanh:</span>
-        <button
-          onClick={() => setCurrentView('home')}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'home' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-        >
-          🏠 Trang chủ (Chung)
-        </button>
-        <button
-          onClick={() => {
-            setIsLoggedIn(false);
-            setCurrentView('login');
-          }}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'login' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-        >
-          🔑 Đăng nhập (Chung)
-        </button>
-        <button
-          onClick={() => {
-            setIsLoggedIn(true);
-            setCurrentView('dashboard');
-          }}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'dashboard' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-        >
-          📊 Dashboard ({roleLabels[currentRole]})
-        </button>
-      </aside>
 
       {/* Universal Footer */}
       <Footer />
