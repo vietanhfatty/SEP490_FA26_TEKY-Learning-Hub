@@ -731,6 +731,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
             </div>
           </div>
         </div>
-      </>}
-    </section>;
-}
+      </div>
+    </div>
+  );
+};
