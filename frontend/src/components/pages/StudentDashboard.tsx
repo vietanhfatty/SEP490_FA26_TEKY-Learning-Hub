@@ -1,12 +1,41 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IconClock,
   IconTrophy,
   IconCheckCircle,
   IconVideo,
-  IconDownload,
 } from '../common/Icons';
 import { Badge } from '../common/Badge';
+import { getStudentData, sessionStatus } from '../../services/studentClasses';
+import type { StudentClasses, StudentSession } from '../../services/studentClasses';
+import './StudentClasses.css';
+
+const zone = 'Asia/Ho_Chi_Minh';
+const dateText = (value: string) =>
+  new Date(value).toLocaleDateString('vi-VN', {
+    timeZone: zone,
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+const timeText = (value: string) =>
+  new Date(value).toLocaleTimeString('vi-VN', { timeZone: zone, hour: '2-digit', minute: '2-digit' });
+const dayKey = (value: string | number) => new Date(value).toLocaleDateString('en-CA', { timeZone: zone });
+const sessionPath = (id: number) => `/dashboard/timetable/${id}`;
+
+function countdown(startsAt: string, now: number) {
+  const minutes = Math.ceil((Date.parse(startsAt) - now) / 60000);
+  if (minutes <= 0) return 'Buổi học đang diễn ra';
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  return `${days > 0 ? `${days} ngày ` : ''}${hours} giờ ${minutes % 60} phút`;
+}
+
+function SessionBadge({ session, now }: { session: StudentSession; now: number }) {
+  const status = sessionStatus(session, now);
+  return <span className={`student-status ${status.kind}`}>{status.label}</span>;
+}
 
 // Upload icon
 const IconUploadSimple: React.FC<{ size?: number; className?: string }> = ({ size = 20, className = '' }) => (
@@ -32,8 +61,72 @@ interface StudentDashboardProps {
 }
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId = 'overview' }) => {
+  // Backend dynamic classes & timetable state
+  const [data, setData] = useState<StudentClasses | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [path, setPath] = useState(window.location.pathname);
+  const [detail, setDetail] = useState<StudentSession | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  // Fallback demo state
   const [projectUploaded, setProjectUploaded] = useState(false);
   const [selectedCourseTab, setSelectedCourseTab] = useState<'SCRATCH-01' | 'PY-GAME-02'>('SCRATCH-01');
+
+  const match = /^\/dashboard\/timetable\/(\d+)$/.exec(path);
+  const detailId = match ? Number(match[1]) : null;
+  const invalidPath = path.startsWith('/dashboard/timetable/') && detailId === null;
+
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener('popstate', onPop);
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    setDetail(null);
+    const load = async () => {
+      try {
+        if (invalidPath) throw new Error('Đường dẫn buổi học không hợp lệ.');
+        if (detailId !== null) {
+          const result = await getStudentData<StudentSession>(`sessions/${detailId}`, controller.signal);
+          if (!controller.signal.aborted) setDetail(result);
+        } else {
+          const result = await getStudentData<StudentClasses>('classes', controller.signal);
+          if (!controller.signal.aborted) {
+            setData(result);
+            setSelectedClassId((prev) =>
+              result.classes.some((c) => c.classId === prev) ? prev : result.classes[0]?.classId ?? null
+            );
+          }
+        }
+      } catch (failure) {
+        if (!controller.signal.aborted) {
+          setError(failure instanceof Error ? failure.message : 'Không thể tải dữ liệu.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [detailId, invalidPath, retry]);
+
+  function navigate(url: string) {
+    window.history.pushState({}, '', url);
+    setPath(url);
+    window.scrollTo({ top: 0 });
+  }
 
   const enrolledCourses = [
     {
@@ -72,213 +165,284 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
       nextTopic: 'Buổi 5: Cấu trúc rẽ nhánh If-Else & Vòng lặp For',
       badge: 'Level 1 Beginner',
       syllabus: [
-        { num: 1, title: 'Cài đặt môi trường Python & Lệnh print/input', status: 'Completed', score: 10 },
-        { num: 2, title: 'Biến số và kiểu dữ liệu cơ bản (int, float, str)', status: 'Completed', score: 9 },
-        { num: 3, title: 'Toán tử số học & Logic so sánh', status: 'Completed', score: 9.5 },
-        { num: 4, title: 'Dự án: Trò chơi đoán số may mắn (Random library)', status: 'Completed', score: 10 },
-        { num: 5, title: 'Cấu trúc rẽ nhánh If-Else & Vòng lặp For', status: 'Next', score: null },
-        { num: 6, title: 'Vòng lặp While & Ứng dụng menu console', status: 'Locked', score: null },
+        { num: 1, title: 'Cài đặt Python, IDLE & Lệnh print() đầu tiên', status: 'Completed', score: 10 },
+        { num: 2, title: 'Biến số (Variables) & Kiểu dữ liệu số/chuỗi', status: 'Completed', score: 9.0 },
+        { num: 3, title: 'Nhập dữ liệu với input() & Toán tử toán học', status: 'Completed', score: 9.5 },
+        { num: 4, title: 'Cấu trúc điều khiển If-Elif-Else & So sánh', status: 'Completed', score: 8.5 },
+        { num: 5, title: 'Vòng lặp For & Hàm range() vẽ hình sao', status: 'Next', score: null },
+        { num: 6, title: 'Vòng lặp While & Trò chơi Đoán số bí ẩn', status: 'Locked', score: null },
+        { num: 7, title: 'Lập trình đồ họa với thư viện Turtle Python', status: 'Locked', score: null },
       ],
     },
   ];
 
   const recentBadges = [
-    { title: 'Chăm Chỉ 100%', desc: 'Điểm danh đầy đủ 8 buổi liên tiếp', icon: '🏆', date: '02/11/2026', unlocked: true },
-    { title: 'Coder Tốc Độ', desc: 'Nộp bài tập Scratch sớm nhất lớp', icon: '⚡', date: '28/10/2026', unlocked: true },
-    { title: 'Sáng Tạo Vô Cực', desc: 'Dự án game có cốt truyện độc đáo', icon: '🎨', date: '20/10/2026', unlocked: true },
-    { title: 'Bậc Thầy Thuật Toán', desc: 'Xử lý logic vòng lặp không lỗi', icon: '🧠', date: '15/10/2026', unlocked: true },
-    { title: 'Robotics Master', desc: 'Lắp ráp mô hình cứu hỏa hoạt động', icon: '🤖', date: 'Sắp đạt', unlocked: false },
-    { title: 'Thuyết Trình Xuất Sắc', desc: 'Đạt điểm A+ phần bảo vệ dự án', icon: '🎤', date: 'Chưa mở', unlocked: false },
+    { title: 'Chăm Chỉ 100%', desc: 'Điểm danh đầy đủ 8 buổi liên tiếp', icon: '🏆', date: '02/11/2026' },
+    { title: 'Coder Tốc Độ', desc: 'Nộp bài tập Scratch sớm nhất lớp', icon: '⚡', date: '28/10/2026' },
+    { title: 'Sáng Tạo Vô Cực', desc: 'Dự án game có cốt truyện độc đáo', icon: '🎨', date: '20/10/2026' },
+    { title: 'Chuyên Gia Bug Hunter', desc: 'Tự sửa 5 lỗi logic thuật toán', icon: '🐞', date: '15/10/2026' },
+    { title: 'Đồng Đội Xuất Sắc', desc: 'Hỗ trợ bạn cùng bàn hoàn thiện code', icon: '🤝', date: '08/10/2026' },
   ];
 
-  const activeCourse = enrolledCourses.find((c) => c.code === selectedCourseTab) || enrolledCourses[0];
+  const currentCourse = enrolledCourses.find((c) => c.code === selectedCourseTab) || enrolledCourses[0];
 
-  // RENDER VIEW: LIVE CLASSROOM
-  if (activeNavId === 'live') {
+  const selectedClass = data?.classes.find((c) => c.classId === selectedClassId);
+  const backendSessions = selectedClass?.sessions ?? [];
+  const nextBackendSession =
+    selectedClass?.enrollmentStatus === 'Active'
+      ? backendSessions.find((s) => s.status === 'Scheduled' && Date.parse(s.endsAt) > now)
+      : undefined;
+
+  const vietnamToday = new Date(`${dayKey(now)}T00:00:00+07:00`);
+  const weekday = new Date(vietnamToday.getTime() + 7 * 3600000).getUTCDay();
+  const monday = vietnamToday.getTime() - ((weekday + 6) % 7) * 86400000 + weekOffset * 7 * 86400000;
+  const days = Array.from({ length: 7 }, (_, index) => monday + index * 86400000);
+
+  // 1. VIEW: CHI TIẾT BUỔI HỌC (Khi nhấn vào 1 session ID)
+  if (detailId !== null && detail) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-150">
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 text-white shadow-xl relative overflow-hidden">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-3 max-w-xl">
-              <div className="flex items-center gap-2">
-                <Badge variant="accent" className="bg-orange-500/30 text-orange-200 border-orange-400/40">
-                  🔴 Buổi học Live chuẩn bị diễn ra
-                </Badge>
-                <span className="text-xs text-blue-200">Bắt đầu: 14:00 (Thứ Bảy hôm nay)</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Lớp Scratch Game 3.0: Buổi 10
-              </h2>
-              <p className="text-blue-100 text-xs sm:text-sm leading-relaxed">
-                Chủ đề: Lập trình xử lý va chạm & Nhảy trọng lực cho nhân vật chính. Giáo viên phụ trách:{' '}
-                <span className="font-semibold text-white">Thầy Hoàng Văn Nam</span>.
-              </p>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/20 text-center min-w-[200px] space-y-2">
-              <p className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Thời gian còn lại</p>
-              <div className="text-3xl font-black tabular-nums tracking-tight text-white">00:45:12</div>
-              <button
-                onClick={() => alert('Đang kết nối vào phòng học trực tuyến TEKY Meeting...')}
-                className="w-full px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-xs shadow-md shadow-orange-500/30 transition-all flex items-center justify-center gap-2"
-              >
-                <IconVideo size={16} />
-                <span>Vào phòng học ngay</span>
-              </button>
-            </div>
-          </div>
+      <div className="space-y-6 py-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate('/dashboard/timetable')}
+            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-semibold flex items-center gap-1.5 transition"
+          >
+            ← Quay lại lịch học
+          </button>
+          <SessionBadge session={detail} now={now} />
         </div>
 
-        {/* Classroom Equipment Check & Rules */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl">🎙️</span>
-              <h4 className="font-bold text-sm text-slate-900 dark:text-white">Kiểm tra Micro & Camera</h4>
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+            {detail.courseName}
+          </p>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">{detail.title}</h2>
+          <p className="text-xs text-slate-500">
+            {dateText(detail.startsAt)} • {timeText(detail.startsAt)} – {timeText(detail.endsAt)}
+          </p>
+
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs">
+            <div>
+              <dt className="text-slate-400">Khóa học</dt>
+              <dd className="font-bold text-slate-800 dark:text-slate-200">{detail.courseCode}</dd>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Hãy đảm bảo tai nghe và micro hoạt động tốt để trao đổi trực tiếp cùng thầy và các bạn trong lớp.
+            <div>
+              <dt className="text-slate-400">Lớp học</dt>
+              <dd className="font-bold text-slate-800 dark:text-slate-200">{detail.classCode}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Giảng viên</dt>
+              <dd className="font-bold text-blue-600 dark:text-blue-400">{detail.teacherName ?? 'Thầy Hoàng Nam'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Phòng học</dt>
+              <dd className="font-bold text-slate-800 dark:text-slate-200">{detail.roomName ?? 'Online Room 04'}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">Nội dung buổi học</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {detail.content || 'Tìm hiểu thuật toán trọng lực, tính toán vận tốc rơi tự do và xử lý va chạm nền tảng.'}
             </p>
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600">
-              <IconCheckCircle size={16} /> Thiết bị đã sẵn sàng
-            </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl">💻</span>
-              <h4 className="font-bold text-sm text-slate-900 dark:text-white">Mở sẵn Scratch 3.0</h4>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Khởi động phần mềm Scratch Desktop hoặc mở trang web Scratch online trước khi vào lớp để không bị lỡ bài học.
-            </p>
-            <a
-              href="https://scratch.mit.edu"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
-            >
-              Mở Scratch Online ↗
-            </a>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl">⭐</span>
-              <h4 className="font-bold text-sm text-slate-900 dark:text-white">Quy tắc lớp học vui vẻ</h4>
-            </div>
-            <ul className="text-xs text-slate-500 space-y-1">
-              <li>• Vào lớp trước giờ học 5 phút.</li>
-              <li>• Giơ tay phát biểu khi có ý tưởng hay.</li>
-              <li>• Tích cực chia sẻ màn hình sản phẩm.</li>
-            </ul>
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">Tài liệu & Học liệu đính kèm</h3>
+            {detail.materials.length === 0 ? (
+              <p className="text-xs text-slate-400">Chưa có học liệu đính kèm cho buổi này.</p>
+            ) : (
+              <ul className="space-y-2 text-xs">
+                {detail.materials.map((m) => (
+                  <li key={m.materialId} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center">
+                    <span className="font-semibold">{m.title}</span>
+                    <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">
+                      Tải về ↗
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  // RENDER VIEW: COURSES & SYLLABUS ROADMAP
+  // 2. VIEW: KHÓA HỌC & ĐỀ CƯƠNG SYLLABUS
   if (activeNavId === 'courses') {
     return (
-      <div className="space-y-6 animate-in fade-in duration-150">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="space-y-6 py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Khóa học & Lộ trình chi tiết</h2>
-            <p className="text-xs text-slate-500">Theo dõi toàn bộ 12 buổi học theo tiêu chuẩn giáo trình CSTA Hoa Kỳ.</p>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Khóa Học & Lộ Trình Đào Tạo STEAM</h3>
+            <p className="text-xs text-slate-500">Xem tiến độ chi tiết từng buổi học chuẩn khung CSTA Hoa Kỳ</p>
           </div>
+
           <div className="flex gap-2">
             {enrolledCourses.map((c) => (
               <button
                 key={c.code}
                 onClick={() => setSelectedCourseTab(c.code as 'SCRATCH-01' | 'PY-GAME-02')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                   selectedCourseTab === c.code
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
                 }`}
               >
-                {c.title}
+                {c.title.split(' ')[2] || c.code} ({c.progress}%)
               </button>
             ))}
           </div>
         </div>
 
-        {/* Selected Course Header Banner */}
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Badge variant="info">{activeCourse.code}</Badge>
-              <span className="text-xs font-semibold text-slate-400">Giảng viên: {activeCourse.teacher}</span>
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-700">
+            <div>
+              <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                {currentCourse.code} • GV: {currentCourse.teacher}
+              </span>
+              <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">{currentCourse.title}</h2>
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{activeCourse.title}</h3>
-            <p className="text-xs text-slate-500">Đã hoàn thành {activeCourse.completedLessons}/{activeCourse.totalLessons} buổi học ({activeCourse.progress}%)</p>
+            <div className="text-right">
+              <span className="text-2xl font-black text-blue-600 tabular-nums">{currentCourse.progress}%</span>
+              <p className="text-[11px] text-slate-400">
+                {currentCourse.completedLessons}/{currentCourse.totalLessons} buổi hoàn thành
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-xs text-slate-400 font-medium">Cấp độ hiện tại</p>
-              <p className="text-sm font-bold text-orange-600">{activeCourse.badge}</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {currentCourse.syllabus.map((lesson) => (
+              <div
+                key={lesson.num}
+                className={`p-4 rounded-2xl border text-xs transition-all ${
+                  lesson.status === 'Completed'
+                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50'
+                    : lesson.status === 'Next'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
+                    : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/50 opacity-60'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-[11px] px-2 py-0.5 rounded-md bg-white/80 dark:bg-slate-700">
+                    Buổi {lesson.num}
+                  </span>
+                  {lesson.score !== null ? (
+                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      {lesson.score}/10 điểm
+                    </span>
+                  ) : lesson.status === 'Next' ? (
+                    <Badge variant="accent">Buổi tiếp theo</Badge>
+                  ) : (
+                    <span className="text-slate-400 text-[10px]">🔒 Chưa mở</span>
+                  )}
+                </div>
+                <p className="font-bold text-slate-800 dark:text-slate-200 line-clamp-2">{lesson.title}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. VIEW: PHÒNG HỌC TRỰC TUYẾN (LIVE CLASSROOM)
+  if (activeNavId === 'live') {
+    return (
+      <div className="space-y-6 py-6">
+        <div className="p-8 rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 text-white shadow-xl space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <Badge variant="accent" className="bg-orange-500/40 text-orange-200 border-orange-300/40 px-3 py-1">
+              🔴 Phòng học Trực tuyến STEAM WebRTC
+            </Badge>
+            <span className="text-xs text-blue-200 font-medium">Hệ thống âm thanh & Micro: Hoạt động tốt ✓</span>
+          </div>
+
+          <div className="max-w-2xl space-y-2">
+            <h2 className="text-3xl font-black">Lớp Scratch Game 3.0: Buổi 10</h2>
+            <p className="text-blue-100 text-sm leading-relaxed">
+              Xử lý va chạm nhân vật & lập trình trọng lực. Giảng viên trực tiếp: <strong>Thầy Hoàng Văn Nam</strong>.
+            </p>
+          </div>
+
+          <div className="pt-4 flex flex-wrap gap-4 items-center">
             <button
-              onClick={() => alert('Đang tải toàn bộ giáo trình PDF...')}
-              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs hover:bg-slate-200 transition-colors flex items-center gap-1.5"
+              onClick={() => alert('Đang kết nối vào phòng học trực tuyến TEKY STEAM...')}
+              className="px-8 py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-extrabold text-sm shadow-xl shadow-orange-500/30 transition-all flex items-center gap-2"
             >
-              <IconDownload size={15} /> Tải giáo trình
+              <IconVideo size={20} /> Tham gia Lớp học Trực tuyến Ngay →
+            </button>
+            <button
+              onClick={() => alert('Đang chạy kiểm tra camera và micro...')}
+              className="px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/20 transition-all"
+            >
+              Kiểm tra thiết bị (Mic & Cam)
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Lessons List Roadmap */}
-        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-100 dark:border-slate-700 font-bold text-sm text-slate-900 dark:text-white flex items-center justify-between">
-            <span>Danh sách 12 buổi học</span>
-            <span className="text-xs text-slate-400 font-normal">Xanh lá: Đã học • Cam: Buổi tiếp theo • Khóa: Sắp tới</span>
+  // 4. VIEW: DỰ ÁN & BÀI TẬP (DROPZONE)
+  if (activeNavId === 'assignments') {
+    return (
+      <div className="space-y-6 py-6">
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Nộp Dự Án & Bài Tập Tuần Này</h3>
+          <p className="text-xs text-slate-500">
+            Hạn nộp: Chủ Nhật, 23:59. Hỗ trợ định dạng file Scratch (.sb3), Python (.py), Arduino (.ino) hoặc file nén (.zip).
+          </p>
+
+          <div
+            onClick={() => setProjectUploaded(true)}
+            className="border-2 border-dashed border-blue-400 dark:border-blue-700 rounded-3xl p-10 text-center hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer transition-all"
+          >
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center mb-4">
+              <IconUploadSimple size={32} />
+            </div>
+            {projectUploaded ? (
+              <div className="text-sm font-bold text-emerald-600 flex items-center justify-center gap-2">
+                <IconCheckCircle size={20} />
+                <span>Đã nộp thành công: flappy_bird_scratch_final.sb3 (1.4 MB) • Điểm chờ chấm</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  Kéo thả file mã nguồn dự án vào đây, hoặc nhấn để chọn từ máy tính
+                </p>
+                <p className="text-xs text-slate-400 mt-1">Dung lượng tối đa 25MB • Chuẩn định dạng TEKY</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. VIEW: BẢNG VÀNG THÀNH TÍCH (TROPHY CABINET)
+  if (activeNavId === 'achievements') {
+    return (
+      <div className="space-y-6 py-6">
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+              <IconTrophy size={22} className="text-amber-500" /> Bảng Vàng & Huy Hiệu STEAM Đạt Được
+            </h3>
+            <Badge variant="success">8/20 Huy hiệu đã mở khóa</Badge>
           </div>
 
-          <div className="divide-y divide-slate-100 dark:divide-slate-700">
-            {activeCourse.syllabus.map((lesson) => (
-              <div
-                key={lesson.num}
-                className={`p-4 sm:p-5 flex items-center justify-between gap-4 transition-colors ${
-                  lesson.status === 'Next'
-                    ? 'bg-blue-50/70 dark:bg-blue-950/40 border-l-4 border-l-blue-600'
-                    : 'hover:bg-slate-50/80 dark:hover:bg-slate-700/30'
-                }`}
-              >
-                <div className="flex items-center gap-3.5">
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                      lesson.status === 'Completed'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                        : lesson.status === 'Next'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {lesson.status === 'Completed' ? '✓' : lesson.num}
-                  </div>
-                  <div>
-                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                      Buổi {lesson.num}: {lesson.title}
-                    </h5>
-                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                      {lesson.score !== null && (
-                        <span className="font-semibold text-emerald-600">Điểm số: {lesson.score}/10</span>
-                      )}
-                      <span>• Thời lượng: 90 phút</span>
-                    </div>
-                  </div>
-                </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+            {recentBadges.map((b, idx) => (
+              <div key={idx} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-700/40 border border-slate-200/80 dark:border-slate-700 flex items-start gap-3">
+                <span className="text-3xl">{b.icon}</span>
                 <div>
-                  {lesson.status === 'Completed' ? (
-                    <Badge variant="success">Đã hoàn thành</Badge>
-                  ) : lesson.status === 'Next' ? (
-                    <Badge variant="accent">Buổi học kế tiếp</Badge>
-                  ) : (
-                    <Badge variant="neutral">Chưa mở</Badge>
-                  )}
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{b.title}</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">{b.desc}</p>
+                  <span className="text-[10px] text-slate-400 mt-2 block font-medium">Đạt được: {b.date}</span>
                 </div>
               </div>
             ))}
@@ -288,164 +452,23 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
     );
   }
 
-  // RENDER VIEW: ASSIGNMENTS & HOMEWORK
-  if (activeNavId === 'assignments') {
-    return (
-      <div className="space-y-6 animate-in fade-in duration-150">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Dự án & Nộp bài tập STEAM</h2>
-            <p className="text-xs text-slate-500">Nộp file Scratch (.sb3), Python (.py) hoặc link dự án trực tuyến để nhận điểm và huy hiệu.</p>
-          </div>
-          <Badge variant="warning">1 Bài cần nộp tuần này</Badge>
-        </div>
-
-        {/* Current Active Assignment */}
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-xs font-bold text-blue-600">Scratch Game 3.0 • Buổi 9</span>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">
-                Dự án: Lập trình Game Flappy Bird hoàn chỉnh (Có tính điểm và âm thanh)
-              </h3>
-            </div>
-            <div className="text-right">
-              <span className="text-xs font-semibold text-rose-600">Hạn chót: Chủ Nhật 23:59</span>
-              <p className="text-[11px] text-slate-400">Còn 2 ngày</p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50 text-xs text-slate-600 dark:text-slate-300 space-y-2">
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Yêu cầu dự án:</p>
-            <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-400 text-[11px]">
-              <li>Nhân vật chú chim có hiệu ứng vỗ cánh khi bấm phím Space.</li>
-              <li>Chướng ngại vật cột ống di chuyển liên tục từ phải sang trái.</li>
-              <li>Có biến Score tăng thêm 1 điểm khi vượt qua mỗi cột.</li>
-              <li>Có âm thanh Game Over khi chạm vào cột hoặc rơi xuống đất.</li>
-            </ul>
-          </div>
-
-          {/* Interactive Dropzone */}
-          <div
-            onClick={() => setProjectUploaded(true)}
-            className="border-2 border-dashed border-blue-300 dark:border-blue-700 rounded-2xl p-8 text-center hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer transition-colors"
-          >
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center mb-3">
-              <IconUploadSimple size={28} />
-            </div>
-            {projectUploaded ? (
-              <div className="space-y-2">
-                <div className="text-xs font-bold text-emerald-600 flex items-center justify-center gap-2">
-                  <IconCheckCircle size={18} />
-                  <span>Đã tải lên tệp: flappy_bird_scratch_final.sb3 (1.4 MB)</span>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    alert('Đã gửi bài tập thành công cho Thầy Hoàng Văn Nam chấm điểm!');
-                  }}
-                  className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-[0.98] transition-all"
-                >
-                  Xác nhận Nộp bài ngay →
-                </button>
-              </div>
-            ) : (
-              <>
-                <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Kéo thả file bài tập vào đây, hoặc click để chọn file từ máy
-                </p>
-                <p className="text-[11px] text-slate-400 mt-1">Định dạng hỗ trợ: .sb3, .py, .zip (Tối đa 25MB)</p>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Previous Submissions History */}
-        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 space-y-4">
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Lịch sử bài tập đã chấm điểm</h4>
-          <div className="divide-y divide-slate-100 dark:divide-slate-700 text-xs">
-            <div className="py-3 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">Buổi 8: Game Bắt Táo Rơi (Apple Catcher)</p>
-                <p className="text-[11px] text-slate-400">Nộp ngày 25/10/2026 • Thầy Hoàng Nam chấm</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-emerald-600 text-sm">10/10 ⭐</span>
-                <Badge variant="success">Xuất sắc</Badge>
-              </div>
-            </div>
-            <div className="py-3 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">Buổi 5: Dự án Mèo bắt chuột Mini</p>
-                <p className="text-[11px] text-slate-400">Nộp ngày 10/10/2026 • Thầy Hoàng Nam chấm</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-emerald-600 text-sm">9.5/10 ⭐</span>
-                <Badge variant="success">Đạt chuẩn</Badge>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // RENDER VIEW: ACHIEVEMENTS & TROPHY ROOM
-  if (activeNavId === 'achievements') {
-    return (
-      <div className="space-y-6 animate-in fade-in duration-150">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Bảng Vàng Thành Tích & Huy Hiệu</h2>
-            <p className="text-xs text-slate-500">Mỗi buổi học và dự án hoàn thành giúp em thăng cấp và tích lũy XP!</p>
-          </div>
-          <Badge variant="accent">Cấp độ 4: Coder Nhí Triển Vọng</Badge>
-        </div>
-
-        {/* XP & Level Meter */}
-        <div className="p-6 rounded-3xl bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg space-y-3">
-          <div className="flex justify-between items-center text-xs font-bold">
-            <span>Tiến trình thăng cấp Level 5</span>
-            <span className="tabular-nums">850 / 1000 XP</span>
-          </div>
-          <div className="w-full h-3 rounded-full bg-white/30 overflow-hidden">
-            <div className="h-full bg-white rounded-full transition-all duration-300" style={{ width: '85%' }}></div>
-          </div>
-          <p className="text-[11px] text-white/90">Chỉ còn 150 XP nữa để đạt huy hiệu 👑 Hiệp sĩ Scratch!</p>
-        </div>
-
-        {/* Badges Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {recentBadges.map((b, idx) => (
-            <div
-              key={idx}
-              className={`p-5 rounded-2xl border transition-all flex items-start gap-4 ${
-                b.unlocked
-                  ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm'
-                  : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800 opacity-60'
-              }`}
-            >
-              <div className="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-950/60 text-2xl flex items-center justify-center shrink-0">
-                {b.icon}
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
-                  {b.title}
-                  {b.unlocked && <span className="text-[10px] text-emerald-600 font-bold">✓ Đã mở</span>}
-                </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">{b.desc}</p>
-                <p className="text-[10px] text-slate-400 pt-1">{b.date}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // DEFAULT RENDER VIEW: OVERVIEW BENTO
+  // 6. DEFAULT / OVERVIEW: BENTO GRID KẾT HỢP DỮ LIỆU BACKEND + LỊCH TUẦN + HUY HIỆU
   return (
-    <div className="space-y-8 animate-in fade-in duration-150">
+    <div className="space-y-8 py-6">
+      {loading && (
+        <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-xs font-semibold flex items-center justify-between">
+          <span>Đang đồng bộ dữ liệu lớp học thời gian thực...</span>
+        </div>
+      )}
+      {error && (
+        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 text-xs font-medium flex items-center justify-between">
+          <span>{error} (Đang hiển thị dữ liệu lớp học lưu trữ ngoại tuyến)</span>
+          <button onClick={() => setRetry((r) => r + 1)} className="font-bold underline ml-2">
+            Thử lại ↻
+          </button>
+        </div>
+      )}
+
       {/* Top Banner & Next Class Countdown (Bento Top) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Next Class Hero Card */}
@@ -453,15 +476,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Badge variant="accent" className="bg-orange-500/30 text-orange-200 border-orange-400/40">
-                🔴 Sắp Diễn Ra (Còn 45 phút)
+                🔴 Sắp Diễn Ra ({countdown(nextBackendSession ? nextBackendSession.startsAt : new Date(Date.now() + 45 * 60000).toISOString(), now)})
               </Badge>
               <span className="text-xs text-blue-200">Thứ Bảy, 14:00 - 15:30</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Lớp Scratch Game 3.0: Buổi 10
+              {nextBackendSession ? nextBackendSession.title : 'Lớp Scratch Game 3.0: Buổi 10'}
             </h2>
             <p className="text-blue-100 text-xs sm:text-sm max-w-xl">
-              Chủ đề: Xử lý va chạm & lập trình thanh máu (HP Bar) cho nhân vật chính. Giáo viên: Thầy Hoàng Văn Nam.
+              Chủ đề: Xử lý va chạm & lập trình thanh máu (HP Bar) cho nhân vật chính. Giáo viên:{' '}
+              {nextBackendSession?.teacherName ?? 'Thầy Hoàng Văn Nam'}.
             </p>
           </div>
 
@@ -471,13 +495,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
                 HN1
               </div>
               <div>
-                <p className="text-xs font-semibold">Phòng học Online 04</p>
-                <p className="text-[11px] text-blue-200">Meeting ID: teky-scratch-10</p>
+                <p className="text-xs font-semibold">{nextBackendSession?.roomName ?? 'Phòng học Online 04'}</p>
+                <p className="text-[11px] text-blue-200">
+                  Meeting ID: {nextBackendSession?.sessionId ? `teky-${nextBackendSession.sessionId}` : 'teky-scratch-10'}
+                </p>
               </div>
             </div>
 
             <button
-              onClick={() => alert('Đang mở phòng học trực tuyến của lớp học TEKY...')}
+              onClick={() => {
+                if (nextBackendSession) {
+                  navigate(sessionPath(nextBackendSession.sessionId));
+                } else {
+                  alert('Đang mở phòng học Zoom/Meet của lớp học TEKY...');
+                }
+              }}
               className="px-6 py-3 min-h-[44px] rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-xs shadow-md shadow-orange-500/30 transition-all flex items-center gap-2"
             >
               Vào Lớp Học Ngay →
@@ -494,65 +526,91 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
                   👦
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Nguyễn Minh Quân</h3>
-                  <p className="text-xs text-slate-500">Mã HS: TEKY-2026-88</p>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                    {data?.fullName ?? 'Nguyễn Minh Quân'}
+                  </h3>
+                  <p className="text-xs text-slate-500">Mã HS: {data?.studentCode ?? 'TEKY-2026-88'}</p>
                 </div>
               </div>
               <Badge variant="accent">Học sinh Tiêu biểu</Badge>
             </div>
 
             {/* Streak Counter */}
-            <div className="p-4 rounded-2xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 mb-4">
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 mb-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-orange-800 dark:text-orange-300">🔥 Chuỗi học tập liên tiếp</span>
-                <span className="text-lg font-extrabold text-orange-600 tabular-nums">12 Ngày</span>
+                <span className="text-xs font-bold text-amber-800 dark:text-amber-300">🔥 Chuỗi học tập: 5 Ngày</span>
+                <span className="text-xs text-amber-600 font-semibold">+50 EXP</span>
               </div>
-              <p className="text-[11px] text-orange-700 dark:text-orange-400 mt-1">Hoàn thành bài tập đúng hạn để nhận thêm Huy hiệu Master!</p>
+              <div className="flex justify-between items-center mt-2.5 px-1">
+                {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d, i) => (
+                  <div key={d} className="flex flex-col items-center gap-1">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        i < 5
+                          ? 'bg-amber-500 text-white'
+                          : i === 5
+                          ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 border border-amber-400 animate-pulse'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
+                      }`}
+                    >
+                      {i < 5 ? '✓' : d}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-center pt-2 border-t border-slate-100 dark:border-slate-700 text-xs">
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-700/50">
-              <p className="text-slate-400 text-[11px]">Điểm trung bình</p>
-              <p className="text-base font-bold text-slate-900 dark:text-white tabular-nums">9.5/10</p>
+          <div className="grid grid-cols-2 gap-3 pt-2 text-center text-xs border-t border-slate-100 dark:border-slate-700">
+            <div>
+              <p className="text-slate-400 text-[11px]">Tổng điểm dự án</p>
+              <p className="text-lg font-black text-blue-600 tabular-nums">9.5 / 10</p>
             </div>
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-700/50">
-              <p className="text-slate-400 text-[11px]">Huy hiệu đạt được</p>
-              <p className="text-base font-bold text-orange-600 tabular-nums">8 Huy hiệu</p>
+            <div>
+              <p className="text-slate-400 text-[11px]">Chuyên cần</p>
+              <p className="text-lg font-black text-emerald-600 tabular-nums">100%</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Bento: Enrolled Courses & Curriculum Roadmap */}
+      {/* Main Grid: Enrolled Courses & Week Schedule + Right Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Courses & Milestone Progress */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Lộ trình khóa học của em</h3>
-            <span className="text-xs text-blue-600 font-semibold cursor-pointer">Xem tất cả giáo trình →</span>
-          </div>
-
+          {/* Active Courses Bento Cards */}
           <div className="space-y-4">
-            {enrolledCourses.map((c, idx) => (
-              <div key={idx} className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Khóa học đang diễn ra</h3>
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">2 Khóa đang theo học</span>
+            </div>
+
+            {enrolledCourses.map((c) => (
+              <div
+                key={c.code}
+                className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{c.code}</span>
-                    <h4 className="text-base font-bold text-slate-900 dark:text-white">{c.title}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-base text-slate-900 dark:text-white">{c.title}</h4>
+                      <Badge variant="info">{c.badge}</Badge>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Mã: {c.code} • GV: {c.teacher}
+                    </p>
                   </div>
-                  <Badge variant="info">{c.badge}</Badge>
+                  <div className="text-right">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 tabular-nums">
+                      {c.completedLessons}/{c.totalLessons} Buổi học ({c.progress}%)
+                    </span>
+                  </div>
                 </div>
 
-                {/* Progress Bar */}
-                <div>
-                  <div className="flex justify-between text-xs mb-1.5 font-medium">
-                    <span className="text-slate-600 dark:text-slate-400">Tiến độ bài học: {c.completedLessons}/{c.totalLessons} buổi</span>
-                    <span className="text-blue-600 font-bold tabular-nums">{c.progress}%</span>
-                  </div>
-                  <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-sky-400 rounded-full transition-all duration-300" style={{ width: `${c.progress}%` }}></div>
-                  </div>
+                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${c.progress}%` }}
+                  ></div>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 flex items-center justify-between text-xs">
@@ -560,18 +618,99 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
                     <IconClock size={16} className="text-slate-400 shrink-0" />
                     <span className="font-medium">{c.nextTopic}</span>
                   </div>
-                  <button className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-blue-600 shadow-sm hover:bg-slate-50">
-                    Tài liệu bài học
+                  <button
+                    onClick={() => setSelectedCourseTab(c.code as 'SCRATCH-01' | 'PY-GAME-02')}
+                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-blue-600 shadow-sm hover:bg-slate-50"
+                  >
+                    Xem giáo án
                   </button>
                 </div>
               </div>
             ))}
           </div>
 
+          {/* Week Schedule Matrix Preview (From studentClasses backend) */}
+          <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-base text-slate-900 dark:text-white">Lịch học theo tuần</h4>
+                <p className="text-xs text-slate-500">
+                  {new Date(days[0]).toLocaleDateString('vi-VN', { timeZone: zone })} –{' '}
+                  {new Date(days[6]).toLocaleDateString('vi-VN', { timeZone: zone })}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  aria-label="Tuần trước"
+                  onClick={() => setWeekOffset((w) => w - 1)}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+                >
+                  Hôm nay
+                </button>
+                <button
+                  aria-label="Tuần sau"
+                  onClick={() => setWeekOffset((w) => w + 1)}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                >
+                  →
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 pt-2 text-center text-xs">
+              {days.map((day, index) => {
+                const scheduled = backendSessions.filter((s) => dayKey(s.startsAt) === dayKey(day));
+                const isToday = dayKey(day) === dayKey(now);
+                return (
+                  <div
+                    key={day}
+                    className={`p-2 rounded-xl border text-[11px] ${
+                      isToday
+                        ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30'
+                        : 'border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/40'
+                    }`}
+                  >
+                    <span className={`font-bold block ${isToday ? 'text-blue-600' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {index === 6 ? 'CN' : `T${index + 2}`}
+                    </span>
+                    <small className="text-slate-400 block text-[10px]">
+                      {new Date(day).toLocaleDateString('vi-VN', { timeZone: zone, day: '2-digit', month: '2-digit' })}
+                    </small>
+
+                    <div className="mt-2">
+                      {scheduled.length === 0 ? (
+                        <span className="text-slate-400 text-[10px] italic">Trống</span>
+                      ) : (
+                        scheduled.map((s) => (
+                          <button
+                            key={s.sessionId}
+                            onClick={() => navigate(sessionPath(s.sessionId))}
+                            className="w-full p-1 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-200 text-[10px] font-semibold truncate hover:underline"
+                          >
+                            {timeText(s.startsAt)}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Project & Homework Submission Box */}
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
             <h4 className="font-bold text-base text-slate-900 dark:text-white mb-2">Nộp dự án & Bài tập tuần này</h4>
-            <p className="text-xs text-slate-500 mb-4">Hạn chót: Chủ Nhật, 23:59. Hỗ trợ định dạng file Scratch (.sb3), Python (.py) hoặc link GitHub.</p>
+            <p className="text-xs text-slate-500 mb-4">
+              Hạn chót: Chủ Nhật, 23:59. Hỗ trợ định dạng file Scratch (.sb3), Python (.py) hoặc link GitHub.
+            </p>
 
             <div
               onClick={() => setProjectUploaded(true)}
@@ -587,7 +726,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
                 </div>
               ) : (
                 <>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Kéo thả file bài tập vào đây, hoặc click để chọn file từ máy</p>
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Kéo thả file bài tập vào đây, hoặc click để chọn file từ máy
+                  </p>
                   <p className="text-[11px] text-slate-400 mt-1">Dung lượng tối đa 25MB</p>
                 </>
               )}
@@ -607,7 +748,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
             </div>
 
             <div className="space-y-3">
-              {recentBadges.slice(0, 4).map((b, idx) => (
+              {recentBadges.map((b, idx) => (
                 <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-xs">
                   <span className="text-2xl">{b.icon}</span>
                   <div className="flex-1">

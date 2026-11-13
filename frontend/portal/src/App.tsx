@@ -27,7 +27,7 @@ function RoleRedirect() {
 export function App() {
   const navigate = useNavigate();
   const isAccountVisible = useAuth().isLoggedIn;
-  const { isLoggedIn, role, accessToken, refreshToken, user } = useAuth();
+  const { isLoggedIn, role, accessToken, refreshToken, user, logout } = useAuth();
 
   /**
    * Điều hướng tới Shell đúng của vai trò.

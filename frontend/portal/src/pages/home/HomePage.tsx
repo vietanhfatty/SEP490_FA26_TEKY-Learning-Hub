@@ -7,7 +7,7 @@ interface HomePageProps {
   isLoggedIn?: boolean;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onNavigate, isLoggedIn }) => {
+export const HomePage: React.FC<HomePageProps> = ({ onNavigate, isLoggedIn: _isLoggedIn = false }) => {
   const [selectedAge, setSelectedAge] = useState<'All' | '7-9' | '10-12' | '13-16'>('All');
 
   const steamTracks = [
@@ -89,29 +89,75 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, isLoggedIn }) =>
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
-            {isLoggedIn ? (
-              <button
-                onClick={() => onNavigate('dashboard')}
-                className="px-6 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2"
-              >
-                Vào Bảng điều khiển (Dashboard) <IconChevronRight size={18} />
-              </button>
-            ) : (
-              <button
-                onClick={() => onNavigate('login')}
-                className="px-6 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2"
-              >
-                Đăng nhập vào hệ thống <IconChevronRight size={18} />
-              </button>
-            )}
             <button
-              onClick={() => {
-                document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-md border border-white/20 transition-all"
+              onClick={() => onNavigate('dashboard')}
+              className="px-6 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2"
             >
-              Khám phá chương trình STEAM ↓
+              🚀 Vào Bảng điều khiển LMS (Trải nghiệm 5 Vai trò) <IconChevronRight size={18} />
             </button>
+            <button
+              onClick={() => onNavigate('login')}
+              className="px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-md border border-white/20 transition-all flex items-center gap-2"
+            >
+              Cổng Đăng nhập Phân quyền
+            </button>
+          </div>
+
+          {/* Quick LMS Role Switcher Bar */}
+          <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 space-y-2">
+            <p className="text-xs text-sky-200 font-semibold">Khám phá nhanh không gian làm việc theo vai trò LMS:</p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button
+                onClick={() => {
+                  localStorage.setItem('teky_role', 'student');
+                  localStorage.removeItem('teky_logged_out');
+                  onNavigate('dashboard');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-orange-500/80 hover:bg-orange-500 text-white font-medium transition"
+              >
+                👦 Học sinh (Bento & Lộ trình CSTA)
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('teky_role', 'parent');
+                  localStorage.removeItem('teky_logged_out');
+                  onNavigate('dashboard');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-pink-500/80 hover:bg-pink-500 text-white font-medium transition"
+              >
+                👩 Phụ huynh (Sổ liên lạc & Năng lực 5D)
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('teky_role', 'teacher');
+                  localStorage.removeItem('teky_logged_out');
+                  onNavigate('dashboard');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-blue-500/80 hover:bg-blue-500 text-white font-medium transition"
+              >
+                👨‍🏫 Giảng viên (Điểm danh 1-chạm & Giáo án)
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('teky_role', 'academic_manager');
+                  localStorage.removeItem('teky_logged_out');
+                  onNavigate('dashboard');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-amber-500/80 hover:bg-amber-500 text-white font-medium transition"
+              >
+                👩‍💻 Quản lý Đào tạo (Ma trận Xung đột)
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('teky_role', 'admin');
+                  localStorage.removeItem('teky_logged_out');
+                  onNavigate('dashboard');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition"
+              >
+                🛡️ Quản trị viên (Hạ tầng & Audit Logs)
+              </button>
+            </div>
           </div>
 
           {/* Social Proof Stats */}
