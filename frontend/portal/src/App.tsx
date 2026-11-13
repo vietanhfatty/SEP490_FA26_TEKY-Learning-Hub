@@ -3,7 +3,6 @@ import { HomePage } from './pages/home/HomePage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ParentDashboard } from './pages/parent/ParentDashboard';
-import type { UserRole } from '@teky/shared';
 
 export function App() {
   const [currentView, setCurrentView] = useState<'home' | 'login' | 'student' | 'parent'>('home');

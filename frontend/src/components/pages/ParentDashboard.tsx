@@ -136,7 +136,10 @@ export const ParentDashboard: React.FC = () => {
   }, [loadChildDetails]);
 
   useEffect(() => {
-    void loadParentHub();
+    const timer = window.setTimeout(() => {
+      void loadParentHub();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadParentHub]);
 
   // Subscribe to realtime workstation check-in events (SCR-PAR-01 Real-Time Attendance Monitoring)

@@ -222,7 +222,10 @@ export const TeacherDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void loadAllTeacherData();
+    const timer = window.setTimeout(() => {
+      void loadAllTeacherData();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadAllTeacherData]);
 
   const handleSelectSessionForAttendance = async (sessionId: number) => {
