@@ -229,7 +229,7 @@ public class Assignment
     public string Title { get; set; } = string.Empty;
     public string? Instructions { get; set; }
     public DateTime? DueAt { get; set; }
-    public string Status { get; set; } = "Open";
+    public string Status { get; set; } = "Published"; // Draft, Published, Closed (DB CHECK)
     public DateTime? ClosedAt { get; set; }
     public string? ClosedReason { get; set; }
     public string? MasterAstJson { get; set; }
@@ -258,7 +258,7 @@ public class Submission
     public int AttemptNo { get; set; } = 1;
     public string BlocklyJson { get; set; } = "{}";
     public string? AstJson { get; set; }
-    public string Status { get; set; } = "Submitted"; // Submitted, Graded
+    public string Status { get; set; } = "Pending"; // Pending, AutoGraded, Finalized (DB CHECK)
     public bool IsCurrent { get; set; } = true;
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
 
@@ -311,7 +311,7 @@ public class Grade
     public decimal? HardwareScore { get; set; }
     public decimal? FinalScore { get; set; }
     public string? RemarkText { get; set; }
-    public string? RemarkSource { get; set; } // Text, Voice
+    public string? RemarkSource { get; set; } // Typed, Voice (DB CHECK)
     public bool IsFinalized { get; set; } = false;
     public int? FinalizedBy { get; set; }
     public DateTime? FinalizedAt { get; set; }
@@ -386,6 +386,21 @@ public class LeaderboardCycle
     public string Status { get; set; } = "Active";
 
     public ICollection<LeaderboardEntry> Entries { get; set; } = new List<LeaderboardEntry>();
+}
+
+public class SimulationRun
+{
+    public long RunId { get; set; }
+    public int AssignmentId { get; set; }
+    public int StudentId { get; set; }
+    public long? SubmissionId { get; set; }
+    public int MapId { get; set; }
+    public int ExecTimeMs { get; set; }
+    public int BlockCount { get; set; }
+    public int CheckpointsReached { get; set; } = 0;
+    public bool ReachedFinish { get; set; } = false;
+    public string? TrajectoryJson { get; set; }
+    public DateTime RunAt { get; set; } = DateTime.UtcNow;
 }
 
 public class LeaderboardEntry

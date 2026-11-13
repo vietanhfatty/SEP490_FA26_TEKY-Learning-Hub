@@ -71,7 +71,7 @@ public class ExcelExportService : IExcelExportService
         int row = 5;
         int stt = 1;
 
-        var activeStudents = classroom.Enrollments.Where(e => e.Status == "Enrolled").OrderBy(e => e.Student.User.FullName).ToList();
+        var activeStudents = classroom.Enrollments.Where(e => e.Status == "Active").OrderBy(e => e.Student.User.FullName).ToList();
         foreach (var item in activeStudents)
         {
             var student = item.Student;

@@ -90,3 +90,12 @@ public class LeaderboardRankItemDto
     public int BestTimeMs { get; set; }
     public int BestBlockCount { get; set; }
 }
+
+/// <summary>SCR-PAR-04: Danh mục nhãn dán cổ vũ</summary>
+public class CheerStickerDto
+{
+    public int StickerId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+}

@@ -38,6 +38,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<CheerMessage> CheerMessages => Set<CheerMessage>();
     public DbSet<PortfolioItem> PortfolioItems => Set<PortfolioItem>();
     public DbSet<AchievementCard> AchievementCards => Set<AchievementCard>();
+    public DbSet<SimulationRun> SimulationRuns => Set<SimulationRun>();
     public DbSet<LeaderboardCycle> LeaderboardCycles => Set<LeaderboardCycle>();
     public DbSet<LeaderboardEntry> LeaderboardEntries => Set<LeaderboardEntry>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -233,6 +234,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             e.HasOne(ac => ac.Item).WithMany(i => i.Cards).HasForeignKey(ac => ac.ItemId);
         });
 
+        modelBuilder.Entity<SimulationRun>(e =>
+        {
+            e.ToTable("SimulationRuns");
+            e.HasKey(sr => sr.RunId);
+        });
+
         modelBuilder.Entity<LeaderboardCycle>(e =>
         {
             e.ToTable("LeaderboardCycles");
@@ -264,5 +271,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             e.ToTable("SpotlightBroadcasts");
             e.HasKey(sb => sb.BroadcastId);
         });
+
+        // Precision cho toàn bộ cột decimal để khớp SQL Server schema và triệt tiêu cảnh báo EF Core 30000
+        foreach (var property in modelBuilder.Model.GetEntityTypes()
+                     .SelectMany(t => t.GetProperties())
+                     .Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))
+        {
+            property.SetPrecision(10);
+            property.SetScale(2);
+        }
     }
 }

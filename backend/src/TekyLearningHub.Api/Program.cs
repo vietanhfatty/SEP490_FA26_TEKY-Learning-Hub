@@ -30,7 +30,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "http://localhost:5173", 
                 "http://localhost:5174", 
-                "http://localhost:3000")
+                "http://localhost:3000",
+                "http://localhost:3001")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials(); // Required for SignalR WebSocket handshake
@@ -38,6 +39,29 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Global exception handling → trả JSON { message } để Frontend hiển thị trạng thái Error có hướng khắc phục
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var ex = feature?.Error;
+        context.Response.StatusCode = ex switch
+        {
+            KeyNotFoundException => StatusCodes.Status404NotFound,
+            UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+            ArgumentException or InvalidOperationException => StatusCodes.Status400BadRequest,
+            _ => StatusCodes.Status500InternalServerError
+        };
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = context.Response.StatusCode == StatusCodes.Status500InternalServerError
+                ? "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."
+                : ex?.Message
+        });
+    });
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -108,4 +108,14 @@ public class ParentController : ControllerBase
         var result = await _parentService.GetClassLeaderboardAsync(classId, ct);
         return Ok(result);
     }
+
+    /// <summary>
+    /// SCR-PAR-04: Danh mục nhãn dán cổ vũ (Cheer Stickers)
+    /// </summary>
+    [HttpGet("stickers")]
+    public async Task<ActionResult<List<CheerStickerDto>>> GetStickers(CancellationToken ct)
+    {
+        var result = await _parentService.GetCheerStickersAsync(ct);
+        return Ok(result);
+    }
 }

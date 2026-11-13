@@ -33,9 +33,9 @@ public class TeacherController : ControllerBase
     /// SCR-TEA-01: Lấy thông tin Bàn làm việc giáo viên, thời khóa biểu tuần & cảnh báo vắng mặt
     /// </summary>
     [HttpGet("workspace")]
-    public async Task<ActionResult<TeacherWorkspaceDto>> GetWorkspace([FromQuery] int teacherId, CancellationToken ct)
+    public async Task<ActionResult<TeacherWorkspaceDto>> GetWorkspace([FromQuery] int teacherId, [FromQuery] DateOnly? weekStart, CancellationToken ct)
     {
-        var result = await _teacherService.GetTeacherWorkspaceAsync(teacherId, ct);
+        var result = await _teacherService.GetTeacherWorkspaceAsync(teacherId, weekStart, ct);
         return Ok(result);
     }
 
@@ -148,5 +148,35 @@ public class TeacherController : ControllerBase
         var fileBytes = await _excelExportService.ExportClassGradebookAsync(classId, ct);
         var fileName = $"Bang_Diem_TEKY_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    /// <summary>
+    /// SCR-TEA-01: Danh sách lớp giáo viên đang phụ trách
+    /// </summary>
+    [HttpGet("classes")]
+    public async Task<ActionResult<List<TeacherClassSummaryDto>>> GetClasses([FromQuery] int teacherId, CancellationToken ct)
+    {
+        var result = await _teacherService.GetTeacherClassesAsync(teacherId, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// SCR-TEA-05: Hàng chờ chấm bài Hybrid 60/40
+    /// </summary>
+    [HttpGet("submissions")]
+    public async Task<ActionResult<List<GradingQueueItemDto>>> GetGradingQueue([FromQuery] int teacherId, [FromQuery] int? classId, CancellationToken ct)
+    {
+        var result = await _teacherService.GetGradingQueueAsync(teacherId, classId, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// SCR-TEA-02: Danh sách đơn xin học bù của các lớp giáo viên phụ trách
+    /// </summary>
+    [HttpGet("makeup")]
+    public async Task<ActionResult<List<MakeupRequestItemDto>>> GetMakeupRequests([FromQuery] int teacherId, CancellationToken ct)
+    {
+        var result = await _teacherService.GetMakeupRequestsAsync(teacherId, ct);
+        return Ok(result);
     }
 }

@@ -33,6 +33,7 @@ public interface IApplicationDbContext
     DbSet<CheerMessage> CheerMessages { get; }
     DbSet<PortfolioItem> PortfolioItems { get; }
     DbSet<AchievementCard> AchievementCards { get; }
+    DbSet<SimulationRun> SimulationRuns { get; }
     DbSet<LeaderboardCycle> LeaderboardCycles { get; }
     DbSet<LeaderboardEntry> LeaderboardEntries { get; }
     DbSet<Notification> Notifications { get; }

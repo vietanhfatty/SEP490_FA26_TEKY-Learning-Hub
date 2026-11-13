@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
+using TekyLearningHub.Infrastructure.Hubs;
 
 namespace TekyLearningHub.Infrastructure.Services;
 
@@ -72,10 +74,12 @@ public class AiAssistantService : IAiAssistantService
 public class NotificationService : INotificationService
 {
     private readonly IApplicationDbContext _context;
+    private readonly IHubContext<NotificationHub> _notificationHub;
 
-    public NotificationService(IApplicationDbContext context)
+    public NotificationService(IApplicationDbContext context, IHubContext<NotificationHub> notificationHub)
     {
         _context = context;
+        _notificationHub = notificationHub;
     }
 
     public async Task SendNotificationAsync(int recipientUserId, string type, string title, string body, string? refType = null, long? refId = null, CancellationToken cancellationToken = default)
@@ -94,5 +98,16 @@ public class NotificationService : INotificationService
 
         await _context.Notifications.AddAsync(notification, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _notificationHub.Clients.Group($"user_{recipientUserId}").SendAsync("OnNotificationReceived", new
+        {
+            notification.NotificationId,
+            notification.Type,
+            notification.Title,
+            notification.Body,
+            notification.RefType,
+            notification.RefId,
+            notification.CreatedAt
+        }, cancellationToken);
     }
 }

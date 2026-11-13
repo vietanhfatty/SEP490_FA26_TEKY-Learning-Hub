@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IconClock, IconTrophy, IconCheckCircle } from '../common/Icons';
 import { Badge } from '../common/Badge';
+import { subscribeRealtimeEvents } from '../../services/lmsApi';
 
 // Upload icon
 const IconUploadSimple: React.FC<{ size?: number; className?: string }> = ({ size = 20, className = '' }) => (
@@ -13,6 +14,21 @@ const IconUploadSimple: React.FC<{ size?: number; className?: string }> = ({ siz
 
 export const StudentDashboard: React.FC = () => {
   const [projectUploaded, setProjectUploaded] = useState(false);
+  const [focusLock, setFocusLock] = useState<{ isLocked: boolean; message: string } | null>(null);
+  const [spotlightBanner, setSpotlightBanner] = useState<{ studentName: string; payload: string } | null>(null);
+  const [cheerCelebration, setCheerCelebration] = useState<{ stickerName: string; message: string } | null>(null);
+
+  useEffect(() => {
+    return subscribeRealtimeEvents((ev) => {
+      if (ev.type === 'FOCUS_MODE') {
+        setFocusLock(ev.isLocked ? { isLocked: true, message: ev.message } : null);
+      } else if (ev.type === 'SPOTLIGHT') {
+        setSpotlightBanner({ studentName: ev.studentName, payload: ev.screenPayload });
+      } else if (ev.type === 'CHEER_CONFETTI') {
+        setCheerCelebration({ stickerName: ev.stickerName, message: ev.message });
+      }
+    });
+  }, []);
 
   const enrolledCourses = [
     {
@@ -42,11 +58,73 @@ export const StudentDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8 py-6">
+    <div className="space-y-8 py-6 relative">
+      {/* SCR-TEA-03: Classroom Focus Mode Full-Screen Lock Overlay */}
+      {focusLock?.isLocked && (
+        <div className="fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white">
+          <div className="max-w-lg w-full p-8 rounded-2xl bg-slate-800 border border-slate-700 shadow-2xl space-y-4">
+            <Badge variant="danger">🔒 CLASSROOM FOCUS MODE (SCR-TEA-03)</Badge>
+            <h2 className="text-2xl font-extrabold">Giáo viên đang khóa màn hình phòng Lab</h2>
+            <p className="text-sm text-slate-300 leading-relaxed">{focusLock.message}</p>
+            <button
+              type="button"
+              onClick={() => setFocusLock(null)}
+              className="mt-2 min-h-[44px] px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-bold"
+            >
+              Đã hiểu (Tạm đóng lớp phủ demo)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SCR-PAR-04: Parent Live Cheer Box & Confetti Celebration Banner */}
+      {cheerCelebration && (
+        <div className="p-5 rounded-2xl bg-orange-50 dark:bg-orange-950/60 border-2 border-orange-400 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎊🎆🏆</span>
+              <Badge variant="accent">Pháo hoa cổ vũ từ Bố Mẹ ({cheerCelebration.stickerName})</Badge>
+            </div>
+            <p className="text-sm font-bold text-orange-950 dark:text-orange-100">
+              "{cheerCelebration.message}"
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCheerCelebration(null)}
+            className="min-h-[44px] px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shrink-0"
+          >
+            Con cảm ơn Bố Mẹ! ❤️
+          </button>
+        </div>
+      )}
+
+      {/* SCR-TEA-03: Live Screen Spotlight Broadcast Banner */}
+      {spotlightBanner && (
+        <div className="p-5 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center gap-2">
+              <Badge variant="info">📡 Spotlight toàn phòng Lab</Badge>
+              <strong className="text-blue-950 dark:text-blue-100">
+                Giáo viên đang chiếu bài làm mẫu của bạn {spotlightBanner.studentName}
+              </strong>
+            </div>
+            <p className="font-mono text-blue-900 dark:text-blue-200">{spotlightBanner.payload}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSpotlightBanner(null)}
+            className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold shrink-0"
+          >
+            Đóng Spotlight
+          </button>
+        </div>
+      )}
+
       {/* Top Banner & Next Class Countdown (Bento Top) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Next Class Hero Card */}
-        <div className="lg:col-span-2 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white shadow-lg relative overflow-hidden flex flex-col justify-between">
+        {/* Next Class Hero Card (Solid High-Contrast Brand Blue — No AI-Slop Gradient) */}
+        <div className="lg:col-span-2 p-6 sm:p-8 rounded-2xl bg-blue-600 dark:bg-blue-700 text-white shadow-lg relative overflow-hidden flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Badge variant="accent" className="bg-orange-500/30 text-orange-200 border-orange-400/40">

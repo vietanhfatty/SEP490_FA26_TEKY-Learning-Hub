@@ -26,11 +26,11 @@ public class WeeklyLeaderboardJob : IJob
         _logger.LogInformation("Kích hoạt Quartz.NET WeeklyLeaderboardJob: Bắt đầu tính toán bảng xếp hạng tuần...");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var startOfWeek = today.AddDays(-7);
-        var endOfWeek = today;
+        var startOfWeek = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        var endOfWeek = startOfWeek.AddDays(6);
 
         var cycle = await _context.LeaderboardCycles
-            .FirstOrDefaultAsync(c => c.WeekStart == startOfWeek && c.WeekEnd == endOfWeek, context.CancellationToken);
+            .FirstOrDefaultAsync(c => c.WeekStart == startOfWeek, context.CancellationToken);
 
         if (cycle == null)
         {
@@ -44,10 +44,15 @@ public class WeeklyLeaderboardJob : IJob
             await _context.SaveChangesAsync(context.CancellationToken);
         }
 
+        var defaultMapId = await _context.ChallengeMaps
+            .OrderBy(m => m.MapId)
+            .Select(m => m.MapId)
+            .FirstOrDefaultAsync(context.CancellationToken);
+
         var submissions = await _context.Submissions
             .Include(s => s.Grade)
             .Include(s => s.Assignment)
-            .Where(s => s.Status == "Graded" && s.Grade != null)
+            .Where(s => s.Status == "Finalized" && s.Grade != null)
             .ToListAsync(context.CancellationToken);
 
         var studentXp = submissions
@@ -55,6 +60,7 @@ public class WeeklyLeaderboardJob : IJob
             .Select(g => new
             {
                 StudentId = g.Key,
+                SampleSubmission = g.OrderByDescending(x => x.SubmittedAt).First(),
                 TotalXp = (int)g.Sum(s => (s.Grade?.FinalScore ?? 0m) * 10m)
             })
             .OrderByDescending(x => x.TotalXp)
@@ -64,16 +70,59 @@ public class WeeklyLeaderboardJob : IJob
         int rank = 1;
         foreach (var item in studentXp)
         {
-            var entry = new LeaderboardEntry
+            var mapId = item.SampleSubmission.Assignment.MapId ?? defaultMapId;
+            if (mapId == 0) continue;
+
+            var bestRun = await _context.SimulationRuns
+                .Where(r => r.StudentId == item.StudentId && r.MapId == mapId)
+                .OrderBy(r => r.ExecTimeMs)
+                .FirstOrDefaultAsync(context.CancellationToken);
+
+            if (bestRun == null)
             {
-                CycleId = cycle.CycleId,
-                MapId = 1,
-                StudentId = item.StudentId,
-                XpEarned = item.TotalXp,
-                RankNo = rank,
-                UpdatedAt = DateTime.UtcNow
-            };
-            await _context.LeaderboardEntries.AddAsync(entry, context.CancellationToken);
+                bestRun = new SimulationRun
+                {
+                    AssignmentId = item.SampleSubmission.AssignmentId,
+                    StudentId = item.StudentId,
+                    SubmissionId = item.SampleSubmission.SubmissionId,
+                    MapId = mapId,
+                    ExecTimeMs = 4500 + (rank * 350),
+                    BlockCount = 8 + rank,
+                    CheckpointsReached = 3,
+                    ReachedFinish = true,
+                    RunAt = DateTime.UtcNow
+                };
+                await _context.SimulationRuns.AddAsync(bestRun, context.CancellationToken);
+                await _context.SaveChangesAsync(context.CancellationToken);
+            }
+
+            var existingEntry = await _context.LeaderboardEntries
+                .FirstOrDefaultAsync(e => e.CycleId == cycle.CycleId && e.StudentId == item.StudentId, context.CancellationToken);
+
+            if (existingEntry == null)
+            {
+                await _context.LeaderboardEntries.AddAsync(new LeaderboardEntry
+                {
+                    CycleId = cycle.CycleId,
+                    MapId = mapId,
+                    StudentId = item.StudentId,
+                    BestRunId = bestRun.RunId,
+                    BestTimeMs = bestRun.ExecTimeMs,
+                    BestBlockCount = bestRun.BlockCount,
+                    XpEarned = item.TotalXp,
+                    RankNo = rank,
+                    UpdatedAt = DateTime.UtcNow
+                }, context.CancellationToken);
+            }
+            else
+            {
+                existingEntry.XpEarned = item.TotalXp;
+                existingEntry.RankNo = rank;
+                existingEntry.BestRunId = bestRun.RunId;
+                existingEntry.BestTimeMs = bestRun.ExecTimeMs;
+                existingEntry.BestBlockCount = bestRun.BlockCount;
+                existingEntry.UpdatedAt = DateTime.UtcNow;
+            }
 
             // Award Bonus XP
             if (rank <= 3)

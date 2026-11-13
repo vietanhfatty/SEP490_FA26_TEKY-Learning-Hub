@@ -135,3 +135,50 @@ public class ScoreDistributionBucketDto
     public string Range { get; set; } = string.Empty;
     public int Count { get; set; }
 }
+
+/// <summary>SCR-TEA-05: Hàng chờ chấm bài Hybrid (bài nộp của học sinh trong các lớp giáo viên phụ trách)</summary>
+public class GradingQueueItemDto
+{
+    public long SubmissionId { get; set; }
+    public int AssignmentId { get; set; }
+    public string AssignmentTitle { get; set; } = string.Empty;
+    public int ClassId { get; set; }
+    public string ClassCode { get; set; } = string.Empty;
+    public int StudentId { get; set; }
+    public string StudentCode { get; set; } = string.Empty;
+    public string StudentName { get; set; } = string.Empty;
+    public int AttemptNo { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public DateTime SubmittedAt { get; set; }
+    public string BlocklyJson { get; set; } = "{}";
+    public decimal? AutoAstScore { get; set; }
+    public decimal? MatchPercent { get; set; }
+    public decimal? HardwareScore { get; set; }
+    public decimal? FinalScore { get; set; }
+    public string? RemarkText { get; set; }
+    public string? RemarkSource { get; set; }
+}
+
+/// <summary>Danh sách lớp giáo viên đang phụ trách (bộ lọc cho Analytics / Focus Mode)</summary>
+public class TeacherClassSummaryDto
+{
+    public int ClassId { get; set; }
+    public string ClassCode { get; set; } = string.Empty;
+    public string ClassName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public int StudentCount { get; set; }
+}
+/// <summary>SCR-TEA-02: Đơn xin học bù chờ giáo viên duyệt</summary>
+public class MakeupRequestItemDto
+{
+    public int MakeupId { get; set; }
+    public int StudentId { get; set; }
+    public string StudentName { get; set; } = string.Empty;
+    public string ClassCode { get; set; } = string.Empty;
+    public DateOnly MissedDate { get; set; }
+    public int? PreferredSessionId { get; set; }
+    public DateOnly? PreferredDate { get; set; }
+    public string? Reason { get; set; }
+    public string Status { get; set; } = "Pending";
+    public DateTime CreatedAt { get; set; }
+}

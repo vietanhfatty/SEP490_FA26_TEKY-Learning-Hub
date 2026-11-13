@@ -19,6 +19,7 @@ public interface IParentService
     Task<List<StudentPortfolioDetailDto>> GetStudentPortfoliosAsync(int studentId, CancellationToken ct = default);
     Task<StudentPortfolioDetailDto> GetPublicPortfolioByQrTokenAsync(Guid qrToken, CancellationToken ct = default);
     Task<ClassLeaderboardDto> GetClassLeaderboardAsync(int classId, CancellationToken ct = default);
+    Task<List<CheerStickerDto>> GetCheerStickersAsync(CancellationToken ct = default);
 }
 
 public class ParentService : IParentService
@@ -59,7 +60,7 @@ public class ParentService : IParentService
         foreach (var link in links)
         {
             var student = link.Student;
-            var activeClass = student.Enrollments.FirstOrDefault(e => e.Status == "Enrolled")?.Class;
+            var activeClass = student.Enrollments.FirstOrDefault(e => e.Status == "Active")?.Class;
 
             var todayAttendance = await _context.AttendanceRecords
                 .AsNoTracking()
@@ -68,7 +69,12 @@ public class ParentService : IParentService
                 .FirstOrDefaultAsync(ct);
 
             var todaySession = activeClass?.Sessions.FirstOrDefault(s => s.SessionDate == today);
-            bool isInActive = todaySession?.Status == "InProgress";
+            // ClassSessions.Status chỉ cho phép Scheduled/Done/Cancelled → "đang học" được suy ra theo khung giờ thực tế
+            var nowTime = TimeOnly.FromDateTime(DateTime.Now).ToTimeSpan();
+            bool isInActive = todaySession != null
+                && todaySession.Status == "Scheduled"
+                && nowTime >= todaySession.StartTime
+                && nowTime <= todaySession.EndTime;
 
             childrenList.Add(new ChildOverviewDto
             {
@@ -80,7 +86,7 @@ public class ParentService : IParentService
                 StemPoints = student.StemPoints,
                 CurrentClassName = activeClass?.Name ?? "Chưa xếp lớp",
                 CurrentLabRoom = todaySession?.Room?.RoomName ?? "Phòng Lab STEM",
-                TodayAttendanceStatus = todayAttendance?.Status ?? "Absent",
+                TodayAttendanceStatus = todayAttendance?.Status ?? (todaySession == null ? "NoSession" : "NotMarked"),
                 TodayMarkedAt = todayAttendance?.MarkedAt,
                 IsInActiveSession = isInActive
             });
@@ -114,13 +120,19 @@ public class ParentService : IParentService
         var grades = await _context.Grades
             .AsNoTracking()
             .Include(g => g.Submission)
+                .ThenInclude(s => s.Assignment)
             .Where(g => g.Submission.StudentId == studentId)
             .ToListAsync(ct);
 
         var result = new List<EContactBookItemDto>();
         foreach (var att in attendances)
         {
-            var grade = grades.FirstOrDefault(g => g.Submission.Assignment.ClassId == att.Session.ClassId);
+            // Gắn điểm của bài nộp trong đúng lớp và đúng ngày diễn ra buổi học
+            var grade = grades
+                .Where(g => g.Submission.Assignment.ClassId == att.Session.ClassId
+                            && DateOnly.FromDateTime(g.Submission.SubmittedAt) == att.Session.SessionDate)
+                .OrderByDescending(g => g.FinalizedAt)
+                .FirstOrDefault();
 
             result.Add(new EContactBookItemDto
             {
@@ -132,8 +144,8 @@ public class ParentService : IParentService
                 AutoAstScore = grade?.AutoAstScore,
                 HardwareScore = grade?.HardwareScore,
                 FinalScore = grade?.FinalScore,
-                RemarkText = grade?.RemarkText ?? (att.Status == "Present" ? "Con học tập chăm chỉ và hoàn thành bài tốt." : "Con vắng mặt."),
-                RemarkSource = grade?.RemarkSource ?? "Text"
+                RemarkText = grade?.RemarkText,
+                RemarkSource = grade?.RemarkSource
             });
         }
 
@@ -173,11 +185,15 @@ public class ParentService : IParentService
 
         // SignalR trigger
         var studentClass = await _context.Enrollments
-            .Where(e => e.StudentId == request.StudentId && e.Status == "Enrolled")
+            .Where(e => e.StudentId == request.StudentId && e.Status == "Active")
             .Select(e => e.ClassId)
             .FirstOrDefaultAsync(ct);
 
-        await _realtimeService.SendCheerConfettiAsync(studentClass, request.StudentId, request.StickerId?.ToString() ?? "PROUD", request.Message, ct);
+        var stickerCode = request.StickerId.HasValue
+            ? await _context.CheerStickers.Where(s => s.StickerId == request.StickerId.Value).Select(s => s.Code).FirstOrDefaultAsync(ct)
+            : null;
+
+        await _realtimeService.SendCheerConfettiAsync(studentClass, request.StudentId, stickerCode ?? "PROUD", request.Message, ct);
 
         await _context.SaveChangesAsync(ct);
         return true;
@@ -255,9 +271,16 @@ public class ParentService : IParentService
         var weekStart = activeCycle?.WeekStart ?? today.AddDays(-(int)today.DayOfWeek);
         var weekEnd = activeCycle?.WeekEnd ?? weekStart.AddDays(7);
 
+        // Chỉ xếp hạng học sinh đang học trong lớp này
+        var classStudentIds = await _context.Enrollments
+            .AsNoTracking()
+            .Where(e => e.ClassId == classId && e.Status == "Active")
+            .Select(e => e.StudentId)
+            .ToListAsync(ct);
+
         var entries = await _context.LeaderboardEntries
             .AsNoTracking()
-            .Where(e => activeCycle != null && e.CycleId == activeCycle.CycleId)
+            .Where(e => activeCycle != null && e.CycleId == activeCycle.CycleId && classStudentIds.Contains(e.StudentId))
             .Include(e => e.Student)
                 .ThenInclude(s => s.User)
             .OrderBy(e => e.RankNo)
@@ -282,5 +305,20 @@ public class ParentService : IParentService
             WeekEndDate = weekEnd,
             TopRankings = entries
         };
+    }
+
+    public async Task<List<CheerStickerDto>> GetCheerStickersAsync(CancellationToken ct = default)
+    {
+        return await _context.CheerStickers
+            .AsNoTracking()
+            .OrderBy(s => s.StickerId)
+            .Select(s => new CheerStickerDto
+            {
+                StickerId = s.StickerId,
+                Code = s.Code,
+                Name = s.Name,
+                ImageUrl = s.ImageUrl
+            })
+            .ToListAsync(ct);
     }
 }
