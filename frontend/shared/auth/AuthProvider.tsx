@@ -164,6 +164,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [applySsoSession]);
 
+  // Đồng bộ đa tab: Lắng nghe sự kiện đăng xuất từ tab khác qua localStorage
+  useEffect(() => {
+    const handleStorageEvent = (event: StorageEvent) => {
+      if (
+        event.key === 'teky_logout_event' ||
+        (event.key === 'teky_access_token' && !event.newValue)
+      ) {
+        setRole(null);
+        setAccessToken(null);
+        setRefreshToken(null);
+        setClaims(null);
+        setUser(null);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageEvent);
+    return () => window.removeEventListener('storage', handleStorageEvent);
+  }, []);
+
   // Tự động làm mới token định kỳ, đồng bộ lại claim sau mỗi lần refresh.
   useEffect(() => {
     if (accessToken && refreshToken) {

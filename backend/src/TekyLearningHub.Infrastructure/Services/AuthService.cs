@@ -245,7 +245,7 @@ public class AuthService : IAuthService
             var auditLog = new AuditLog
             {
                 ActorUserId = effectiveUserId.Value,
-                ActorType = roleName ?? "User",
+                ActorType = TekyLearningHub.Domain.Constants.AuditActorTypes.User,
                 Action = allDevices ? "USER_LOGOUT_ALL_DEVICES" : "USER_LOGOUT",
                 EntityType = "UserSession",
                 IpAddress = ipAddress,

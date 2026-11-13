@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '../common/Badge';
 import { IconCheckCircle, IconAlertCircle, IconClock, IconGraduationCap } from '../common/Icons';
 
-export const StaffDashboard: React.FC = () => {
+interface StaffDashboardProps {
+  activeNavId?: string;
+}
+
+export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeNavId = 'attendance' }) => {
   const [activeTab, setActiveTab] = useState<'attendance' | 'makeup' | 'kits' | 'schedule'>('attendance');
+
+  useEffect(() => {
+    if (activeNavId === 'makeup') setActiveTab('makeup');
+    else if (activeNavId === 'kits') setActiveTab('kits');
+    else if (activeNavId === 'schedule') setActiveTab('schedule');
+    else setActiveTab('attendance');
+  }, [activeNavId]);
 
   // Daily Operational Metrics
   const dailyMetrics = [

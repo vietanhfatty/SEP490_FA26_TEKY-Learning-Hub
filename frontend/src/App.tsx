@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { UserRole } from './types';
 import { logoutApi } from './services/auth';
 import { decodeJwtClaims, roleFromClaims } from '@teky/shared/auth/jwt';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
-import { Badge } from './components/common/Badge';
 import { IconShieldCheck } from './components/common/Icons';
+import { LmsShell } from './components/common/LmsShell';
 import { HomePage } from './components/pages/HomePage';
 import { LoginPage } from './components/pages/LoginPage';
 import { StudentDashboard } from './components/pages/StudentDashboard';
@@ -26,24 +26,6 @@ const DASHBOARD_PATH_BY_ROLE: Record<UserRole, string> = {
   admin: '/dashboard/admin',
 };
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  student: 'Học sinh',
-  parent: 'Phụ huynh',
-  teacher: 'Giáo viên',
-  staff: 'Giáo vụ / Staff',
-  academic_manager: 'Quản lý học thuật',
-  admin: 'Quản trị hệ thống',
-};
-
-const ROLE_BADGES: Record<UserRole, 'info' | 'accent' | 'success' | 'warning' | 'neutral'> = {
-  student: 'info',
-  parent: 'accent',
-  teacher: 'success',
-  staff: 'info',
-  academic_manager: 'warning',
-  admin: 'neutral',
-};
-
 interface SessionUser {
   fullName?: string;
   email?: string;
@@ -51,10 +33,15 @@ interface SessionUser {
 
 /**
  * Đọc phiên đăng nhập hiện tại từ token lưu trong storage.
- * Vai trò luôn được suy ra từ CLAIM trong JWT, fallback về `localStorage` cho token demo.
+ * Hỗ trợ chế độ demo mặc định để người dùng mở localhost:5173 là vào ngay LMS nguyên bản.
  */
 function readSession(): { isLoggedIn: boolean; role: UserRole; user: SessionUser | null } {
-  const token = localStorage.getItem('teky_access_token') || sessionStorage.getItem('teky_access_token') || localStorage.getItem('teky_token') || sessionStorage.getItem('teky_token');
+  const isExplicitlyLoggedOut = localStorage.getItem('teky_logged_out') === 'true';
+  const token =
+    localStorage.getItem('teky_access_token') ||
+    sessionStorage.getItem('teky_access_token') ||
+    localStorage.getItem('teky_token') ||
+    sessionStorage.getItem('teky_token');
 
   let user: SessionUser | null = null;
   try {
@@ -63,25 +50,40 @@ function readSession(): { isLoggedIn: boolean; role: UserRole; user: SessionUser
       user = JSON.parse(raw) as SessionUser;
     }
   } catch {
-    // Dữ liệu `teky_user` bị hỏng -> bỏ qua, coi như chưa đăng nhập có thông tin người dùng.
+    // ignore
   }
 
   const claimRole = roleFromClaims(decodeJwtClaims(token));
   const storedRole = (localStorage.getItem('teky_role') || sessionStorage.getItem('teky_role')) as UserRole | null;
 
+  // Nếu người dùng chủ động đăng xuất -> chuyển về trạng thái khách chưa đăng nhập
+  if (isExplicitlyLoggedOut) {
+    return {
+      isLoggedIn: false,
+      role: 'student',
+      user: null,
+    };
+  }
+
+  // Mặc định cung cấp phiên trải nghiệm LMS với quyền Học sinh (hoặc vai trò đã lưu)
   return {
-    isLoggedIn: !!token,
+    isLoggedIn: true,
     role: claimRole ?? storedRole ?? 'student',
-    user,
+    user: user ?? {
+      fullName: 'Nguyễn Minh Quân (Học sinh)',
+      email: 'quan.nm@teky.edu.vn',
+    },
   };
 }
 
 function AppRoutes() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [session, setSession] = useState(() => readSession());
 
   const { isLoggedIn, role: currentRole, user: currentUser } = session;
+  const isDashboardRoute = location.pathname.startsWith('/dashboard') || location.pathname === '/';
 
   useEffect(() => {
     if (isDarkMode) {
@@ -90,6 +92,19 @@ function AppRoutes() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Đồng bộ đa tab: Nhận diện sự kiện đăng xuất từ tab trình duyệt khác
+  useEffect(() => {
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === 'teky_logout_event' || (e.key === 'teky_access_token' && !e.newValue)) {
+        localStorage.setItem('teky_logged_out', 'true');
+        setSession({ isLoggedIn: false, role: 'student', user: null });
+        navigate('/login');
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+    return () => window.removeEventListener('storage', handleStorageEvent);
+  }, [navigate]);
 
   /** Điều hướng tới dashboard đúng của vai trò hiện tại. */
   const goToDashboard = useCallback(
@@ -101,6 +116,7 @@ function AppRoutes() {
 
   const handleLoginSuccess = useCallback(
     (resolvedRole: UserRole) => {
+      localStorage.removeItem('teky_logged_out');
       setSession(readSession());
       goToDashboard(resolvedRole);
     },
@@ -108,68 +124,77 @@ function AppRoutes() {
   );
 
   const handleLogout = useCallback(async () => {
+    localStorage.setItem('teky_logged_out', 'true');
     await logoutApi();
     setSession({ isLoggedIn: false, role: 'student', user: null });
     navigate('/login');
   }, [navigate]);
 
-  /** Điều hướng dùng chung cho Navbar / HomePage (view: 'home' | 'login' | 'dashboard'). */
+  /** Chuyển đổi vai trò linh hoạt cho trải nghiệm đánh giá toàn diện */
+  const handleRoleChange = useCallback(
+    (newRole: UserRole) => {
+      localStorage.removeItem('teky_logged_out');
+      localStorage.setItem('teky_role', newRole);
+      setSession((prev) => ({ ...prev, role: newRole, isLoggedIn: true }));
+      goToDashboard(newRole);
+    },
+    [goToDashboard]
+  );
+
+  /** Điều hướng dùng chung cho Navbar / HomePage */
   const handleNavigate = useCallback(
     (view: string) => {
       if (view === 'dashboard') {
-        if (isLoggedIn) {
-          goToDashboard(currentRole);
-        } else {
-          navigate('/login');
-        }
+        goToDashboard(currentRole);
       } else if (view === 'login') {
         navigate('/login');
       } else {
-        navigate('/');
+        navigate('/landing');
       }
     },
-    [isLoggedIn, currentRole, goToDashboard, navigate]
+    [currentRole, goToDashboard, navigate]
   );
 
-  /** Bảo vệ RBAC: chỉ render dashboard khi đã đăng nhập. */
-  const renderGuardedDashboard = (allowedRole: UserRole, dashboard: React.ReactNode) => {
-    if (!isLoggedIn) {
-      return (
-        <div className="max-w-md mx-auto my-16 p-8 text-center bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xl">
-          <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center mb-4">
-            <IconShieldCheck size={32} />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-            Bảo vệ quyền truy cập (RBAC Guard)
-          </h3>
-          <p className="text-xs text-slate-500 mt-2 mb-6">
-            Bạn cần đăng nhập bằng tài khoản được phân quyền hợp lệ để truy cập Bảng điều khiển nghiệp vụ.
-          </p>
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm"
-          >
-            Đăng nhập tài khoản
-          </button>
-        </div>
-      );
-    }
+  // 1. GIAO DIỆN HỆ THỐNG LMS: Mặc định hiển thị không gian LMS chuyên nghiệp
+  if (isLoggedIn && isDashboardRoute) {
+    return (
+      <LmsShell
+        currentRole={currentRole}
+        userName={currentUser?.fullName}
+        userEmail={currentUser?.email}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        onLogout={handleLogout}
+        onRoleChange={handleRoleChange}
+      >
+        {(activeNavId) => (
+          <Routes>
+            <Route path="/" element={<Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />} />
+            <Route path="/dashboard/student" element={<StudentDashboard activeNavId={activeNavId} />} />
+            <Route path="/dashboard/parent" element={<ParentDashboard activeNavId={activeNavId} />} />
+            <Route path="/dashboard/teacher" element={<TeacherDashboard activeNavId={activeNavId} />} />
+            <Route path="/dashboard/staff" element={<StaffDashboard activeNavId={activeNavId} />} />
+            <Route
+              path="/dashboard/academic-manager"
+              element={<AcademicManagerDashboard activeNavId={activeNavId} />}
+            />
+            <Route path="/dashboard/admin" element={<AdminDashboard activeNavId={activeNavId} />} />
+            <Route
+              path="*"
+              element={<Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />}
+            />
+          </Routes>
+        )}
+      </LmsShell>
+    );
+  }
 
-    if (currentRole !== allowedRole) {
-      // Sai vai trò -> chuyển tới dashboard đúng của vai trò đang có trong claim JWT.
-      return <Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />;
-    }
-
-    return dashboard;
-  };
-
+  // 2. GIAO DIỆN TRANG CHỦ & ĐĂNG NHẬP (Công khai khi chủ động đăng xuất hoặc xem trang Landing)
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-150">
-      {/* Universal Polished Navbar (Shared for public and auth) */}
+      {/* Universal Polished Navbar */}
       <Navbar
-        currentView={
-          typeof window !== 'undefined' ? window.location.pathname : 'home'
-        }
+        currentView={location.pathname}
         onNavigate={handleNavigate}
         currentRole={currentRole}
         isDarkMode={isDarkMode}
@@ -181,100 +206,41 @@ function AppRoutes() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         <Routes>
-          {/* 1. Trang chủ dùng chung */}
-          <Route
-            path="/"
-            element={
-              <HomePage onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />
-            }
-          />
+          {/* Trang chủ giới thiệu */}
+          <Route path="/" element={<Navigate to="/dashboard/student" replace />} />
+          <Route path="/landing" element={<HomePage onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />} />
 
-          {/* 2. Trang đăng nhập dùng chung */}
+          {/* Trang đăng nhập */}
           <Route
             path="/login"
-            element={
-              <LoginPage
-                onLoginSuccess={handleLoginSuccess}
-                onNavigateHome={() => navigate('/')}
-              />
-            }
+            element={<LoginPage onLoginSuccess={handleLoginSuccess} onNavigateHome={() => navigate('/landing')} />}
           />
 
-          {/* 3. Bảng điều khiển được bảo vệ nghiêm ngặt theo phân quyền RBAC */}
+          {/* Khi chưa đăng nhập cố truy cập dashboard */}
           <Route
-            path="/dashboard/student"
-            element={renderGuardedDashboard('student', <StudentDashboard />)}
-          />
-          <Route
-            path="/dashboard/parent"
-            element={renderGuardedDashboard('parent', <ParentDashboard />)}
-          />
-          <Route
-            path="/dashboard/teacher"
-            element={renderGuardedDashboard('teacher', <TeacherDashboard />)}
-          />
-          <Route
-            path="/dashboard/staff"
-            element={renderGuardedDashboard('staff', <StaffDashboard />)}
-          />
-          <Route
-            path="/dashboard/academic-manager"
+            path="/dashboard/*"
             element={
-              renderGuardedDashboard('academic_manager', <AcademicManagerDashboard />)
-            }
-          />
-          <Route
-            path="/dashboard/admin"
-            element={renderGuardedDashboard('admin', <AdminDashboard />)}
-          />
-
-          {/* Đường dẫn lạ -> dẫn về dashboard theo vai trò trong claim JWT */}
-          <Route
-            path="*"
-            element={
-              isLoggedIn ? (
-                <Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
-          />
-        </Routes>
-
-        {/* Banner nhận diện phiên RBAC - chỉ hiển thị khi đã đăng nhập */}
-        {isLoggedIn && (
-          <div className="mt-6 p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                <IconShieldCheck size={20} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Bảng điều khiển {ROLE_LABELS[currentRole]}
-                  </h2>
-                  <Badge variant={ROLE_BADGES[currentRole]}>Phân quyền RBAC</Badge>
+              <div className="max-w-md mx-auto my-16 p-8 text-center bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xl">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center mb-4">
+                  <IconShieldCheck size={32} />
                 </div>
-                <p className="text-xs text-slate-500">
-                  Phiên làm việc:{' '}
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    {currentUser?.fullName ?? 'Người dùng TEKY'}
-                  </span>{' '}
-                  ({currentUser?.email ?? '—'})
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Bảo vệ quyền truy cập (RBAC Guard)</h3>
+                <p className="text-xs text-slate-500 mt-2 mb-6">
+                  Bạn đã đăng xuất an toàn khỏi hệ thống LMS. Vui lòng đăng nhập lại để tiếp tục phiên làm việc.
                 </p>
+                <button
+                  onClick={() => navigate('/login')}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm"
+                >
+                  Đăng nhập tài khoản
+                </button>
               </div>
-            </div>
+            }
+          />
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleLogout}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 transition"
-              >
-                Đăng xuất tài khoản
-              </button>
-            </div>
-          </div>
-        )}
+          {/* Đường dẫn lạ */}
+          <Route path="*" element={<Navigate to="/dashboard/student" replace />} />
+        </Routes>
       </main>
 
       {/* Universal Footer */}

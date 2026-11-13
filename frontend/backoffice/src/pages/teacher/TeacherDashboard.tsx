@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { IconCalendar, IconCheckCircle, IconClock, IconBookOpen } from '../common/Icons';
+import { IconCalendar, IconCheckCircle, IconClock, IconBookOpen, IconDownload, IconPlus } from '../common/Icons';
 import { Badge } from '../common/Badge';
 
-export const TeacherDashboard: React.FC = () => {
+interface TeacherDashboardProps {
+  activeNavId?: string;
+}
+
+export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId = 'overview' }) => {
   const [selectedClass, setSelectedClass] = useState('SCRATCH-01');
   const [attendanceSaved, setAttendanceSaved] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -16,6 +20,9 @@ export const TeacherDashboard: React.FC = () => {
     { id: '3', name: 'Lê Hoàng Minh', code: 'TEKY-90', status: 'Late', note: 'Vào muộn 10 phút' },
     { id: '4', name: 'Phạm Quỳnh Anh', code: 'TEKY-91', status: 'Present', note: '' },
     { id: '5', name: 'Vũ Đức Duy', code: 'TEKY-92', status: 'Absent_Excused', note: 'Gia đình xin phép' },
+    { id: '6', name: 'Hoàng Minh Châu', code: 'TEKY-93', status: 'Present', note: '' },
+    { id: '7', name: 'Đặng Quốc Bảo', code: 'TEKY-94', status: 'Present', note: '' },
+    { id: '8', name: 'Nguyễn Gia Huy', code: 'TEKY-95', status: 'Present', note: '' },
   ]);
 
   const scheduleWeekly = [
@@ -26,11 +33,11 @@ export const TeacherDashboard: React.FC = () => {
   ];
 
   const handleMarkAllPresent = () => {
-    setRoster(roster.map(s => ({ ...s, status: 'Present' })));
+    setRoster(roster.map((s) => ({ ...s, status: 'Present' })));
   };
 
-  const handleStatusChange = (id: string, status: (typeof roster)[number]['status']) => {
-    setRoster(roster.map(s => s.id === id ? { ...s, status } : s));
+  const handleStatusChange = (id: string, status: string) => {
+    setRoster(roster.map((s) => (s.id === id ? { ...s, status } : s)));
   };
 
   const handleSaveAttendance = () => {
@@ -38,9 +45,101 @@ export const TeacherDashboard: React.FC = () => {
     setTimeout(() => setAttendanceSaved(false), 2500);
   };
 
+  // VIEW: TEACHING MATERIALS / LESSON PLANS
+  if (activeNavId === 'materials') {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-150">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Kho Giáo Án & Học Liệu Chuẩn</h2>
+            <p className="text-xs text-slate-500">Giáo trình STEAM được biên soạn theo chuẩn CSTA (Computer Science Teachers Association - Hoa Kỳ).</p>
+          </div>
+          <button
+            onClick={() => alert('Đang mở thư viện giáo án số TEKY...')}
+            className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 flex items-center gap-1.5"
+          >
+            <IconPlus size={16} /> Tải lên tài liệu mới
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+            <div className="flex justify-between items-start">
+              <Badge variant="info">Scratch 3.0</Badge>
+              <span className="text-[10px] text-slate-400">12 Bài giảng</span>
+            </div>
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">Giáo án Scratch Game 3.0 (Cấp 1 & 2)</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Trọn bộ Slide trình chiếu, file mẫu .sb3 cho từng buổi học từ Buổi 1 đến Buổi 12 kèm rubric đánh giá học viên.
+            </p>
+            <div className="pt-2 flex gap-2">
+              <button
+                onClick={() => alert('Tải slide bài giảng Buổi 10...')}
+                className="flex-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 flex items-center justify-center gap-1.5"
+              >
+                <IconDownload size={14} /> Slide Buổi 10
+              </button>
+              <button
+                onClick={() => alert('Tải file code starter Scratch...')}
+                className="px-3 py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100"
+              >
+                Code Starter
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+            <div className="flex justify-between items-start">
+              <Badge variant="accent">Python</Badge>
+              <span className="text-[10px] text-slate-400">14 Bài giảng</span>
+            </div>
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">Python Ứng dụng & Mini Games</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Tài liệu lập trình Python từ căn bản biến số, rẽ nhánh if-else tới thư viện Pygame và bài tập lập trình console.
+            </p>
+            <div className="pt-2 flex gap-2">
+              <button
+                onClick={() => alert('Tải slide bài giảng Python...')}
+                className="flex-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 flex items-center justify-center gap-1.5"
+              >
+                <IconDownload size={14} /> Slide Buổi 5
+              </button>
+              <button
+                onClick={() => alert('Tải bài tập trắc nghiệm Python...')}
+                className="px-3 py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100"
+              >
+                Bài tập Quiz
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+            <div className="flex justify-between items-start">
+              <Badge variant="success">Robotics</Badge>
+              <span className="text-[10px] text-slate-400">10 Bài giảng</span>
+            </div>
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">Robotics WeDo & Arduino Sáng Tạo</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Sơ đồ hướng dẫn lắp ráp 3D, lập trình khối lệnh cảm biến khoảng cách, động cơ servo và các nhiệm vụ thực tế.
+            </p>
+            <div className="pt-2 flex gap-2">
+              <button
+                onClick={() => alert('Tải hướng dẫn lắp ráp 3D...')}
+                className="flex-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 flex items-center justify-center gap-1.5"
+              >
+                <IconDownload size={14} /> Sơ đồ lắp ráp 3D
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // DEFAULT VIEW: OVERVIEW WITH SCHEDULE & ATTENDANCE
   return (
-    <div className="space-y-8 py-6">
-      {/* Teacher Profile & Quick Overview */}
+    <div className="space-y-8 animate-in fade-in duration-150">
+      {/* Teacher Profile & Quick Overview Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 font-extrabold text-xl flex items-center justify-center">
@@ -51,20 +150,20 @@ export const TeacherDashboard: React.FC = () => {
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Thầy Hoàng Văn Nam</h2>
               <Badge variant="success">Giảng viên Xuất sắc</Badge>
             </div>
-            <p className="text-xs text-slate-500">Bộ môn: Lập trình Scratch & Python • Đang chọn: {selectedClass}</p>
+            <p className="text-xs text-slate-500">Bộ môn: Lập trình Scratch & Python • Lớp đang chọn: <span className="font-semibold text-blue-600">{selectedClass}</span></p>
           </div>
         </div>
 
         <div className="flex gap-2">
           <button
             onClick={() => alert('Mở form xin nghỉ phép / đổi ca dạy bù')}
-            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200"
+            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200 transition-colors"
           >
             Xin đổi ca / Dạy bù
           </button>
           <button
             onClick={() => alert('Mở kho học liệu giáo trình TEKY')}
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 flex items-center gap-1.5 transition-colors"
           >
             <IconBookOpen size={16} /> Kho giáo án chuẩn
           </button>
@@ -101,7 +200,9 @@ export const TeacherDashboard: React.FC = () => {
                 </div>
                 <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-1">{item.class}</h4>
                 <div className="flex justify-between text-slate-500 text-[11px] pt-1 border-t border-slate-100 dark:border-slate-700">
-                  <span className="flex items-center gap-1"><IconClock size={12} /> {item.time}</span>
+                  <span className="flex items-center gap-1">
+                    <IconClock size={12} /> {item.time}
+                  </span>
                   <span className="font-medium text-slate-600 dark:text-slate-400">{item.room}</span>
                 </div>
               </div>
@@ -115,9 +216,9 @@ export const TeacherDashboard: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                  Điểm danh lớp: Scratch Game 3.0 (Buổi 10)
+                  Điểm danh lớp: {selectedClass === 'SCRATCH-01' ? 'Scratch Game 3.0 (Buổi 10)' : 'Python Robotics (Buổi 4)'}
                 </h3>
-                <Badge variant="success">Sĩ số: 12/12</Badge>
+                <Badge variant="success">Sĩ số: 12 học sinh</Badge>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">Phòng: Online 04 • Thời gian: 14:00 - 15:30</p>
             </div>
@@ -125,13 +226,13 @@ export const TeacherDashboard: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={handleMarkAllPresent}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200"
+                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200 transition-colors"
               >
                 ✓ Tất cả có mặt
               </button>
               <button
                 onClick={handleSaveAttendance}
-                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
+                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition-colors"
               >
                 Lưu điểm danh
               </button>
@@ -141,7 +242,7 @@ export const TeacherDashboard: React.FC = () => {
           {attendanceSaved && (
             <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
               <IconCheckCircle size={16} />
-              <span>Đã lưu kết quả điểm danh thành công! Dữ liệu đã đồng bộ về app Phụ huynh.</span>
+              <span>Đã lưu kết quả điểm danh thành công! Dữ liệu đã đồng bộ tức thì sang app Phụ huynh.</span>
             </div>
           )}
 
@@ -183,7 +284,7 @@ export const TeacherDashboard: React.FC = () => {
                           setStudentToEvaluate(s.name);
                           setShowFeedbackModal(true);
                         }}
-                        className="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold"
+                        className="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold transition-colors"
                       >
                         Đánh giá ★
                       </button>

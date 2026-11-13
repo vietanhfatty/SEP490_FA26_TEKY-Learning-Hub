@@ -7,6 +7,24 @@ namespace TekyLearningHub.Infrastructure.Data;
 public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContext
 {
     public DbSet<AccountEmail> AccountEmails => Set<AccountEmail>();
+    private void ValidateAuditActors()
+    {
+        foreach (var entry in ChangeTracker.Entries<AuditLog>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+            entry.Entity.ActorType = entry.Entity.ActorType;
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        ValidateAuditActors();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        ValidateAuditActors();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<User>().Property(x => x.Bio).HasMaxLength(1000);

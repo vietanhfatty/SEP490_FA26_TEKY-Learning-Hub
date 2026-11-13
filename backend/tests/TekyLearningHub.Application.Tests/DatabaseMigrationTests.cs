@@ -109,6 +109,30 @@ public class DatabaseMigrationTests
         Assert.Equal(0, await partial.Scalar("SELECT COUNT(*) FROM sys.tables WHERE name='__TekySchemaMigrations'"));
     }
 
+    [SqlServerFact]
+    public async Task EveryRoleCanLogoutAgainstSqlServerAuditConstraints()
+    {
+        await using var database = new TestDatabase(); await database.Migrate();
+        using var db = new TekyLearningHub.Infrastructure.Data.ApplicationDbContext(
+            Microsoft.EntityFrameworkCore.SqlServerDbContextOptionsExtensions.UseSqlServer(
+                new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<TekyLearningHub.Infrastructure.Data.ApplicationDbContext>(), database.ConnectionString).Options);
+        var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
+        var service = new TekyLearningHub.Infrastructure.Services.AuthService(db,
+            new TekyLearningHub.Infrastructure.Security.PasswordHasher(),
+            new TekyLearningHub.Infrastructure.Security.JwtTokenGenerator(config));
+        string[] roles = ["Student", "Teacher", "Admin", "Parent", "Staff", "AcademicManager"];
+        for (byte id=1; id<=6; id++) {
+            var role = new TekyLearningHub.Domain.Entities.Role {RoleId=id,RoleName=roles[id-1]};
+            var user = new TekyLearningHub.Domain.Entities.User {Email=$"role{id}@example.com",FullName="Test",PasswordHash="hash",RoleId=id,Role=role,Status="Active",ThemeMode="Light"};
+            db.Users.Add(user); await db.SaveChangesAsync();
+            Assert.True((await service.LogoutAsync(null,user.UserId,"127.0.0.1",true)).Success);
+        }
+        Assert.Equal(6, await database.Scalar("SELECT COUNT(*) FROM dbo.AuditLogs WHERE ActorType='User' AND Action='USER_LOGOUT_ALL_DEVICES'"));
+        db.AuditLogs.Add(new TekyLearningHub.Domain.Entities.AuditLog {ActorType="System",Action="SYSTEM_TEST"});
+        await db.SaveChangesAsync();
+        Assert.Equal(1, await database.Scalar("SELECT COUNT(*) FROM dbo.AuditLogs WHERE ActorType='System'"));
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string name = "Teky_MigrationTests_" + Guid.NewGuid().ToString("N");

@@ -12,6 +12,7 @@ import { useAuth } from '@teky/shared/auth/authContext';
 import { detectCurrentShell, resolveShellForRole, shellOrigin } from '@teky/shared/auth/shellConfig';
 import { buildCrossAppUrl } from '@teky/shared/auth/shellTransfer';
 import { Forbidden } from '@teky/shared/ui/Forbidden';
+import { LmsShell } from '@teky/shared/ui/LmsShell';
 import type { UserRole } from '@teky/shared/types';
 
 /**
@@ -27,7 +28,7 @@ function RoleRedirect() {
 export function App() {
   const navigate = useNavigate();
   const isAccountVisible = useAuth().isLoggedIn;
-  const { role, accessToken, refreshToken, user } = useAuth();
+  const { role, accessToken, refreshToken, user, logout } = useAuth();
 
   /**
    * Điều hướng tới Shell đúng của vai trò.
@@ -93,7 +94,17 @@ export function App() {
           path="/teacher"
           element={
             <RoleGuard allowedRoles={['teacher']} fallback={forbidden('Giáo viên')}>
-              <TeacherDashboard />
+              <LmsShell
+                currentRole="teacher"
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={false}
+                onToggleTheme={() => {}}
+                onLogout={logout}
+                onRoleChange={(newRole) => navigateToShell(newRole)}
+              >
+                {(activeNavId) => <TeacherDashboard activeNavId={activeNavId} />}
+              </LmsShell>
             </RoleGuard>
           }
         />
@@ -103,7 +114,17 @@ export function App() {
           path="/staff"
           element={
             <RoleGuard allowedRoles={['staff']} fallback={forbidden('Giáo vụ')}>
-              <StaffDashboard />
+              <LmsShell
+                currentRole="staff"
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={false}
+                onToggleTheme={() => {}}
+                onLogout={logout}
+                onRoleChange={(newRole) => navigateToShell(newRole)}
+              >
+                {(activeNavId) => <StaffDashboard activeNavId={activeNavId} />}
+              </LmsShell>
             </RoleGuard>
           }
         />
@@ -113,7 +134,17 @@ export function App() {
           path="/academic-manager"
           element={
             <RoleGuard allowedRoles={['academic_manager']} fallback={forbidden('Quản lý học thuật')}>
-              <AcademicManagerDashboard />
+              <LmsShell
+                currentRole="academic_manager"
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={false}
+                onToggleTheme={() => {}}
+                onLogout={logout}
+                onRoleChange={(newRole) => navigateToShell(newRole)}
+              >
+                {(activeNavId) => <AcademicManagerDashboard activeNavId={activeNavId} />}
+              </LmsShell>
             </RoleGuard>
           }
         />
@@ -123,7 +154,17 @@ export function App() {
           path="/admin"
           element={
             <RoleGuard allowedRoles={['admin']} fallback={forbidden('Quản trị hệ thống')}>
-              <AdminDashboard />
+              <LmsShell
+                currentRole="admin"
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={false}
+                onToggleTheme={() => {}}
+                onLogout={logout}
+                onRoleChange={(newRole) => navigateToShell(newRole)}
+              >
+                {(activeNavId) => <AdminDashboard activeNavId={activeNavId} />}
+              </LmsShell>
             </RoleGuard>
           }
         />

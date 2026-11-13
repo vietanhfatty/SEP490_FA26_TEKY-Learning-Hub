@@ -11,6 +11,7 @@ import { useAuth } from '@teky/shared/auth/authContext';
 import { detectCurrentShell, resolveShellForRole, shellOrigin } from '@teky/shared/auth/shellConfig';
 import { buildCrossAppUrl } from '@teky/shared/auth/shellTransfer';
 import { Forbidden } from '@teky/shared/ui/Forbidden';
+import { LmsShell } from '@teky/shared/ui/LmsShell';
 import type { UserRole } from '@teky/shared/types';
 
 /**
@@ -113,7 +114,17 @@ export function App() {
                 />
               }
             >
-              <StudentDashboard />
+              <LmsShell
+                currentRole="student"
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={false}
+                onToggleTheme={() => {}}
+                onLogout={logout}
+                onRoleChange={(newRole) => navigateToShell(newRole)}
+              >
+                {(activeNavId) => <StudentDashboard activeNavId={activeNavId} />}
+              </LmsShell>
             </RoleGuard>
           }
         />
@@ -132,7 +143,17 @@ export function App() {
                 />
               }
             >
-              <ParentDashboard />
+              <LmsShell
+                currentRole="parent"
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={false}
+                onToggleTheme={() => {}}
+                onLogout={logout}
+                onRoleChange={(newRole) => navigateToShell(newRole)}
+              >
+                {(activeNavId) => <ParentDashboard activeNavId={activeNavId} />}
+              </LmsShell>
             </RoleGuard>
           }
         />

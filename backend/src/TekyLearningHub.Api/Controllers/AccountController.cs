@@ -22,7 +22,7 @@ public class AccountController(ApplicationDbContext db, IPasswordHasher hasher, 
   user.SecurityVersion++; user.MustChangePwd=false; user.FailedLoginCount=0; user.LockoutEndAt=null;
   foreach(var session in await db.UserSessions.Where(x=>x.UserId==user.UserId && x.IsActive).ToListAsync()) {session.IsActive=false;session.LogoutAt=DateTime.UtcNow;}
   foreach(var otp in await db.PasswordResetOtps.Where(x=>x.UserId==user.UserId && x.UsedAt==null).ToListAsync()) otp.UsedAt=DateTime.UtcNow;
-  db.AuditLogs.Add(new AuditLog {ActorUserId=user.UserId,ActorType="User",Action="PASSWORD_UPDATED",CreatedAt=DateTime.UtcNow});
+  db.AuditLogs.Add(new AuditLog {ActorUserId=user.UserId,ActorType=TekyLearningHub.Domain.Constants.AuditActorTypes.User,Action="PASSWORD_UPDATED",CreatedAt=DateTime.UtcNow});
  }
  [HttpPost("auth/forgot-password")]
  public async Task<IActionResult> Forgot(ForgotPasswordRequest request) {

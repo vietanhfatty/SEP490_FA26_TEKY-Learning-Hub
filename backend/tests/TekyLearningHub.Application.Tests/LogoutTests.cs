@@ -47,21 +47,27 @@ public class LogoutTests
         return new AuthService(context, passwordHasher, jwtGenerator);
     }
 
-    [Fact]
-    public async Task LogoutAsync_WithValidRefreshToken_RevokesSessionAndCreatesAuditLog()
+    [Theory]
+    [InlineData(1,"Student")]
+    [InlineData(2,"Teacher")]
+    [InlineData(3,"Admin")]
+    [InlineData(4,"Parent")]
+    [InlineData(5,"Staff")]
+    [InlineData(6,"AcademicManager")]
+    public async Task LogoutAsync_WithValidRefreshToken_RevokesSessionAndCreatesAuditLog(byte roleId, string roleName)
     {
         // Arrange
         using var context = CreateInMemoryDbContext(Guid.NewGuid().ToString());
         var authService = CreateAuthService(context);
 
-        var role = new Role { RoleId = 1, RoleName = "student" };
+        var role = new Role { RoleId = roleId, RoleName = roleName };
         var user = new User
         {
             UserId = 10,
             Email = "student10@teky.edu.vn",
             FullName = "Nguyễn Văn Test",
             PasswordHash = "hash",
-            RoleId = 1,
+            RoleId = roleId,
             Role = role,
             Status = "Active",
             ThemeMode = "light"
@@ -96,6 +102,7 @@ public class LogoutTests
         var auditLog = await context.AuditLogs.FirstOrDefaultAsync(a => a.ActorUserId == user.UserId);
         Assert.NotNull(auditLog);
         Assert.Equal("USER_LOGOUT", auditLog.Action);
+        Assert.Equal("User", auditLog.ActorType);
         Assert.Equal("192.168.1.1", auditLog.IpAddress);
     }
 
@@ -154,6 +161,7 @@ public class LogoutTests
         var auditLog = await context.AuditLogs.FirstOrDefaultAsync(a => a.ActorUserId == user.UserId);
         Assert.NotNull(auditLog);
         Assert.Equal("USER_LOGOUT_ALL_DEVICES", auditLog.Action);
+        Assert.Equal("User", auditLog.ActorType);
     }
 
     [Fact]
