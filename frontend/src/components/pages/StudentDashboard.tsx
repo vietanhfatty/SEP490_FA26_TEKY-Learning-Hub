@@ -286,11 +286,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
               <button
                 key={c.code}
                 onClick={() => setSelectedCourseTab(c.code as 'SCRATCH-01' | 'PY-GAME-02')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  selectedCourseTab === c.code
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedCourseTab === c.code
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {c.title.split(' ')[2] || c.code} ({c.progress}%)
               </button>
@@ -318,13 +317,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
             {currentCourse.syllabus.map((lesson) => (
               <div
                 key={lesson.num}
-                className={`p-4 rounded-2xl border text-xs transition-all ${
-                  lesson.status === 'Completed'
+                className={`p-4 rounded-2xl border text-xs transition-all ${lesson.status === 'Completed'
                     ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50'
                     : lesson.status === 'Next'
-                    ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
-                    : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/50 opacity-60'
-                }`}
+                      ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/50 opacity-60'
+                  }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold text-[11px] px-2 py-0.5 rounded-md bg-white/80 dark:bg-slate-700">
@@ -545,13 +543,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
                 {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d, i) => (
                   <div key={d} className="flex flex-col items-center gap-1">
                     <span
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                        i < 5
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i < 5
                           ? 'bg-amber-500 text-white'
                           : i === 5
-                          ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 border border-amber-400 animate-pulse'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
-                      }`}
+                            ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 border border-amber-400 animate-pulse'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
+                        }`}
                     >
                       {i < 5 ? '✓' : d}
                     </span>
@@ -671,11 +668,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
                 return (
                   <div
                     key={day}
-                    className={`p-2 rounded-xl border text-[11px] ${
-                      isToday
+                    className={`p-2 rounded-xl border text-[11px] ${isToday
                         ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30'
                         : 'border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/40'
-                    }`}
+                      }`}
                   >
                     <span className={`font-bold block ${isToday ? 'text-blue-600' : 'text-slate-700 dark:text-slate-300'}`}>
                       {index === 6 ? 'CN' : `T${index + 2}`}
@@ -735,49 +731,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
             </div>
           </div>
         </div>
-
-        {/* Right Sidebar: Badges & Teacher Remarks */}
-        <div className="space-y-6">
-          {/* Trophy Cabinet */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                <IconTrophy size={18} className="text-orange-500" /> Bảng Vàng Thành Tích
-              </h4>
-              <span className="text-[11px] text-slate-400">8/20 Huy hiệu</span>
-            </div>
-
-            <div className="space-y-3">
-              {recentBadges.map((b, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-xs">
-                  <span className="text-2xl">{b.icon}</span>
-                  <div className="flex-1">
-                    <p className="font-bold text-slate-800 dark:text-slate-200">{b.title}</p>
-                    <p className="text-[11px] text-slate-500">{b.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Teacher Latest Remarks */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">Nhận xét buổi học gần nhất</h4>
-            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-xs space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-blue-900 dark:text-blue-300">Thầy Hoàng Nam</span>
-                <span className="text-amber-500">★★★★★</span>
-              </div>
-              <p className="text-slate-700 dark:text-slate-300 italic text-[11px] leading-relaxed">
-                "Minh Quân nắm bắt thuật toán trọng lực rất nhanh. Em đã tự tạo thêm tính năng âm thanh khi nhân vật nhảy rất sáng tạo!"
-              </p>
-              <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/60 text-[10px] text-slate-400">
-                Buổi 9 • Ngày 01/11/2026
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+      </>}
+    </section>;
+}
