@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using TekyLearningHub.Domain.Constants;
 
 namespace TekyLearningHub.Domain.Entities;
 
@@ -9,7 +10,12 @@ public partial class AuditLog
 
     public int? ActorUserId { get; set; }
 
-    public string ActorType { get; set; } = null!;
+    private string _actorType = AuditActorTypes.User;
+    public string ActorType
+    {
+        get => _actorType;
+        set => _actorType = AuditActorTypes.Normalize(value);
+    }
 
     public string Action { get; set; } = null!;
 

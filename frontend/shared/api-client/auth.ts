@@ -126,27 +126,60 @@ export async function refreshTokenApi(): Promise<boolean> {
   return false;
 }
 
-export async function logoutApi(): Promise<void> {
+export interface LogoutOptions {
+  allDevices?: boolean;
+}
+
+export async function logoutApi(options?: LogoutOptions): Promise<void> {
   const refreshToken =
     localStorage.getItem('teky_refresh_token') || sessionStorage.getItem('teky_refresh_token');
+  const accessToken =
+    localStorage.getItem('teky_access_token') ||
+    sessionStorage.getItem('teky_access_token') ||
+    localStorage.getItem('teky_token') ||
+    sessionStorage.getItem('teky_token');
 
-  if (refreshToken) {
-    try {
-      await fetch(`${API_BASE_URL}/auth/revoke-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-    } catch {
-      // ignore
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        refreshToken: refreshToken || null,
+        allDevices: options?.allDevices ?? false,
+      }),
+    });
+  } catch {
+    if (refreshToken) {
+      try {
+        await fetch(`${API_BASE_URL}/auth/revoke-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+      } catch {
+        // ignore
+      }
     }
   }
 
-  localStorage.removeItem('teky_access_token');
-  localStorage.removeItem('teky_refresh_token');
-  localStorage.removeItem('teky_user');
-  localStorage.removeItem('teky_role');
-  localStorage.removeItem('teky_token');
-  sessionStorage.clear();
+  for (const target of [localStorage, sessionStorage]) {
+    for (const key of ['teky_access_token', 'teky_refresh_token', 'teky_user', 'teky_role', 'teky_token']) {
+      target.removeItem(key);
+    }
+  }
+
+  try {
+    localStorage.setItem('teky_logout_event', Date.now().toString());
+    localStorage.removeItem('teky_logout_event');
+  } catch {
+    // ignore
+  }
 }
 

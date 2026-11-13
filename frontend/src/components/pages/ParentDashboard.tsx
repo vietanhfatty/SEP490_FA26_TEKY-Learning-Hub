@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { IconDownload } from '../common/Icons';
+import { IconDownload, IconSparkles, IconCreditCard, IconFileText } from '../common/Icons';
 import { Badge } from '../common/Badge';
 
-export const ParentDashboard: React.FC = () => {
+interface ParentDashboardProps {
+  activeNavId?: string;
+}
+
+export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 'overview' }) => {
   const [selectedChild, setSelectedChild] = useState<'quan' | 'my'>('quan');
+  const isFocusedFeedback = activeNavId === 'feedback';
+  const isFocusedCompetency = activeNavId === 'competency';
+  const isFocusedTuition = activeNavId === 'tuition';
 
   const childrenData = {
     quan: {
@@ -74,7 +81,7 @@ export const ParentDashboard: React.FC = () => {
   const child = childrenData[selectedChild];
 
   return (
-    <div className="space-y-8 py-6">
+    <div className="space-y-8 animate-in fade-in duration-150">
       {/* Top: Header & Multi-Child Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
         <div>
@@ -110,134 +117,150 @@ export const ParentDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Child Summary Stats Grid */}
+      {/* Child Fast Facts Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400">Lớp đang theo học</p>
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1 truncate">{child.currentClass}</h4>
-          <p className="text-[11px] text-blue-600 mt-2 font-medium">GV phụ trách: {child.teacher}</p>
+        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <p className="text-xs text-slate-400 font-medium">Lớp học hiện tại</p>
+          <p className="text-sm font-bold text-slate-900 dark:text-white mt-1">{child.currentClass}</p>
+          <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-2 font-medium">GV: {child.teacher}</p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400">Tỷ lệ chuyên cần</p>
-          <h4 className="font-bold text-lg text-emerald-600 mt-1 tabular-nums">{child.attendanceRate}</h4>
-          <Badge variant="success" className="mt-2">100% Có mặt đúng giờ</Badge>
+        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <p className="text-xs text-slate-400 font-medium">Tỷ lệ Chuyên cần</p>
+          <p className="text-xl font-extrabold text-emerald-600 mt-1 tabular-nums">{child.attendanceRate}</p>
+          <p className="text-[11px] text-emerald-600/80 mt-2 font-medium">✓ Không nghỉ buổi nào</p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400">Điểm đánh giá trung bình</p>
-          <h4 className="font-bold text-lg text-blue-600 mt-1 tabular-nums">{child.avgScore}</h4>
-          <span className="text-amber-500 text-xs">★★★★★ Xuất sắc</span>
+        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <p className="text-xs text-slate-400 font-medium">Điểm trung bình dự án</p>
+          <p className="text-xl font-extrabold text-blue-600 mt-1 tabular-nums">{child.avgScore}</p>
+          <p className="text-[11px] text-blue-500 mt-2 font-medium">Xếp loại: Xuất sắc ★★★★★</p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400">Lịch học tiếp theo</p>
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1">Thứ Bảy, 14:00</h4>
-          <p className="text-[11px] text-slate-500 mt-2">Phòng Online 04 (Zoom)</p>
+        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <p className="text-xs text-slate-400 font-medium">Học phí & Hóa đơn</p>
+          <p className="text-sm font-bold text-slate-900 dark:text-white mt-1">Đã hoàn thành Kỳ 2</p>
+          <p className="text-[11px] text-slate-400 mt-2">Hạn đóng kỳ tới: 15/12/2026</p>
         </div>
       </div>
 
-      {/* Middle Section: Competency Assessment & Teacher Remarks Timeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 5-Dimension STEAM Competency Report */}
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+      {/* Main Split: Teacher Remarks (Left) vs 5D STEAM Competency (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Teacher Feedback Timeline */}
+        <div
+          className={`space-y-4 ${
+            isFocusedFeedback
+              ? 'lg:col-span-3 ring-2 ring-blue-500/50 rounded-3xl p-1'
+              : isFocusedCompetency || isFocusedTuition
+              ? 'hidden lg:block lg:col-span-2'
+              : 'lg:col-span-2'
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
-              Đánh giá 5 năng lực STEAM cốt lõi
+            <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+              <IconFileText size={18} className="text-blue-600" /> Sổ liên lạc & Nhận xét của Giáo viên
             </h3>
-            <span className="text-xs text-blue-600 font-medium">Báo cáo tháng 10/2026</span>
-          </div>
-          <p className="text-xs text-slate-500">
-            Hệ thống chấm điểm chuẩn CSTA dựa trên quá trình tương tác lớp học và chất lượng nộp sản phẩm thực tế:
-          </p>
-
-          <div className="space-y-3 pt-2">
-            {child.competencies.map((comp, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">{comp.label}</span>
-                  <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">{comp.score}/100</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                  <div
-                    className="h-full bg-blue-600 rounded-full transition-all duration-300"
-                    style={{ width: `${comp.score}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+            <span className="text-xs text-slate-400">Cập nhật sau mỗi buổi học</span>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-xs text-blue-800 dark:text-blue-300">
-            <span className="font-bold">Đánh giá chung:</span> Bé có thế mạnh đặc biệt ở tư duy tạo hình và sáng tạo sản phẩm độc lập.
-          </div>
-        </div>
-
-        {/* Teacher Feedback Timeline */}
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
-              Nhận xét chi tiết sau từng buổi học
-            </h3>
-            <Badge variant="info">Cập nhật sau mỗi ca học</Badge>
-          </div>
-
-          <div className="space-y-4 pt-1">
+          <div className="space-y-4">
             {child.feedbackHistory.map((fb, idx) => (
-              <div key={idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900 dark:text-white">{fb.session}</span>
-                  <span className="text-amber-500">★★★★★</span>
+              <div key={idx} className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-100 dark:border-slate-700 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-900 dark:text-white">{fb.session}: </span>
+                    <span className="text-slate-600 dark:text-slate-300">{fb.topic}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-500 font-bold">★★★★★</span>
+                    <Badge variant="success">{fb.attendance}</Badge>
+                  </div>
                 </div>
-                <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">Nội dung: {fb.topic}</p>
-                <p className="text-slate-600 dark:text-slate-300 italic">"{fb.teacherNote}"</p>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-600/60 text-[11px] text-slate-400">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">✓ {fb.attendance}</span>
-                  <span>Đã duyệt bởi Quản lý học thuật</span>
+
+                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">
+                  "{fb.teacherNote}"
+                </p>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Người nhận xét: {child.teacher}</span>
+                  <button
+                    onClick={() => alert('Gửi lời nhắn tới giáo viên...')}
+                    className="text-blue-600 font-semibold hover:underline"
+                  >
+                    Gửi phản hồi cho Thầy cô 💬
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Tuition & Invoice Table */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">Lịch sử học phí & Hóa đơn điện tử</h3>
-            <p className="text-xs text-slate-500">Minh bạch biểu phí, xuất hóa đơn VAT tự động</p>
-          </div>
-          <button className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 font-semibold text-xs hover:bg-blue-100 flex items-center gap-1.5">
-            <IconDownload size={14} /> Tải biên lai
-          </button>
-        </div>
+        {/* Right: STEAM 5D Competency Graph */}
+        <div
+          className={`space-y-6 ${
+            isFocusedCompetency || isFocusedTuition
+              ? 'lg:col-span-3'
+              : isFocusedFeedback
+              ? 'hidden lg:block'
+              : ''
+          }`}
+        >
+          <div
+            className={`p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 ${
+              isFocusedCompetency ? 'ring-2 ring-orange-500/50' : ''
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                <IconSparkles size={16} className="text-orange-500" /> Đánh giá năng lực STEAM 5D
+              </h4>
+              <Badge variant="info">Chuẩn CSTA</Badge>
+            </div>
+            <p className="text-xs text-slate-500">Đánh giá đa chiều dựa trên các bài nộp và hoạt động thực tế trên lớp.</p>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-400 uppercase text-[10px]">
-              <tr>
-                <th className="p-3">Mã hóa đơn</th>
-                <th className="p-3">Khoản thu</th>
-                <th className="p-3">Số tiền</th>
-                <th className="p-3">Ngày thanh toán</th>
-                <th className="p-3">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {child.invoices.map((inv) => (
-                <tr key={inv.id}>
-                  <td className="p-3 font-semibold text-slate-900 dark:text-white">{inv.id}</td>
-                  <td className="p-3 text-slate-700 dark:text-slate-300">{inv.title}</td>
-                  <td className="p-3 font-bold text-slate-900 dark:text-white tabular-nums">{inv.amount}</td>
-                  <td className="p-3 text-slate-500">{inv.date}</td>
-                  <td className="p-3">
-                    <Badge variant="success">{inv.status}</Badge>
-                  </td>
-                </tr>
+            <div className="space-y-3 pt-2">
+              {child.competencies.map((comp, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-slate-700 dark:text-slate-300">{comp.label}</span>
+                    <span className="text-blue-600 tabular-nums">{comp.score}/100</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-sky-400 rounded-full"
+                      style={{ width: `${comp.score}%` }}
+                    ></div>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            <button
+              onClick={() => alert('Đang xuất báo cáo năng lực STEAM định dạng PDF...')}
+              className="w-full mt-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-colors"
+            >
+              <IconDownload size={16} /> Tải báo cáo năng lực (PDF)
+            </button>
+          </div>
+
+          {/* Tuition Invoices */}
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+            <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+              <IconCreditCard size={16} className="text-emerald-600" /> Hóa đơn học phí gần nhất
+            </h4>
+            {child.invoices.map((inv) => (
+              <div key={inv.id} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-700/50 space-y-1 text-xs">
+                <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200">
+                  <span>{inv.title}</span>
+                  <Badge variant="success">{inv.status}</Badge>
+                </div>
+                <div className="flex justify-between text-slate-400 text-[11px] pt-1">
+                  <span>Số tiền: <b className="text-slate-900 dark:text-white tabular-nums">{inv.amount}</b></span>
+                  <span>Ngày: {inv.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
