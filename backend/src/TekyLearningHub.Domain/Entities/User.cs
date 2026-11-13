@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace TekyLearningHub.Domain.Entities;
@@ -28,6 +28,9 @@ public partial class User
     public bool MustChangePwd { get; set; }
 
     public int FailedLoginCount { get; set; }
+    public DateTime? LockoutEndAt { get; set; }
+    public int SecurityVersion { get; set; }
+    public string? Bio { get; set; }
 
     public DateTime? LastLoginAt { get; set; }
 

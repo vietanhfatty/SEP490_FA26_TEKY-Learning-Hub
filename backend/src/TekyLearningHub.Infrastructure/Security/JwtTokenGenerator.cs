@@ -28,7 +28,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var roleName = user.Role?.RoleName?.ToLowerInvariant() ?? GetRoleNameFromId(user.RoleId);
+        var roleName = RoleNameNormalizer.Normalize(user.Role?.RoleName) ?? RoleNameNormalizer.FromRoleId(user.RoleId);
 
         var claims = new List<Claim>
         {
@@ -36,6 +36,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, user.FullName),
             new(ClaimTypes.Role, roleName),
+            new("security_version", user.SecurityVersion.ToString()),
             new("role_id", user.RoleId.ToString()),
             new("role_name", roleName),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
@@ -77,15 +78,8 @@ public class JwtTokenGenerator : IJwtTokenGenerator
 
     private static string GetRoleNameFromId(byte roleId)
     {
-        return roleId switch
-        {
-            1 => "student",
-            2 => "parent",
-            3 => "teacher",
-            4 => "academic_manager",
-            5 => "admin",
-            _ => "student"
-        };
+        // Mapping bám sát enum Domain UserRole (Student=1, Teacher=2, Admin=3, Parent=4, Staff=5, AcademicManager=6)
+        return RoleNameNormalizer.FromRoleId(roleId);
     }
 }
 

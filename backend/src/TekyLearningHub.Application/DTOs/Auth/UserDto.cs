@@ -9,6 +9,7 @@ public class UserDto
     public byte RoleId { get; set; }
     public string? AvatarUrl { get; set; }
     public string? Phone { get; set; }
+    public string? Bio { get; set; }
     public string Status { get; set; } = "Active";
     public string ThemeMode { get; set; } = "Light";
 }

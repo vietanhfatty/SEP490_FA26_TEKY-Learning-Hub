@@ -2,14 +2,21 @@ import React, { useState } from 'react';
 import type { UserRole } from '@teky/shared';
 import { IconGraduationCap, IconShieldCheck, IconCheckCircle, IconArrowRight, IconLock } from '@teky/shared';
 import { Badge } from '@teky/shared';
-import { loginApi, normalizeRole } from '@teky/shared';
+import { loginApi } from '@teky/shared';
+import { decodeJwtClaims, roleFromClaims } from '@teky/shared/auth/jwt';
+import { useAuth } from '@teky/shared/auth/authContext';
 
 interface LoginPageProps {
-  onLoginSuccess: (role: UserRole) => void;
+  /**
+   * Callback sau khi đăng nhập thành công.
+   * Nhận vai trò (suy ra từ CLAIM trong JWT) và access token để điều hướng sang Shell khác.
+   */
+  onLoginSuccess: (role: UserRole, accessToken?: string) => void;
   onNavigateHome?: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigateHome }) => {
+  const { login: syncSession } = useAuth();
   const [email, setEmail] = useState('student@teky.edu.vn');
   const [password, setPassword] = useState('Teky@2026!');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,11 +29,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  // 5 standard roles supported by centralized login portal
+  // 6 standard roles supported by centralized login portal
   const demoAccounts: { role: UserRole; name: string; email: string; roleLabel: string; desc: string }[] = [
     { role: 'student', name: 'Nguyễn Minh Quân (Học sinh)', email: 'student@teky.edu.vn', roleLabel: 'Học sinh', desc: 'Lịch học, nộp dự án, huy hiệu STEAM' },
     { role: 'parent', name: 'Trần Thu Trang (Phụ huynh)', email: 'parent@teky.edu.vn', roleLabel: 'Phụ huynh', desc: 'Theo dõi con, nhận xét GV, học phí' },
     { role: 'teacher', name: 'Thầy Hoàng Văn Nam (Giáo viên)', email: 'teacher@teky.edu.vn', roleLabel: 'Giáo viên', desc: 'Điểm danh 1 chạm, giáo án, nhận xét' },
+    { role: 'staff', name: 'Nguyễn Thu Nga (Giáo vụ)', email: 'staff@teky.edu.vn', roleLabel: 'Giáo vụ', desc: 'Lớp học, xếp lịch học bù, chăm sóc học viên' },
     { role: 'academic_manager', name: 'Đỗ Thị Hồng (QL Đào tạo)', email: 'manager@teky.edu.vn', roleLabel: 'QL Học thuật', desc: 'Ma trận xung đột, điều phối GV, khóa học' },
     { role: 'admin', name: 'Admin Kỹ Thuật (System Admin)', email: 'admin@teky.edu.vn', roleLabel: 'Quản trị viên', desc: 'Phân quyền RBAC, Audit logs, an ninh' },
   ];
@@ -35,15 +43,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
     setEmail(acc.email);
     setPassword('Teky@2026!');
     setErrorMessage(null);
-  };
-
-  const inferRoleFromInput = (input: string): UserRole => {
-    const lower = input.toLowerCase();
-    if (lower.includes('parent')) return 'parent';
-    if (lower.includes('teacher') || lower.includes('gv')) return 'teacher';
-    if (lower.includes('manager') || lower.includes('academic') || lower.includes('ql')) return 'academic_manager';
-    if (lower.includes('admin') || lower.includes('root')) return 'admin';
-    return 'student';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,27 +55,66 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
       const response = await loginApi(email, password, rememberMe);
 
       if (response.success && response.data) {
-        const resolvedRole = normalizeRole(response.data.user.role);
-        setTokenIssuedNotice(`Đã xác thực BCrypt thành công! Cấp phát Access Token (${response.data.accessToken.substring(0, 16)}...) & Refresh Token.`);
+        // Ưu tiên giải mã CLAIM trong JWT Access Token (role_id > role_name > role).
+        // Chỉ fallback về body response khi token không phải JWT hợp lệ.
+        const claims = decodeJwtClaims(response.data.accessToken);
+        const claimRole = roleFromClaims(claims);
+        const resolvedRole = claimRole;
+        if (!resolvedRole) throw new Error('Vai trò trong phiên đăng nhập không hợp lệ.');
+
+        setTokenIssuedNotice('Đăng nhập thành công. Đang mở trang của bạn…');
+        const accessToken = response.data?.accessToken;
+        // Đồng bộ phiên vào AuthProvider để RoleGuard nhận đúng vai trò ngay lập tức.
+        syncSession(resolvedRole, accessToken ?? '', response.data?.refreshToken, {
+          email: response.data.user.email,
+          fullName: response.data.user.fullName,
+          role: resolvedRole,
+          roleId: response.data.user.roleId,
+        });
         setTimeout(() => {
-          onLoginSuccess(resolvedRole);
+          onLoginSuccess(resolvedRole, accessToken);
         }, 600);
       } else {
-        if (response.errors?.some((err) => err.includes('Network error') || err.includes('Failed to fetch') || err.includes('kết nối'))) {
-          const fallbackRole = inferRoleFromInput(email);
+        if (import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH === 'true' && response.errors?.some((err) => err.includes('Network error') || err.includes('Failed to fetch') || err.includes('kết nối'))) {
+          // Backend không chạy: chỉ dùng fallback khi khớp đúng tài khoản demo + mật khẩu chuẩn.
+          const matchedDemo = demoAccounts.find(
+            (acc) => acc.email.toLowerCase() === email.trim().toLowerCase()
+          );
+
+          if (!matchedDemo || password !== 'Teky@2026!') {
+            setErrorMessage('Tài khoản hoặc mật khẩu không chính xác.');
+            return;
+          }
+
+          const fallbackRole = matchedDemo.role;
           localStorage.setItem('teky_role', fallbackRole);
           localStorage.setItem('teky_token', 'jwt-demo-token-bcrypt-verified');
+          localStorage.setItem('teky_access_token', 'jwt-demo-token-bcrypt-verified');
           localStorage.setItem('teky_refresh_token', 'rt-demo-token-active');
+          localStorage.setItem(
+            'teky_user',
+            JSON.stringify({
+              userId: 99,
+              email: matchedDemo.email,
+              fullName: matchedDemo.name,
+              role: fallbackRole,
+              status: 'Active',
+              themeMode: 'Light',
+            })
+          );
+
           setTokenIssuedNotice(`[Chế độ dự phòng] Xác thực danh tính vai trò '${fallbackRole}' thành công.`);
           setTimeout(() => {
-            onLoginSuccess(fallbackRole);
+            onLoginSuccess(fallbackRole, 'jwt-demo-token-bcrypt-verified');
           }, 400);
         } else {
           setErrorMessage(response.message || 'Tài khoản hoặc mật khẩu không chính xác.');
         }
       }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Đã xảy ra lỗi trong quá trình xác thực.');
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Đã xảy ra lỗi trong quá trình xác thực.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -84,11 +122,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
 
   const handleForgotSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    window.location.assign('/forgot-password');
+    return;
     setForgotSent(true);
-    setTimeout(() => {
-      setShowForgotModal(false);
-      setForgotSent(false);
-    }, 2000);
+    setShowForgotModal(false);
+    setForgotSent(false);
   };
 
   return (
@@ -220,7 +258,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
               </label>
 
               <span className="text-[11px] text-slate-400">
-                Vai trò nhận diện: <span className="font-bold text-blue-600 dark:text-blue-400 uppercase">{inferRoleFromInput(email)}</span>
+                Vai trò nhận diện:{' '}
+                <span className="font-bold text-blue-600 dark:text-blue-400 uppercase">
+                  {demoAccounts.find((acc) => acc.email.toLowerCase() === email.trim().toLowerCase())
+                    ?.roleLabel ?? 'Sẽ xác thực qua JWT'}
+                </span>
               </span>
             </div>
 

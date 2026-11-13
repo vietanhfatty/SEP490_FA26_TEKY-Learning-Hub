@@ -25,14 +25,27 @@ export interface LoginResponse {
   errors?: string[];
 }
 
-export const API_BASE_URL = (typeof window !== 'undefined' && (window as any)._env_?.VITE_API_BASE_URL) || 'https://localhost:7001/api';
+/**
+ * Base URL của backend API.
+ *
+ * Ưu tiên `VITE_API_BASE_URL` từ biến môi trường của Vite, sau đó tới `window._env_`
+ * (cơ chế runtime config), cuối cùng là đường dẫn tương đối `/api` để đi qua
+ * dev-server proxy của từng app (portal: 3000, backoffice: 3001, app gốc: 5173).
+ */
+export const API_BASE_URL =
+  (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' &&
+    (window as unknown as { _env_?: { VITE_API_BASE_URL?: string } })._env_?.VITE_API_BASE_URL) ||
+  '/api';
 
 export function normalizeRole(backendRole: string): UserRole {
   const lower = backendRole.toLowerCase().trim();
-  if (lower.includes('parent') || lower === '2') return 'parent';
-  if (lower.includes('teach') || lower.includes('gv') || lower === '3') return 'teacher';
-  if (lower.includes('manager') || lower.includes('academic') || lower === '4') return 'academic_manager';
-  if (lower.includes('admin') || lower === '5') return 'admin';
+  // Mapping role_id theo enum Domain UserRole: Student=1, Teacher=2, Admin=3, Parent=4, Staff=5, AcademicManager=6
+  if (lower.includes('parent') || lower === '4') return 'parent';
+  if (lower.includes('teach') || lower.includes('tutor') || lower.includes('gv') || lower === '2') return 'teacher';
+  if (lower.includes('manager') || lower.includes('academic') || lower === '6') return 'academic_manager';
+  if (lower.includes('staff') || lower.includes('giao_vu') || lower === '5') return 'staff';
+  if (lower.includes('admin') || lower === '3') return 'admin';
   return 'student';
 }
 
@@ -57,13 +70,14 @@ export async function loginApi(
     const data = await response.json().catch(() => null);
 
     if (response.ok && data?.success && data?.data) {
+      for (const target of [localStorage, sessionStorage]) for (const key of ['teky_access_token','teky_refresh_token','teky_user','teky_role','teky_token']) target.removeItem(key);
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem('teky_access_token', data.data.accessToken);
       storage.setItem('teky_refresh_token', data.data.refreshToken);
       storage.setItem('teky_user', JSON.stringify(data.data.user));
       const clientRole = normalizeRole(data.data.user.role);
       storage.setItem('teky_role', clientRole);
-      localStorage.setItem('teky_token', data.data.accessToken);
+      storage.setItem('teky_token', data.data.accessToken);
       return data;
     }
 
@@ -72,11 +86,11 @@ export async function loginApi(
       message: data?.message || `Đăng nhập không thành công (HTTP ${response.status})`,
       errors: data?.errors,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
       message: 'Không thể kết nối đến máy chủ API xác thực (https://localhost:7001). Đang chuyển sang chế độ dự phòng kiểm thử.',
-      errors: [error?.message || 'Network error'],
+      errors: [error instanceof Error ? error.message : 'Network error'],
     };
   }
 }
@@ -99,9 +113,11 @@ export async function refreshTokenApi(): Promise<boolean> {
     if (!response.ok) return false;
     const data = await response.json();
     if (data?.success && data?.data) {
-      localStorage.setItem('teky_access_token', data.data.accessToken);
-      localStorage.setItem('teky_refresh_token', data.data.refreshToken);
-      localStorage.setItem('teky_token', data.data.accessToken);
+      const storage = localStorage.getItem('teky_refresh_token') ? localStorage : sessionStorage;
+      storage.setItem('teky_access_token', data.data.accessToken);
+      storage.setItem('teky_refresh_token', data.data.refreshToken);
+      storage.setItem('teky_user', JSON.stringify(data.data.user));
+      storage.setItem('teky_token', data.data.accessToken);
       return true;
     }
   } catch {

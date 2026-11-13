@@ -25,14 +25,17 @@ export interface LoginResponse {
   errors?: string[];
 }
 
-export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
+export const API_BASE_URL =
+  (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
+  '/api';
 
 export function normalizeRole(backendRole: string): UserRole {
   const lower = backendRole.toLowerCase().trim();
+  // Mapping role_id theo enum Domain UserRole: Student=1, Teacher=2, Admin=3, Parent=4, Staff=5, AcademicManager=6
   if (lower.includes('parent') || lower === '4') return 'parent';
-  if (lower.includes('teach') || lower.includes('gv') || lower === '2') return 'teacher';
-  if (lower.includes('staff') || lower.includes('giao_vu') || lower === '5') return 'staff';
+  if (lower.includes('teach') || lower.includes('tutor') || lower.includes('gv') || lower === '2') return 'teacher';
   if (lower.includes('manager') || lower.includes('academic') || lower === '6') return 'academic_manager';
+  if (lower.includes('staff') || lower.includes('giao_vu') || lower === '5') return 'staff';
   if (lower.includes('admin') || lower === '3') return 'admin';
   return 'student';
 }
@@ -58,13 +61,16 @@ export async function loginApi(
     const data = await response.json().catch(() => null);
 
     if (response.ok && data?.success && data?.data) {
+      for (const target of [localStorage, sessionStorage]) {
+        for (const key of ['teky_access_token', 'teky_refresh_token', 'teky_user', 'teky_role', 'teky_token']) target.removeItem(key);
+      }
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem('teky_access_token', data.data.accessToken);
       storage.setItem('teky_refresh_token', data.data.refreshToken);
       storage.setItem('teky_user', JSON.stringify(data.data.user));
       const clientRole = normalizeRole(data.data.user.role);
       storage.setItem('teky_role', clientRole);
-      localStorage.setItem('teky_token', data.data.accessToken);
+      storage.setItem('teky_token', data.data.accessToken);
       return data;
     }
 
@@ -73,12 +79,12 @@ export async function loginApi(
       message: data?.message || `Đăng nhập không thành công (HTTP ${response.status})`,
       errors: data?.errors,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If backend is not reached or network error occurs, try direct fallback to localhost:5268 or return connection error
     return {
       success: false,
       message: 'Không thể kết nối đến máy chủ Backend API (http://localhost:5268).',
-      errors: [error?.message || 'Network error', 'Connection refused'],
+      errors: [error instanceof Error ? error.message : 'Network error', 'Connection refused'],
     };
   }
 }

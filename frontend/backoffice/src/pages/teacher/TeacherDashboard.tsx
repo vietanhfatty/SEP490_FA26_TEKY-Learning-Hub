@@ -29,7 +29,7 @@ export const TeacherDashboard: React.FC = () => {
     setRoster(roster.map(s => ({ ...s, status: 'Present' })));
   };
 
-  const handleStatusChange = (id: string, status: any) => {
+  const handleStatusChange = (id: string, status: (typeof roster)[number]['status']) => {
     setRoster(roster.map(s => s.id === id ? { ...s, status } : s));
   };
 

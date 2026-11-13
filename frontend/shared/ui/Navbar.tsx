@@ -1,5 +1,5 @@
 import React from 'react';
-import type { UserRole } from '../../types';
+import type { UserRole } from '../types';
 import { IconBell, IconMoon, IconSun, IconLogOut, IconGraduationCap, IconLogIn } from './Icons';
 import { Badge } from './Badge';
 
@@ -26,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     student: { label: 'Học sinh', badge: 'info' },
     parent: { label: 'Phụ huynh', badge: 'accent' },
     teacher: { label: 'Giảng viên', badge: 'success' },
+    staff: { label: 'Giáo vụ', badge: 'info' },
     academic_manager: { label: 'Quản lý học thuật', badge: 'warning' },
     admin: { label: 'Quản trị hệ thống', badge: 'neutral' },
   };
@@ -34,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     student: 'Nguyễn Minh Quân',
     parent: 'Trần Thu Trang',
     teacher: 'Thầy Hoàng Văn Nam',
+    staff: 'Nguyễn Thu Nga',
     academic_manager: 'Đỗ Thị Hồng',
     admin: 'Admin Kỹ Thuật',
   };
