@@ -53,7 +53,7 @@ public class TeacherService : ITeacherService
         var classes = await _context.Classes
             .AsNoTracking()
             .Where(c => c.TeacherId == teacherId && c.Status == "Open")
-            .Include(c => c.Sessions)
+            .Include(c => c.ClassSessions)
             .Include(c => c.Enrollments)
             .ToListAsync(ct);
 
@@ -79,7 +79,7 @@ public class TeacherService : ITeacherService
             .ThenBy(s => s.StartTime)
             .ToListAsync(ct);
 
-        var sessionMapByClass = classes.ToDictionary(c => c.ClassId, c => c.Sessions);
+        var sessionMapByClass = classes.ToDictionary(c => c.ClassId, c => c.ClassSessions);
 
         var scheduleList = weeklySessions.Select(s => new TeacherScheduleSessionDto
         {
@@ -92,8 +92,8 @@ public class TeacherService : ITeacherService
                 : 0) + 1,
             Title = $"Buổi học ngày {s.SessionDate:dd/MM/yyyy}",
             SessionDate = s.SessionDate,
-            StartTime = s.StartTime.ToString(@"hh\:mm"),
-            EndTime = s.EndTime.ToString(@"hh\:mm"),
+            StartTime = s.StartTime.ToString("HH:mm"),
+            EndTime = s.EndTime.ToString("HH:mm"),
             RoomName = s.Room?.RoomName ?? "Phòng Lab STEM",
             Status = s.Status,
             EnrolledStudentsCount = s.Class.Enrollments.Count(e => e.Status == "Active"),
@@ -264,7 +264,7 @@ public class TeacherService : ITeacherService
 
         foreach (var cp in request.Checkpoints)
         {
-            map.Checkpoints.Add(new MapCheckpoint
+            map.MapCheckpoints.Add(new MapCheckpoint
             {
                 SeqNo = cp.SeqNo,
                 X = cp.X,
@@ -301,6 +301,7 @@ public class TeacherService : ITeacherService
                 SubmissionId = submission.SubmissionId,
                 AutoAstScore = astScore,
                 MatchPercent = astScore * 10m,
+                EngineVersion = "TED-v1.0",
                 EvaluatedAt = DateTime.UtcNow
             };
             await _context.AstEvaluations.AddAsync(astEval, ct);
@@ -348,7 +349,7 @@ public class TeacherService : ITeacherService
 
         // Tự động xuất bản Portfolio & Thẻ thành tích QR (SCR-PAR-03) khi đạt từ 8.0 điểm trở lên
         var existingPortfolio = await _context.PortfolioItems
-            .Include(pi => pi.Cards)
+            .Include(pi => pi.AchievementCards)
             .FirstOrDefaultAsync(pi => pi.SubmissionId == submission.SubmissionId, ct);
 
         if (existingPortfolio == null && finalScore >= 8.0m)
@@ -362,7 +363,7 @@ public class TeacherService : ITeacherService
                 FinalScore = finalScore,
                 CompletedAt = DateTime.UtcNow
             };
-            portfolioItem.Cards.Add(new AchievementCard
+            portfolioItem.AchievementCards.Add(new AchievementCard
             {
                 StudentId = submission.StudentId,
                 Title = $"Chứng nhận: {submission.Assignment?.Title ?? "Kỹ sư STEM nhí"}",

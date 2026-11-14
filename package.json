@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "turbo dev",
+    "backend": "powershell -NoProfile -Command \"$env:PATH=\\\"$env:USERPROFILE\\.dotnet;$env:PATH\\\"; $env:DOTNET_ROOT=\\\"$env:USERPROFILE\\.dotnet\\\"; dotnet run --project backend/src/TekyLearningHub.Api/TekyLearningHub.Api.csproj --urls http://localhost:5268\"",
+    "frontend": "npm --prefix frontend run dev",
     "build": "turbo build",
     "lint": "turbo lint"
   },

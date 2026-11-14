@@ -69,22 +69,22 @@ public class TeacherAndParentServiceTests
         var ctx = new ApplicationDbContext(options);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var teacherUser = new User { UserId = 1, Email = "gv@teky.edu.vn", FullName = "Thầy Nguyễn Văn Nam", Status = "Active", RoleId = 2 };
-        var studentUser = new User { UserId = 2, Email = "hs@teky.edu.vn", FullName = "Lê Bảo An", Status = "Active", RoleId = 3 };
-        var parentUser = new User { UserId = 5, Email = "ph@teky.edu.vn", FullName = "Chị Nguyễn Thị Lan", Status = "Active", RoleId = 4 };
+        var teacherUser = new User { UserId = 1, Email = "gv@teky.edu.vn", PasswordHash = "hash", FullName = "Thầy Nguyễn Văn Nam", Status = "Active", ThemeMode = "Light", RoleId = 2 };
+        var studentUser = new User { UserId = 2, Email = "hs@teky.edu.vn", PasswordHash = "hash", FullName = "Lê Bảo An", Status = "Active", ThemeMode = "Light", RoleId = 3 };
+        var parentUser = new User { UserId = 5, Email = "ph@teky.edu.vn", PasswordHash = "hash", FullName = "Chị Nguyễn Thị Lan", Status = "Active", ThemeMode = "Light", RoleId = 4 };
 
-        var teacher = new TeacherProfile { UserId = 1, User = teacherUser, Bio = "Master Robotics" };
+        var teacher = new TeacherProfile { UserId = 1, User = teacherUser, TeacherCode = "TEKY-TEA-001", Bio = "Master Robotics" };
         var student = new StudentProfile { UserId = 2, User = studentUser, StudentCode = "TEKY-STU-001", TotalXp = 100, StemPoints = 50, Status = "Active" };
         var parent = new ParentProfile { UserId = 5, User = parentUser, Occupation = "Kỹ sư" };
 
         var room = new Room { RoomId = 1, RoomName = "Lab Robotics 202", Capacity = 16, Status = "Active" };
-        var course = new Course { CourseId = 1, CourseCode = "ROBO-K10", Name = "STEM Robot Sáng Tạo", Status = "Active" };
+        var course = new Course { CourseId = 1, CourseCode = "ROBO-K10", Name = "STEM Robot Sáng Tạo", LevelCode = "L1", Status = "Active" };
         var cls = new Class { ClassId = 3, CourseId = 1, Course = course, ClassCode = "ROBOT-K10-A", Name = "Lớp STEM Robot K10-A", TeacherId = 1, Teacher = teacher, Status = "Open" };
-        var session = new ClassSession { SessionId = 6, ClassId = 3, Class = cls, RoomId = 1, Room = room, SessionDate = today, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(10, 0, 0), Status = "Scheduled" };
+        var session = new ClassSession { SessionId = 6, ClassId = 3, Class = cls, RoomId = 1, Room = room, SessionDate = today, StartTime = new TimeOnly(8, 0), EndTime = new TimeOnly(10, 0), Status = "Scheduled" };
         var enrollment = new Enrollment { EnrollmentId = 1, ClassId = 3, Class = cls, StudentId = 2, Student = student, Status = "Active", ProgressPercent = 50m };
         var link = new ParentStudentLink { LinkId = 1, ParentId = 5, Parent = parent, StudentId = 2, Student = student, Relationship = "Mẹ", Status = "Active" };
 
-        var map = new ChallengeMap { MapId = 3, Name = "Mê cung Rừng Nhiệt Đới", Theme = "Jungle", Status = "Active", CreatedBy = 1 };
+        var map = new ChallengeMap { MapId = 3, Name = "Mê cung Rừng Nhiệt Đới", Theme = "Jungle", LayoutJson = "{}", Status = "Active", CreatedBy = 1 };
         var ast = new AstAnalysisService();
         var masterXml = @"<xml><block type=""robot_start""><next><block type=""robot_move""><field name=""STEPS"">3</field></block></next></block></xml>";
         var masterAstJson = ast.SerializeAstToJson(ast.ParseBlocklyXmlToAst(masterXml));
@@ -165,10 +165,10 @@ public class TeacherAndParentServiceTests
         Assert.Equal("Voice", savedGrade.RemarkSource);
 
         // Tự động sinh Portfolio & QR Token khi điểm >= 8.0
-        var portfolio = await ctx.PortfolioItems.Include(p => p.Cards).SingleOrDefaultAsync(p => p.SubmissionId == 10);
+        var portfolio = await ctx.PortfolioItems.Include(p => p.AchievementCards).SingleOrDefaultAsync(p => p.SubmissionId == 10);
         Assert.NotNull(portfolio);
-        Assert.NotEmpty(portfolio!.Cards);
-        Assert.NotEqual(Guid.Empty, portfolio.Cards.First().QrToken);
+        Assert.NotEmpty(portfolio!.AchievementCards);
+        Assert.NotEqual(Guid.Empty, portfolio.AchievementCards.First().QrToken);
         Assert.Single(notify.Sent);
     }
 

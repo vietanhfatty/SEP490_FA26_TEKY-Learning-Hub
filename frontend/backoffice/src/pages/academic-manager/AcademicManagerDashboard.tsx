@@ -1,9 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IconAlertCircle, IconPlus, IconDownload } from '../common/Icons';
 import { Badge } from '../common/Badge';
 
-export const AcademicManagerDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'courses' | 'timetable' | 'teachers' | 'surveys'>('timetable');
+interface AcademicManagerDashboardProps {
+  activeNavId?: string;
+}
+
+export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> = ({ activeNavId = 'kpi' }) => {
+  const [activeTab, setActiveTab] = useState<'kpi' | 'courses' | 'timetable' | 'teachers' | 'surveys'>('timetable');
+
+  useEffect(() => {
+    if (activeNavId === 'timetable') setActiveTab('timetable');
+    else if (activeNavId === 'courses') setActiveTab('courses');
+    else if (activeNavId === 'teachers') setActiveTab('teachers');
+    else if (activeNavId === 'surveys') setActiveTab('surveys');
+    else if (activeNavId === 'kpi' || activeNavId === 'overview') setActiveTab('kpi');
+  }, [activeNavId]);
 
   const coursesList = [
     { code: 'SCRATCH-01', title: 'Lập trình Scratch Game 3.0', subject: 'Scratch', age: '7-9', lessons: 12, classes: 8, status: 'Published' },
@@ -77,48 +89,134 @@ export const AcademicManagerDashboard: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 text-xs font-semibold">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 text-xs font-semibold overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('kpi')}
+          className={`pb-3 whitespace-nowrap transition-colors ${
+            activeTab === 'kpi'
+              ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          Tổng quan KPI & Tiến độ học thuật
+        </button>
         <button
           onClick={() => setActiveTab('timetable')}
-          className={`pb-3 transition-colors ${
+          className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'timetable'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
-              : 'text-slate-500 hover:text-slate-800'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           Xếp lịch & Xung đột thời khóa biểu
         </button>
         <button
           onClick={() => setActiveTab('courses')}
-          className={`pb-3 transition-colors ${
+          className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'courses'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
-              : 'text-slate-500 hover:text-slate-800'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           Quản lý Khóa học & Giáo trình
         </button>
         <button
           onClick={() => setActiveTab('teachers')}
-          className={`pb-3 transition-colors ${
+          className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'teachers'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
-              : 'text-slate-500 hover:text-slate-800'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           Điều phối & Tìm GV rảnh
         </button>
         <button
           onClick={() => setActiveTab('surveys')}
-          className={`pb-3 transition-colors ${
+          className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'surveys'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
-              : 'text-slate-500 hover:text-slate-800'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           Khảo sát chất lượng & Báo cáo
         </button>
       </div>
+
+      {/* Tab Content 0: KPI & Academic Progress */}
+      {activeTab === 'kpi' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Tiến độ Hoàn thành Khung chương trình CSTA</h3>
+                  <p className="text-xs text-slate-500">Tỷ lệ học sinh đạt chuẩn đầu ra năng lực STEAM theo độ tuổi</p>
+                </div>
+                <Badge variant="success">94.6% Đạt chuẩn</Badge>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Khối Tiểu học (7-10 tuổi): Scratch & Lego Robotics</span>
+                    <span className="font-bold text-blue-600 tabular-nums">96%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '96%' }}></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Khối THCS (11-14 tuổi): Python, Web & Arduino</span>
+                    <span className="font-bold text-emerald-600 tabular-nums">91%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                    <div className="bg-emerald-600 h-2.5 rounded-full" style={{ width: '91%' }}></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Khối THPT (15-18 tuổi): AI, Data Science & App Dev</span>
+                    <span className="font-bold text-orange-600 tabular-nums">88%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                    <div className="bg-orange-600 h-2.5 rounded-full" style={{ width: '88%' }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Cần xử lý gấp trong ngày</h3>
+              <div className="space-y-3">
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs">
+                  <div className="flex items-center justify-between font-bold text-rose-700 dark:text-rose-400">
+                    <span>Xung đột ca dạy T7 14:00</span>
+                    <Badge variant="danger">Gấp</Badge>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-300 mt-1">Thầy Hoàng Văn Nam trùng 2 lớp song song</p>
+                  <button onClick={() => setActiveTab('timetable')} className="text-rose-600 font-semibold underline text-[11px] mt-2 block">
+                    Đi tới ma trận xử lý →
+                  </button>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs">
+                  <div className="flex items-center justify-between font-bold text-amber-700 dark:text-amber-400">
+                    <span>Duyệt đề cương AI-VISION</span>
+                    <Badge variant="warning">Chờ ký</Badge>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-300 mt-1">Đề cương 16 buổi cần hội đồng chuyên môn duyệt</p>
+                  <button onClick={() => setActiveTab('courses')} className="text-amber-600 font-semibold underline text-[11px] mt-2 block">
+                    Xem bản thảo giáo án →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab Content 1: Timetable & Conflict Matrix */}
       {activeTab === 'timetable' && (

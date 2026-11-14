@@ -72,8 +72,32 @@ const FALLBACK_WORKSPACE: TeacherWorkspaceDto = {
   ],
 };
 
-export const TeacherDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TeacherTab>('workspace');
+interface TeacherDashboardProps {
+  activeNavId?: string;
+}
+
+const mapSidebarNavToTab = (navId?: string): TeacherTab => {
+  switch (navId) {
+    case 'attendance':
+    case 'swap':
+      return 'attendance';
+    case 'materials':
+      return 'map_builder';
+    case 'grading':
+      return 'grading';
+    default:
+      return 'workspace';
+  }
+};
+
+export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId = 'overview' }) => {
+  const [activeTab, setActiveTab] = useState<TeacherTab>(() => mapSidebarNavToTab(activeNavId));
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setActiveTab(mapSidebarNavToTab(activeNavId));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeNavId]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);

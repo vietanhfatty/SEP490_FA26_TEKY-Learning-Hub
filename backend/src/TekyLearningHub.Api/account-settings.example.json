@@ -1,0 +1,10 @@
+{
+  "Smtp": {
+    "Host": "smtp.example.com",
+    "Port": 587,
+    "EnableSsl": true,
+    "Username": "configure-with-user-secrets-or-environment",
+    "Password": "configure-with-user-secrets-or-environment",
+    "From": "no-reply@example.com"
+  }
+}

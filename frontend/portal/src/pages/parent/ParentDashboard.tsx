@@ -47,7 +47,12 @@ const STICKER_ICONS: Record<string, string> = {
   CREATIVE: '💡',
 };
 
-export const ParentDashboard: React.FC = () => {
+interface ParentDashboardProps {
+  activeNavId?: string;
+}
+
+export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId: _activeNavId = 'overview' }) => {
+  void _activeNavId;
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);

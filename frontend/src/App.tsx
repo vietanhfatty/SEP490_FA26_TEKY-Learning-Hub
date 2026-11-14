@@ -1,22 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { UserRole } from './types';
+import { AuthProvider } from '@teky/shared/auth/AuthProvider';
+import { useAuth } from '@teky/shared/auth/authContext';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
-import { Badge } from './components/common/Badge';
-import { IconShieldCheck } from './components/common/Icons';
+import { LmsShell } from './components/common/LmsShell';
 import { HomePage } from './components/pages/HomePage';
+import { CourseCatalogPage, CourseDetailPage } from '@teky/shared/public/CourseCatalogPage';
 import { LoginPage } from './components/pages/LoginPage';
 import { StudentDashboard } from './components/pages/StudentDashboard';
 import { ParentDashboard } from './components/pages/ParentDashboard';
 import { TeacherDashboard } from './components/pages/TeacherDashboard';
 import { AcademicManagerDashboard } from './components/pages/AcademicManagerDashboard';
+import { StaffDashboard } from './components/pages/StaffDashboard';
 import { AdminDashboard } from './components/pages/AdminDashboard';
 
-export function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'login' | 'dashboard'>('home');
-  const [currentRole, setCurrentRole] = useState<UserRole>('student');
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+/** Đường dẫn dashboard của từng vai trò trong app hợp nhất. */
+const DASHBOARD_PATH_BY_ROLE: Record<UserRole, string> = {
+  student: '/dashboard/student',
+  parent: '/dashboard/parent',
+  teacher: '/dashboard/teacher',
+  staff: '/dashboard/staff',
+  academic_manager: '/dashboard/academic-manager',
+  admin: '/dashboard/admin',
+};
+
+function AppRoutes() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { isLoggedIn, role: currentRole, user: currentUser, logout } = useAuth();
+  const isDashboardRoute = location.pathname.startsWith('/dashboard');
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (location.pathname === '/login') document.title = 'Đăng nhập | TEKY Learning Hub';
+    if (location.pathname === '/forgot-password') document.title = 'Khôi phục mật khẩu | TEKY Learning Hub';
+  }, [location.pathname]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -26,60 +47,89 @@ export function App() {
     }
   }, [isDarkMode]);
 
-  const roleLabels: Record<UserRole, string> = {
-    student: 'Học sinh',
-    parent: 'Phụ huynh',
-    teacher: 'Giáo viên',
-    academic_manager: 'Quản lý học thuật',
-    admin: 'Quản trị hệ thống',
-  };
+  /** Điều hướng tới dashboard đúng của vai trò hiện tại. */
+  const goToDashboard = useCallback(
+    (targetRole: UserRole) => {
+      navigate(DASHBOARD_PATH_BY_ROLE[targetRole] ?? '/dashboard/student');
+    },
+    [navigate]
+  );
 
-  const roleBadges: Record<UserRole, 'info' | 'accent' | 'success' | 'warning' | 'neutral'> = {
-    student: 'info',
-    parent: 'accent',
-    teacher: 'success',
-    academic_manager: 'warning',
-    admin: 'neutral',
-  };
+  const handleLoginSuccess = useCallback(
+    (resolvedRole: UserRole) => {
+      goToDashboard(resolvedRole);
+    },
+    [goToDashboard]
+  );
 
-  const userInfo: Record<UserRole, { name: string; email: string }> = {
-    student: { name: 'Nguyễn Minh Quân (9 tuổi)', email: 'student@teky.edu.vn' },
-    parent: { name: 'Trần Thu Trang (Phụ huynh bé Quân)', email: 'parent@teky.edu.vn' },
-    teacher: { name: 'Thầy Hoàng Văn Nam (Giảng viên STEAM)', email: 'teacher@teky.edu.vn' },
-    academic_manager: { name: 'Đỗ Thị Hồng (Trưởng ban Đào tạo)', email: 'manager@teky.edu.vn' },
-    admin: { name: 'Admin Kỹ Thuật (System Admin)', email: 'admin@teky.edu.vn' },
-  };
+  const handleLogout = useCallback(async () => {
+    await logout();
+    navigate('/login');
+  }, [logout, navigate]);
 
-  const handleRoleChange = (role: UserRole) => {
-    setCurrentRole(role);
-    setIsLoggedIn(true);
-    setCurrentView('dashboard');
-  };
+  /** Điều hướng dùng chung cho Navbar / HomePage */
+  const handleNavigate = useCallback(
+    (view: string) => {
+      if (view === 'dashboard') {
+        if (currentRole) goToDashboard(currentRole);
+        else navigate('/login');
+      } else if (view === 'courses') {
+        navigate('/courses');
+      } else if (view === 'login') {
+        navigate('/login');
+      } else {
+        navigate('/landing');
+      }
+    },
+    [currentRole, goToDashboard, navigate]
+  );
 
-  const handleLoginSuccess = (role: UserRole) => {
-    setCurrentRole(role);
-    setIsLoggedIn(true);
-    setCurrentView('dashboard');
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentView('login');
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-150">
-      {/* Universal Polished Navbar (Shared for public and auth) */}
-      <Navbar
-        currentView={currentView}
-        onNavigate={(view) => {
-          if (view === 'dashboard' && !isLoggedIn) {
-            setCurrentView('login');
-          } else {
-            setCurrentView(view as 'home' | 'login' | 'dashboard');
-          }
-        }}
+  // Reject unauthorized URLs before mounting any dashboard or its data requests.
+  if (isDashboardRoute && (!isLoggedIn || !currentRole)) return <Navigate to="/login" replace />;
+  if (isDashboardRoute && currentRole && location.pathname !== '/' && location.pathname !== DASHBOARD_PATH_BY_ROLE[currentRole]) {
+    return <Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole]} replace />;
+  }
+  if (isLoggedIn && currentRole && isDashboardRoute) {
+    return (
+      <LmsShell
         currentRole={currentRole}
+        userName={currentUser?.fullName}
+        userEmail={currentUser?.email}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        onLogout={handleLogout}
+      >
+        {(activeNavId, onSelectNav) => (
+          <Routes>
+            <Route path="/" element={<Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />} />
+            <Route path="/dashboard/student" element={<StudentDashboard key={activeNavId} activeNavId={activeNavId} onSelectNav={onSelectNav} />} />
+            <Route path="/dashboard/parent" element={<ParentDashboard activeNavId={activeNavId} />} />
+            <Route path="/dashboard/teacher" element={<TeacherDashboard activeNavId={activeNavId} />} />
+            <Route path="/dashboard/staff" element={<StaffDashboard activeNavId={activeNavId} />} />
+            <Route
+              path="/dashboard/academic-manager"
+              element={<AcademicManagerDashboard activeNavId={activeNavId} />}
+            />
+            <Route path="/dashboard/admin" element={<AdminDashboard activeNavId={activeNavId} userName={currentUser?.fullName} onSelectNav={onSelectNav} />} />
+            <Route
+              path="*"
+              element={<Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />}
+            />
+          </Routes>
+        )}
+      </LmsShell>
+    );
+  }
+
+  // 2. GIAO DIỆN TRANG CHỦ & ĐĂNG NHẬP (Công khai khi chủ động đăng xuất hoặc xem trang Landing)
+  return (
+    <div className={`public-site${isDarkMode ? ' public-dark' : ''}`}>
+      {/* Universal Polished Navbar */}
+      <Navbar
+        currentView={location.pathname}
+        onNavigate={handleNavigate}
+        currentRole={currentRole}
+        userName={currentUser?.fullName}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         isLoggedIn={isLoggedIn}
@@ -87,118 +137,38 @@ export function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        {/* 1. Trang chủ dùng chung */}
-        {currentView === 'home' && (
-          <HomePage
-            onNavigate={(view) => {
-              if (view === 'dashboard' && !isLoggedIn) {
-                setCurrentView('login');
-              } else {
-                setCurrentView(view as 'home' | 'login' | 'dashboard');
-              }
-            }}
-            isLoggedIn={isLoggedIn}
+      <main id="public-content" className="public-main">
+        <Routes>
+          {/* Trang chủ giới thiệu */}
+          <Route path="/" element={<Navigate to="/landing" replace />} />
+          <Route path="/landing" element={<HomePage onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />} />
+          <Route path="/courses" element={<CourseCatalogPage />} />
+          <Route path="/courses/:courseId" element={<CourseDetailPage isLoggedIn={isLoggedIn} onAccessLearning={() => handleNavigate('dashboard')} />} />
+
+          {/* Trang đăng nhập */}
+          <Route
+            path="/login"
+            element={<LoginPage onLoginSuccess={handleLoginSuccess} onNavigateHome={() => navigate('/landing')} />}
           />
-        )}
 
-        {/* 2. Trang đăng nhập dùng chung */}
-        {currentView === 'login' && (
-          <LoginPage
-            onLoginSuccess={handleLoginSuccess}
-            onNavigateHome={() => setCurrentView('home')}
-          />
-        )}
+          <Route path="/dashboard/*" element={<Navigate to="/login" replace />} />
 
-        {/* 3. Bảng điều khiển (Chỉ chia role ở Dashboard) */}
-        {currentView === 'dashboard' && (
-          <div className="space-y-6">
-            {/* RBAC Role Context Switcher Banner inside Dashboard */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                  <IconShieldCheck size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Bảng điều khiển: {roleLabels[currentRole]}
-                    </h2>
-                    <Badge variant={roleBadges[currentRole]}>RBAC</Badge>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Tài khoản: <span className="font-semibold text-slate-700 dark:text-slate-300">{userInfo[currentRole].name}</span> ({userInfo[currentRole].email})
-                  </p>
-                </div>
-              </div>
-
-              {/* Role Switcher specifically inside Dashboard */}
-              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl text-xs overflow-x-auto">
-                <span className="text-[11px] font-semibold text-slate-400 px-2 whitespace-nowrap">Chuyển vai trò:</span>
-                {(['student', 'parent', 'teacher', 'academic_manager', 'admin'] as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => handleRoleChange(r)}
-                    className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all font-medium ${
-                      currentRole === r
-                        ? 'bg-blue-600 text-white shadow-sm font-semibold'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {roleLabels[r]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Render the appropriate Dashboard component */}
-            {currentRole === 'student' && <StudentDashboard />}
-            {currentRole === 'parent' && <ParentDashboard />}
-            {currentRole === 'teacher' && <TeacherDashboard />}
-            {currentRole === 'academic_manager' && <AcademicManagerDashboard />}
-            {currentRole === 'admin' && <AdminDashboard />}
-          </div>
-        )}
+          {/* Đường dẫn lạ */}
+          <Route path="*" element={<Navigate to="/landing" replace />} />
+        </Routes>
       </main>
-
-      {/* Persistent Quick Demo Floating Pill (Bottom Right) */}
-      <aside aria-label="Demo Navigation" className="fixed bottom-4 right-4 z-50 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl flex items-center gap-1.5 text-[11px] font-semibold">
-        <span className="text-slate-400 pl-2 pr-1">Chuyển nhanh:</span>
-        <button
-          onClick={() => setCurrentView('home')}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'home' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-        >
-          🏠 Trang chủ (Chung)
-        </button>
-        <button
-          onClick={() => {
-            setIsLoggedIn(false);
-            setCurrentView('login');
-          }}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'login' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-        >
-          🔑 Đăng nhập (Chung)
-        </button>
-        <button
-          onClick={() => {
-            setIsLoggedIn(true);
-            setCurrentView('dashboard');
-          }}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'dashboard' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-        >
-          📊 Dashboard ({roleLabels[currentRole]})
-        </button>
-      </aside>
 
       {/* Universal Footer */}
       <Footer />
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider><AppRoutes /></AuthProvider>
+    </BrowserRouter>
   );
 }
 

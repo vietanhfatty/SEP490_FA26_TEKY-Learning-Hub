@@ -1,13 +1,14 @@
 // Base HTTP Client for calling backend endpoints
 const API_BASE_URL =
-  (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_BASE_URL ||
-  'http://localhost:5268/api';
+  (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
+  '/api';
 
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('teky_token');
+  const token = localStorage.getItem('teky_access_token') || sessionStorage.getItem('teky_access_token') ||
+    localStorage.getItem('teky_token') || sessionStorage.getItem('teky_token');
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -27,4 +28,3 @@ export async function apiClient<T>(
 
   return response.json();
 }
-

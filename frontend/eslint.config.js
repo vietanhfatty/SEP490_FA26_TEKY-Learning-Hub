@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Các app con (portal, backoffice, shared) có eslint config riêng.
+  globalIgnores(['dist', 'portal', 'backoffice', 'shared']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

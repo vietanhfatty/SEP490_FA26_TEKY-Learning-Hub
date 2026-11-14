@@ -8,10 +8,15 @@ export const API_ORIGIN =
   (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_ORIGIN ||
   'http://localhost:5268';
 
-export const API_BASE_URL = `${API_ORIGIN}/api`;
+const API_BASE_URL = `${API_ORIGIN}/api`;
 
 export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('teky_token') : null;
+  const token =
+    typeof window !== 'undefined'
+      ? localStorage.getItem('teky_access_token') ||
+        sessionStorage.getItem('teky_access_token') ||
+        localStorage.getItem('teky_token')
+      : null;
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

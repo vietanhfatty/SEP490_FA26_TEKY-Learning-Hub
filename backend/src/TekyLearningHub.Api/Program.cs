@@ -1,12 +1,23 @@
+using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using TekyLearningHub.Application;
+using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Infrastructure;
+using TekyLearningHub.Infrastructure.Data;
+using TekyLearningHub.Infrastructure.Data.Migrations;
 using TekyLearningHub.Infrastructure.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Controllers with JSON settings
+// 1. Register Application & Infrastructure Clean Architecture Layers
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+// 2. Configure Controllers & JSON Serialization
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -15,32 +26,110 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
 
-// OpenAPI & Swagger
-builder.Services.AddOpenApi();
-
-// Clean Architecture Layers Dependency Injection
-builder.Services.AddApplicationServices();
-builder.Services.AddInfrastructureServices(builder.Configuration);
-
-// CORS for Frontend (Vite / React Portal & Backoffice)
+// 3. Configure CORS for Portal & Backoffice Frontend + SignalR WebSockets
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins(
-                "http://localhost:5173", 
-                "http://localhost:5174", 
+                "http://localhost:5173",
+                "http://localhost:5174",
                 "http://localhost:3000",
-                "http://localhost:3001")
+                "http://localhost:3001",
+                "http://localhost:3002",
+                "http://localhost:3003",
+                "https://localhost:7001",
+                "http://localhost:5000")
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials(); // Required for SignalR WebSocket handshake
+            .AllowCredentials();
     });
 });
 
+// 4. Configure JWT Authentication & Bearer Token Validation
+var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "TekyLearningHubSuperSecretKeyForDevelopment2026!MustBe32BytesOrLonger";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "TekyLearningHub";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "TekyLearningHubUsers";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var id = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var version = context.Principal?.FindFirst("security_version")?.Value;
+            var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+            if (!int.TryParse(id, out var userId) || !int.TryParse(version, out var tokenVersion))
+            {
+                context.Fail("Invalid session");
+                return;
+            }
+            var user = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(db.Users, x => x.UserId == userId);
+            if (!TekyLearningHub.Infrastructure.Security.SessionAuthorization.MatchesCurrentUser(context.Principal, user))
+                context.Fail("Session revoked or role changed");
+        }
+    };
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.AddPolicy("account", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+});
+
+// 5. OpenAPI & Scalar API Documentation
+builder.Services.AddOpenApi();
+
 var app = builder.Build();
 
-// Global exception handling → trả JSON { message } để Frontend hiển thị trạng thái Error có hướng khắc phục
+// 6. Automatic Data Seeding on Startup (Roles & Demo Accounts)
+if (app.Environment.IsDevelopment())
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var connectionString = app.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
+        await DevelopmentDatabaseMigrator.ApplyAsync(connectionString, app.Logger);
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        await DbInitializer.SeedAsync(context, passwordHasher);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogCritical(ex, "Không thể cập nhật database Development. Backend dừng để tránh chạy với schema không tương thích.");
+        throw;
+    }
+}
+
+// 7. Global Exception Handling
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -63,24 +152,32 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
-// Configure the HTTP request pipeline.
+// 8. Configure Middleware Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference(options =>
     {
-        options.Title = "TEKY Learning Hub - Teacher & Parent LMS API";
+        options.Title = "TEKY Learning Hub - Full LMS API";
         options.Theme = ScalarTheme.Purple;
     });
 }
 
-app.UseHttpsRedirection();
-app.UseCors("CorsPolicy");
+app.UseCors("AllowFrontend");
+app.Use(async (context, next) =>
+{
+    try { await next(); }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+    {
+        context.Response.StatusCode = 409;
+        await context.Response.WriteAsJsonAsync(new { message = "Dữ liệu vừa thay đổi. Vui lòng tải lại hoặc thử lại." });
+    }
+});
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map REST Controllers
 app.MapControllers();
 
 // Map SignalR Realtime Hubs

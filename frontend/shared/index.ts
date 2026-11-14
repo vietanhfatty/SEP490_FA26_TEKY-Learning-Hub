@@ -3,6 +3,16 @@ export * from './ui/Badge';
 export * from './ui/Footer';
 export * from './ui/Navbar';
 export * from './ui/Icons';
-
-
+export * from './ui/Forbidden';
+export * from './ui/LmsShell';
+export * from './ui/LmsSidebar';
+export * from './ui/LmsHeader';
+export * from './ui/LogoutConfirmDialog';
+export * from './api-client/auth';
 export * from './api-client/lmsApi';
+export * from './auth/jwt';
+export * from './auth/shellConfig';
+export * from './auth/shellTransfer';
+export * from './auth/authContext';
+export * from './auth/AuthProvider';
+export * from './auth/RoleGuard';

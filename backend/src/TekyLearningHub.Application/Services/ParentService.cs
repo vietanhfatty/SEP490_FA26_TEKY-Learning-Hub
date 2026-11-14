@@ -50,7 +50,7 @@ public class ParentService : IParentService
             .Include(l => l.Student)
                 .ThenInclude(s => s.Enrollments)
                     .ThenInclude(e => e.Class)
-                        .ThenInclude(c => c.Sessions)
+                        .ThenInclude(c => c.ClassSessions)
                             .ThenInclude(ses => ses.Room)
             .ToListAsync(ct);
 
@@ -68,9 +68,9 @@ public class ParentService : IParentService
                 .Where(a => a.StudentId == student.UserId && a.Session.SessionDate == today)
                 .FirstOrDefaultAsync(ct);
 
-            var todaySession = activeClass?.Sessions.FirstOrDefault(s => s.SessionDate == today);
+            var todaySession = activeClass?.ClassSessions.FirstOrDefault(s => s.SessionDate == today);
             // ClassSessions.Status chỉ cho phép Scheduled/Done/Cancelled → "đang học" được suy ra theo khung giờ thực tế
-            var nowTime = TimeOnly.FromDateTime(DateTime.Now).ToTimeSpan();
+            var nowTime = TimeOnly.FromDateTime(DateTime.Now);
             bool isInActive = todaySession != null
                 && todaySession.Status == "Scheduled"
                 && nowTime >= todaySession.StartTime
@@ -204,13 +204,13 @@ public class ParentService : IParentService
         var items = await _context.PortfolioItems
             .AsNoTracking()
             .Where(p => p.StudentId == studentId)
-            .Include(p => p.Cards)
+            .Include(p => p.AchievementCards)
             .OrderByDescending(p => p.CompletedAt)
             .ToListAsync(ct);
 
         return items.Select(p =>
         {
-            var card = p.Cards.FirstOrDefault();
+            var card = p.AchievementCards.FirstOrDefault();
             return new StudentPortfolioDetailDto
             {
                 ItemId = p.ItemId,
