@@ -30,6 +30,7 @@ export function App() {
     document.documentElement.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
   const navigate = useNavigate();
+  const location = useLocation();
   const isAccountVisible = useAuth().isLoggedIn;
   const { isLoggedIn, role, accessToken, refreshToken, user, logout } = useAuth();
 
@@ -105,9 +106,8 @@ export function App() {
         />
 
         {/* Dashboard Học sinh - chỉ dành cho role student */}
-        <Route
-          path="/student"
-          element={
+        {['/student', '/dashboard/timetable/*'].map(path => (
+          <Route key={path} path={path} element={
             <RoleGuard
               allowedRoles={['student']}
               fallback={
@@ -125,12 +125,16 @@ export function App() {
                 isDarkMode={isDarkMode}
                 onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
+                onRoleChange={(newRole) => navigateToShell(newRole)}
+                onSelectNav={() => {
+                  if (location.pathname.startsWith('/dashboard/timetable')) navigate('/student');
+                }}
               >
-                {(activeNavId, onSelectNav) => <StudentDashboard key={activeNavId} activeNavId={activeNavId} onSelectNav={onSelectNav} />}
+                {(activeNavId) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'overview' : activeNavId} />}
               </LmsShell>
             </RoleGuard>
-          }
-        />
+          } />
+        ))}
 
         {/* Dashboard Phụ huynh - chỉ dành cho role parent */}
         <Route

@@ -7,5 +7,8 @@ public record StudentClassDto(int ClassId, string ClassCode, string Name, string
 public record StudentSessionDto(int SessionId, int ClassId, string ClassCode, string ClassName,
     int CourseId, string CourseCode, string CourseName, int? LessonId, string Title,
     string? Content, DateTimeOffset StartsAt, DateTimeOffset EndsAt, string Status,
-    string? TeacherName, string? TeacherEmail, string? RoomName, IReadOnlyList<StudentMaterialDto> Materials);
+    string? TeacherName, string? TeacherEmail, string? RoomName, IReadOnlyList<StudentMaterialDto> Materials)
+{
+    public IReadOnlyList<StudentAssignmentDto> Assignments { get; init; } = [];
+}
 public record StudentMaterialDto(int MaterialId, string Title, string MaterialType, string FileUrl);
