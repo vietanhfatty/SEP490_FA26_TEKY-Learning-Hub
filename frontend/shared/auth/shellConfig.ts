@@ -52,7 +52,7 @@ export const BACKOFFICE_ORIGIN = readEnv('VITE_BACKOFFICE_ORIGIN') ?? 'http://lo
 
 /**
  * Trả về Shell đích cho một vai trò.
- * Vai trò không xác định sẽ mặc định về dashboard của Học sinh.
+ * Vai trò không xác định sẽ chuyển tới trang đăng nhập.
  */
 export function resolveShellForRole(role: UserRole | null | undefined): ShellTarget {
   if (!role) {

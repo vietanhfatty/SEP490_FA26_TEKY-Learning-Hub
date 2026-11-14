@@ -1,24 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { IconShieldCheck, IconSearch, IconPlus } from '../common/Icons';
+import React, { useRef, useState } from 'react';
+import { IconShieldCheck, IconSearch, IconPlus, IconUsers, IconBookOpen, IconClock, IconActivity, IconSettings, IconChevronRight, IconX, IconSparkles, IconLayers } from '../common/Icons';
 import { Badge } from '../common/Badge';
 
 interface AdminDashboardProps {
   activeNavId?: string;
+  userName?: string;
+  onSelectNav?: (id: string) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'overview' }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'branches' | 'audit'>('overview');
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'overview', userName = 'TEKY', onSelectNav }) => {
+  const [localTab, setLocalTab] = useState('overview');
+  const activeTab = onSelectNav ? activeNavId : localTab;
+  const setActiveTab = (id: string) => { if (onSelectNav) onSelectNav(id); else setLocalTab(id); };
   const [filterRole, setFilterRole] = useState<string>('All');
   const [searchUser, setSearchUser] = useState('');
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const [period, setPeriod] = useState<'Week' | 'Month'>('Week');
+  const [editing, setEditing] = useState(false);
+  const defaultWidgets = ['overview', 'progress', 'activity', 'actions', 'users', 'timeline'];
+  const [widgets, setWidgets] = useState(defaultWidgets);
+  const widgetDialog = useRef<HTMLDialogElement>(null);
+  const createDialog = useRef<HTMLDialogElement>(null);
+  const [creating, setCreating] = useState<'user' | 'course'>('user');
+  const [notice, setNotice] = useState('');
+  const [addedUsers, setAddedUsers] = useState<{ id: string; name: string; email: string; role: string; branch: string; status: string }[]>([]);
+  const [addedCourses, setAddedCourses] = useState<{ code: string; title: string; subject: string; lessons: number; status: string }[]>([]);
+  const courses = [
+    { code: 'SCRATCH-01', title: 'Lập trình Scratch Game 3.0', subject: 'Scratch', lessons: 12, status: 'Published' },
+    { code: 'PY-GAME-02', title: 'Python Ứng dụng & Mini Games', subject: 'Python', lessons: 14, status: 'Published' },
+    { code: 'ROBO-WEDO-01', title: 'Chế tạo Robotics LEGO WeDo', subject: 'Robotics', lessons: 10, status: 'Published' },
+    { code: 'AI-VISION-04', title: 'Nhập môn Trí tuệ Nhân tạo & Computer Vision', subject: 'AI', lessons: 16, status: 'Draft' },
+    ...addedCourses,
+  ];
+  const widgetNames: Record<string, string> = { overview: 'Overview', progress: "Courses' progress status", activity: 'Portal activity', actions: 'Quick actions', users: 'Users', timeline: 'Timeline' };
+  const openCreate = (type: 'user' | 'course') => { setNotice(''); setCreating(type); createDialog.current?.showModal(); };
+  const moveWidget = (id: string, direction: number) => setWidgets((current) => {
+    const next = [...current]; const index = next.indexOf(id); const target = index + direction;
+    if (target < 0 || target >= next.length) return current;
+    [next[index], next[target]] = [next[target], next[index]]; return next;
+  });
 
-  useEffect(() => {
-    if (activeNavId === 'users') setActiveTab('users');
-    else if (activeNavId === 'branches') setActiveTab('branches');
-    else if (activeNavId === 'audit') setActiveTab('audit');
-    else setActiveTab('overview');
-  }, [activeNavId]);
-
-  const users = [
+  const baseUsers = [
     { id: 'U-001', name: 'Nguyễn Minh Quân', email: 'quan.nm@teky.edu.vn', role: 'Student', branch: 'Online Campus', status: 'Active' },
     { id: 'U-002', name: 'Trần Thu Trang', email: 'trang.tt@parent.com', role: 'Parent', branch: 'Cầu Giấy', status: 'Active' },
     { id: 'U-003', name: 'Hoàng Văn Nam', email: 'nam.hv@teky.edu.vn', role: 'Teacher', branch: 'Ba Đình & Online', status: 'Active' },
@@ -43,53 +65,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
     { time: '08:15:40', actor: 'auth_system', role: 'System', action: 'User Logout & Revoke Session', target: 'Session US-904 (quan.nm)', ip: '118.70.12.45', status: 'Success' },
   ];
 
+  const users = [...baseUsers, ...addedUsers];
+  const activeUsers = users.filter((user) => user.status === 'Active');
+  const userGroups = [
+    { label: 'Admins', count: activeUsers.filter((user) => user.role === 'System Admin').length, color: '#0169ff' },
+    { label: 'Instructors', count: activeUsers.filter((user) => user.role === 'Teacher').length, color: '#0046ab' },
+    { label: 'Learners', count: activeUsers.filter((user) => user.role === 'Student').length, color: '#002a67' },
+    { label: 'Other roles', count: activeUsers.filter((user) => !['System Admin', 'Teacher', 'Student'].includes(user.role)).length, color: '#a6c6f8' },
+  ];
+  let angle = 0;
+  const donut = userGroups.map((group) => { const start = angle; angle += activeUsers.length ? group.count / activeUsers.length * 360 : 0; return `${group.color} ${start}deg ${angle}deg`; }).join(', ');
+  const activity = period === 'Week'
+    ? [{ label: 'Mon', logins: 2, completed: 0 }, { label: 'Tue', logins: 4, completed: 0 }, { label: 'Wed', logins: 1, completed: 0 }, { label: 'Thu', logins: 9, completed: 0 }, { label: 'Fri', logins: 6, completed: 0 }, { label: 'Sat', logins: 3, completed: 0 }, { label: 'Sun', logins: 0, completed: 0 }]
+    : [{ label: 'Week 1', logins: 5, completed: 0 }, { label: 'Week 2', logins: 9, completed: 0 }, { label: 'Week 3', logins: 7, completed: 0 }, { label: 'Week 4', logins: 4, completed: 0 }];
+
   const filteredUsers = users.filter((u) => {
     const matchRole = filterRole === 'All' || u.role === filterRole;
     const matchSearch = u.name.toLowerCase().includes(searchUser.toLowerCase()) || u.email.toLowerCase().includes(searchUser.toLowerCase());
     return matchRole && matchSearch;
   });
 
-  return (
-    <div className="space-y-8 py-6">
-      {/* Top Banner: System Health Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400 font-medium">Trạng thái Cơ sở dữ liệu (SQL Server)</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h4 className="text-xl font-bold text-emerald-600">99.98% Healthy</h4>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2">Latency: 14ms • Connection Pool: 24/100</p>
-        </div>
+  function createPreview(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    const name = String(values.get('name') || '').trim();
+    const identifier = String(values.get('identifier') || '').trim();
+    if (!name || !identifier) return;
+    if (creating === 'user') {
+      if (users.some((user) => user.email.toLowerCase() === identifier.toLowerCase())) { setNotice('Email đã tồn tại trong dữ liệu minh họa.'); return; }
+      setAddedUsers((current) => [...current, { id: `DEMO-${users.length + 1}`, name, email: identifier, role: String(values.get('role') || 'Student'), branch: 'Online Campus', status: 'Active' }]);
+    } else {
+      if (courses.some((course) => course.code.toLowerCase() === identifier.toLowerCase())) { setNotice('Mã khóa học đã tồn tại trong dữ liệu minh họa.'); return; }
+      setAddedCourses((current) => [...current, { code: identifier, title: name, subject: 'STEAM', lessons: Number(values.get('lessons') || 1), status: 'Draft' }]);
+    }
+    form.reset(); createDialog.current?.close();
+    setNotice(`Đã thêm ${creating === 'user' ? 'người dùng' : 'khóa học'} vào dữ liệu minh họa của phiên này.`);
+  }
+  const creation = <dialog ref={createDialog} className="admin-dialog" aria-labelledby="admin-create-title"><form onSubmit={createPreview}><div className="admin-dialog-title"><h2 id="admin-create-title">{creating === 'user' ? 'Add user' : 'Add course'}</h2><button type="button" className="lms-icon-button" aria-label="Close" onClick={() => createDialog.current?.close()}><IconX size={20} /></button></div><p>Thao tác này chỉ thay đổi dữ liệu minh họa trong phiên xem thử.</p><label>{creating === 'user' ? 'Full name' : 'Course name'}<input name="name" required maxLength={150} /></label><label>{creating === 'user' ? 'Email' : 'Course code'}<input name="identifier" type={creating === 'user' ? 'email' : 'text'} required maxLength={150} /></label>{creating === 'user' ? <label>Role<select name="role">{['Student','Parent','Teacher','Academic Manager','System Admin'].map((role) => <option key={role}>{role}</option>)}</select></label> : <label>Lessons<input name="lessons" type="number" min={1} max={100} defaultValue={12} required /></label>}{notice && <p role="status">{notice}</p>}<div className="admin-dialog-actions"><button type="button" className="admin-outline-button" onClick={() => createDialog.current?.close()}>Cancel</button><button type="submit" className="admin-primary-button">{creating === 'user' ? 'Add user' : 'Add course'}</button></div></form></dialog>;
 
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400 font-medium">Tài khoản Hoạt động (Active Users)</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h4 className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">1.482</h4>
-            <Badge variant="info">Toàn hệ thống</Badge>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2">32 phiên đăng nhập trực tuyến</p>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400 font-medium">Bảo mật & Cảnh báo an ninh</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h4 className="text-xl font-bold text-slate-900 dark:text-white">Ổn định</h4>
-            <Badge variant="success">0 Vi phạm</Badge>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2">Đã chặn 4 lượt brute-force hôm nay</p>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-400 font-medium">Sao lưu dữ liệu tự động (Backup)</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h4 className="text-base font-bold text-slate-900 dark:text-white">Thành công</h4>
-            <Badge variant="neutral">02:00 AM</Badge>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2">Lưu trữ đám mây mã hóa AES-256</p>
-        </div>
+  if (activeTab === 'overview') return (
+    <div className="admin-home">
+      <div className="admin-page-heading"><h1><IconSparkles size={25} />Welcome, {userName}!</h1><div><button className="admin-outline-button" onClick={() => widgetDialog.current?.showModal()}>Add widgets</button><button className={`admin-outline-button admin-edit-button${editing ? ' is-active' : ''}`} aria-label={editing ? 'Finish editing widgets' : 'Edit dashboard'} aria-pressed={editing} onClick={() => setEditing(!editing)}><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M12 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7"/><path d="m16 3 5 5M10 14l-1 4 4-1L22 8l-4-4z"/></svg></button></div></div>
+      <p className="admin-demo-label">Dữ liệu minh họa TEKY</p>
+      {notice && <p className="admin-status" role="status">{notice}</p>}
+      <div className="admin-widget-grid">
+        {widgets.map((widget, index) => <section className={`admin-widget admin-widget-${widget}${editing ? ' is-editing' : ''}`} key={widget} aria-label={widgetNames[widget]}>
+          {editing && <div className="admin-widget-controls"><button disabled={index === 0} aria-label={`Move ${widgetNames[widget]} up`} onClick={() => moveWidget(widget, -1)}>↑</button><button disabled={index === widgets.length - 1} aria-label={`Move ${widgetNames[widget]} down`} onClick={() => moveWidget(widget, 1)}>↓</button><button aria-label={`Hide ${widgetNames[widget]}`} onClick={() => setWidgets((current) => current.filter((id) => id !== widget))}><IconX size={17} /></button></div>}
+          {widget === 'overview' && <><h2>Overview</h2><dl className="admin-overview-list">{[{ label: 'Active users', value: activeUsers.length, icon: IconUsers }, { label: 'Assigned courses', value: 0, icon: IconBookOpen }, { label: 'Groups', value: 0, icon: IconUsers }, { label: 'Training time', value: '0h 0m', icon: IconClock }, { label: 'Completion rate', value: '0.00%', icon: IconActivity }].map((metric) => <div key={metric.label}><dt><metric.icon size={22} />{metric.label}</dt><dd>{metric.value}</dd></div>)}</dl></>}
+          {widget === 'progress' && <><button className="admin-widget-heading-link" onClick={() => setActiveTab('courses')}><h2>Courses' progress status</h2><IconChevronRight size={20} /></button><div className="admin-no-stats"><IconBookOpen size={45} /><h3>No stats to show</h3><p>Chưa có hoạt động học tập được ghi nhận.</p><button className="admin-text-button" onClick={() => setActiveTab('courses')}>Go to courses</button></div></>}
+          {widget === 'activity' && <><div className="admin-widget-heading"><h2>Portal activity</h2><label><span className="lms-sr-only">Activity period</span><select value={period} onChange={(event) => setPeriod(event.target.value as 'Week' | 'Month')}><option>Week</option><option>Month</option></select></label></div><div className="admin-activity-chart" role="img" aria-label={`Dữ liệu minh họa: ${activity.map((item) => `${item.label}: ${item.logins} logins, ${item.completed} completions`).join('; ')}`}><div className="admin-chart-y">{[10,8,6,4,2,0].map((value) => <span key={value}>{value}</span>)}</div><div className="admin-chart-plot"><div className="admin-chart-grid">{[0,1,2,3,4,5].map((line) => <i key={line} />)}</div><div className="admin-chart-columns">{activity.map((item) => <div className="admin-chart-column" key={item.label}><div><span className="admin-login-bar" style={{ height: `${item.logins * 10}%` }} /><span className="admin-completion-bar" style={{ height: `${item.completed * 10}%` }} /></div><span>{item.label}</span></div>)}</div></div></div><div className="admin-chart-legend"><span><i style={{ background: '#247dff' }} />Logins</span><span><i style={{ background: '#209066' }} />Course completions</span></div></>}
+          {widget === 'actions' && <><h2>Quick actions</h2><div className="admin-quick-actions"><button onClick={() => openCreate('user')}><IconUsers size={22} />Add user</button><button onClick={() => openCreate('course')}><IconBookOpen size={22} />Add course</button><button onClick={() => setActiveTab('settings')}><IconSettings size={22} />Portal settings</button><button onClick={() => setActiveTab('groups')}><IconUsers size={22} />Groups</button><button onClick={() => setActiveTab('audit')}><IconActivity size={22} />Custom reports</button></div></>}
+          {widget === 'users' && <><button className="admin-widget-heading-link" onClick={() => setActiveTab('users')}><h2>Users</h2><IconChevronRight size={19} /><strong>{activeUsers.length}</strong></button><div className="admin-users-donut" role="img" aria-label={userGroups.map((group) => `${group.label}: ${group.count}`).join(', ')} style={{ background: activeUsers.length ? `conic-gradient(${donut})` : '#e8edf4' }}><span>{activeUsers.length}<small>active users</small></span></div><div className="admin-chart-legend">{userGroups.map((group) => <span key={group.label}><i style={{ background: group.color }} />{group.label} ({group.count})</span>)}</div></>}
+          {widget === 'timeline' && <><button className="admin-widget-heading-link" onClick={() => setActiveTab('audit')}><h2>Timeline</h2><IconChevronRight size={19} /></button><ol className="admin-timeline">{auditLogs.map((log) => <li key={log.time}><i className={log.status === 'Warning' ? 'is-warning' : ''} /><div><strong>{log.actor}</strong> {log.action}<small>{log.target}</small></div><time>{log.time}</time></li>)}</ol></>}
+        </section>)}
       </div>
+      {!widgets.length && <div className="admin-widget admin-no-stats"><IconLayers size={36} /><h2>Your dashboard is ready to customize</h2><button className="admin-outline-button" onClick={() => widgetDialog.current?.showModal()}>Add widgets</button></div>}
+      <dialog ref={widgetDialog} className="admin-dialog" aria-labelledby="widget-dialog-title"><div className="admin-dialog-title"><h2 id="widget-dialog-title">Add widgets</h2><button className="lms-icon-button" aria-label="Close" onClick={() => widgetDialog.current?.close()}><IconX size={20} /></button></div><p>Chọn nội dung bạn muốn hiển thị trên Home.</p><div className="admin-widget-options">{defaultWidgets.map((id) => <label key={id}><input type="checkbox" checked={widgets.includes(id)} onChange={(event) => setWidgets((current) => event.target.checked ? [...current, id] : current.filter((widget) => widget !== id))} />{widgetNames[id]}</label>)}</div><div className="admin-dialog-actions"><button className="admin-outline-button" onClick={() => setWidgets(defaultWidgets)}>Restore default</button><button className="admin-primary-button" onClick={() => widgetDialog.current?.close()}>Done</button></div></dialog>
+      {creation}
+    </div>
+  );
+  if (activeTab === 'courses') return <div className="admin-home"><div className="admin-page-heading"><h1>Courses</h1><button className="admin-primary-button" onClick={() => openCreate('course')}><IconPlus size={18} />Add course</button></div><p className="admin-demo-label">Dữ liệu minh họa TEKY</p>{notice && <p role="status" className="admin-status">{notice}</p>}<label className="admin-catalog-search"><IconSearch size={20} /><input type="search" placeholder="Search courses" aria-label="Search courses" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} /></label><div className="admin-catalog-grid">{courses.filter((course) => `${course.title} ${course.code}`.toLocaleLowerCase('vi').includes(catalogQuery.toLocaleLowerCase('vi'))).map((course) => <article key={course.code} className="admin-widget admin-catalog-card"><div><IconBookOpen size={30} /><span>{course.subject}</span></div><h2>{course.title}</h2><p>{course.code}</p><footer><span>{course.lessons} lessons</span><span>{course.status}</span></footer></article>)}</div>{!courses.some((course) => `${course.title} ${course.code}`.toLocaleLowerCase('vi').includes(catalogQuery.toLocaleLowerCase('vi'))) && <div className="admin-no-stats"><h2>No courses found</h2><button className="admin-text-button" onClick={() => setCatalogQuery('')}>Clear search</button></div>}{creation}</div>;
+  if (['groups','notifications','settings'].includes(activeTab)) return <div className="admin-home"><div className="admin-page-heading"><h1>{activeTab === 'groups' ? 'Groups' : activeTab === 'notifications' ? 'Notifications' : 'Account & Settings'}</h1></div><section className="admin-widget admin-no-stats">{activeTab === 'groups' ? <IconUsers size={42} /> : activeTab === 'notifications' ? <IconActivity size={42} /> : <IconSettings size={42} />}<h2>{activeTab === 'groups' ? 'No groups to show' : activeTab === 'notifications' ? 'No notifications to show' : 'TEKY Learning Hub'}</h2><p>{activeTab === 'settings' ? 'Không gian quản trị dành cho TEKY STEAM Academy.' : 'Dữ liệu sẽ xuất hiện khi dịch vụ quản trị được kết nối.'}</p><button className="admin-text-button" onClick={() => setActiveTab('overview')}>Back to Home</button></section></div>;
 
+  return (
+    <div className="lms-legacy-panel space-y-8 py-6">
+      <div className="admin-page-heading"><h1>{activeTab === 'users' ? 'Users' : activeTab === 'branches' ? 'Branches' : 'Reports'}</h1></div>
+      <p className="admin-demo-label">Dữ liệu minh họa TEKY</p>
+      {notice && <p role="status" className="admin-status">{notice}</p>}
+      {creation}
       {/* Tabs Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 text-xs font-semibold overflow-x-auto">
         <button
@@ -206,7 +250,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
             </div>
 
             <button
-              onClick={() => alert('Mở form tạo tài khoản người dùng mới')}
+              onClick={() => openCreate('user')}
               className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm"
             >
               <IconPlus size={16} /> Thêm tài khoản

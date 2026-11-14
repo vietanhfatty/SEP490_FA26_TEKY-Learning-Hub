@@ -1,8 +1,11 @@
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { HomePage } from './pages/home/HomePage';
+import { CourseCatalogPage, CourseDetailPage } from '@teky/shared/public/CourseCatalogPage';
+import { Navbar } from '@teky/shared/ui/Navbar';
+import { Footer } from '@teky/shared/ui/Footer';
 import { LoginPage } from './pages/auth/LoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ParentDashboard } from './pages/parent/ParentDashboard';
@@ -21,13 +24,22 @@ import type { UserRole } from '@teky/shared/types';
 function RoleRedirect() {
   const { role } = useAuth();
   const target = resolveShellForRole(role);
-  return <Navigate to={target.path} replace />;
+  return <RoleGuard allowedRoles={['student', 'parent']}><Navigate to={target.path} replace /></RoleGuard>;
 }
 
 export function App() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
   const navigate = useNavigate();
   const location = useLocation();
-  const isAccountVisible = useAuth().isLoggedIn;
+  const isPublicRoute = ['/', '/landing', '/login', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/courses');
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (location.pathname === '/login') document.title = 'Đăng nhập | TEKY Learning Hub';
+    if (location.pathname === '/forgot-password') document.title = 'Khôi phục mật khẩu | TEKY Learning Hub';
+  }, [location.pathname]);
   const { isLoggedIn, role, accessToken, refreshToken, user, logout } = useAuth();
 
   /**
@@ -61,34 +73,22 @@ export function App() {
     [navigate, accessToken, refreshToken, user]
   );
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {isAccountVisible && <a href="/account" className="fixed bottom-4 left-4 z-50 rounded-xl bg-blue-700 px-4 py-3 text-white shadow-md focus-visible:ring-2">Tài khoản</a>}
+  const handlePublicNavigate = (view: string) => {
+    if (view === 'dashboard') {
+      if (role) navigateToShell(role);
+      else navigate('/login');
+    } else if (view === 'login') navigate('/login');
+    else if (view === 'courses') navigate('/courses');
+    else navigate('/');
+  };
+  const content = (
       <Routes>
         <Route path="/account" element={<AccountPage />} />
         <Route path="/forgot-password" element={<RecoveryPage />} />
-        {/* Trang chủ dùng chung cho mọi khách ghé thăm */}
-        <Route
-          path="/"
-          element={
-            <HomePage
-              isLoggedIn={isLoggedIn}
-              onNavigate={(view) => {
-                if (view === 'dashboard') {
-                  if (role) {
-                    navigateToShell(role);
-                  } else {
-                    navigate('/login');
-                  }
-                } else if (view === 'login') {
-                  navigate('/login');
-                } else {
-                  navigate('/');
-                }
-              }}
-            />
-          }
-        />
+        <Route path="/" element={<HomePage isLoggedIn={isLoggedIn} onNavigate={handlePublicNavigate} />} />
+        <Route path="/landing" element={<Navigate to="/" replace />} />
+        <Route path="/courses" element={<CourseCatalogPage />} />
+        <Route path="/courses/:courseId" element={<CourseDetailPage isLoggedIn={isLoggedIn} onAccessLearning={() => handlePublicNavigate('dashboard')} />} />
 
         {/* Cổng đăng nhập Universal Login - dùng chung cho mọi vai trò */}
         <Route
@@ -110,7 +110,7 @@ export function App() {
                 <Forbidden
                   currentRoleLabel={role ? resolveShellForRole(role).label : undefined}
                   targetShellLabel={resolveShellForRole('student').label}
-                  onRedirect={() => navigateToShell('student')}
+                  onRedirect={() => role ? navigateToShell(role) : navigate('/login')}
                 />
               }
             >
@@ -118,15 +118,14 @@ export function App() {
                 currentRole="student"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
                 onSelectNav={() => {
                   if (location.pathname.startsWith('/dashboard/timetable')) navigate('/student');
                 }}
               >
-                {(activeNavId) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'overview' : activeNavId} />}
+                {(activeNavId, onSelectNav) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'overview' : activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>
             </RoleGuard>
           } />
@@ -142,7 +141,7 @@ export function App() {
                 <Forbidden
                   currentRoleLabel={role ? resolveShellForRole(role).label : undefined}
                   targetShellLabel={resolveShellForRole('parent').label}
-                  onRedirect={() => navigateToShell('parent')}
+                  onRedirect={() => role ? navigateToShell(role) : navigate('/login')}
                 />
               }
             >
@@ -150,10 +149,9 @@ export function App() {
                 currentRole="parent"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
               >
                 {(activeNavId) => <ParentDashboard activeNavId={activeNavId} />}
               </LmsShell>
@@ -164,8 +162,13 @@ export function App() {
         {/* Bất kỳ đường dẫn nào khác -> điều hướng theo vai trò trong claim JWT */}
         <Route path="*" element={<RoleRedirect />} />
       </Routes>
-    </div>
   );
+  return <div className={isPublicRoute ? `public-site${isDarkMode ? ' public-dark' : ''}` : 'min-h-screen bg-slate-50 text-slate-900 font-sans'}>
+    {isPublicRoute && <Navbar homePath="/" currentView={location.pathname} onNavigate={handlePublicNavigate} currentRole={role} userName={user?.fullName} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(previous => !previous)} isLoggedIn={isLoggedIn} onLogout={logout} />}
+    {!isPublicRoute && isLoggedIn && <a href="/account" className="fixed bottom-4 left-4 z-50 rounded-xl bg-blue-700 px-4 py-3 text-white shadow-md focus-visible:ring-2">Tài khoản</a>}
+    {isPublicRoute ? <main id="public-content" className="public-main">{content}</main> : content}
+    {isPublicRoute && <Footer homePath="/" />}
+  </div>;
 }
 
 export default App;

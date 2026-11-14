@@ -19,14 +19,15 @@ export interface AuthContextType {
   user: AuthUser | null;
   claims: JwtClaims | null;
   isLoggedIn: boolean;
+  isInitializing: boolean;
   accessToken: string | null;
   refreshToken: string | null;
   login: (
     role: UserRole,
-    accessToken?: string,
+    accessToken: string,
     refreshToken?: string,
     user?: Partial<AuthUser>
-  ) => void;
+  ) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<boolean>;
   updateUser: (user: Partial<AuthUser>) => void;
@@ -41,9 +42,10 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   claims: null,
   isLoggedIn: false,
+  isInitializing: true,
   accessToken: null,
   refreshToken: null,
-  login: () => {},
+  login: async () => { throw new Error('AuthProvider is required.'); },
   logout: async () => {},
   refreshSession: async () => false,
   updateUser: () => {},

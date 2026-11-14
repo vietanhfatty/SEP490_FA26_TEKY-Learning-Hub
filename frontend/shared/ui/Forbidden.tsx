@@ -33,8 +33,7 @@ export const Forbidden: React.FC<ForbiddenProps> = ({
           Không đủ quyền hạn truy cập
         </h2>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-          Vai trò của bạn không được phép mở khu vực này. Hệ thống đã ghi nhận yêu cầu vào nhật ký
-          kiểm toán. Vui lòng liên hệ quản trị viên nếu cần bổ sung quyền.
+          Vai trò của bạn không được phép mở khu vực này. Vui lòng liên hệ quản trị viên nếu cần bổ sung quyền.
         </p>
 
         {(currentRoleLabel || targetShellLabel) && (
