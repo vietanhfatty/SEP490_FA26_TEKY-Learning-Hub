@@ -1,7 +1,7 @@
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
 import { AcademicManagerDashboard } from './pages/academic-manager/AcademicManagerDashboard';
 import { AdminDashboard } from './pages/system-admin/AdminDashboard';
@@ -22,10 +22,12 @@ import type { UserRole } from '@teky/shared/types';
 function RoleRedirect() {
   const { role } = useAuth();
   const target = resolveShellForRole(role);
-  return <Navigate to={target.path} replace />;
+  return <RoleGuard allowedRoles={['teacher', 'staff', 'academic_manager', 'admin']}><Navigate to={target.path} replace /></RoleGuard>;
 }
 
 export function App() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => { document.documentElement.classList.toggle('dark', isDarkMode); }, [isDarkMode]);
   const navigate = useNavigate();
   const isAccountVisible = useAuth().isLoggedIn;
   const { role, accessToken, refreshToken, user, logout } = useAuth();
@@ -98,10 +100,9 @@ export function App() {
                 currentRole="teacher"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
               >
                 {(activeNavId) => <TeacherDashboard activeNavId={activeNavId} />}
               </LmsShell>
@@ -118,10 +119,9 @@ export function App() {
                 currentRole="staff"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
               >
                 {(activeNavId) => <StaffDashboard activeNavId={activeNavId} />}
               </LmsShell>
@@ -138,10 +138,9 @@ export function App() {
                 currentRole="academic_manager"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
               >
                 {(activeNavId) => <AcademicManagerDashboard activeNavId={activeNavId} />}
               </LmsShell>
@@ -158,12 +157,11 @@ export function App() {
                 currentRole="admin"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
               >
-                {(activeNavId) => <AdminDashboard activeNavId={activeNavId} />}
+                {(activeNavId, onSelectNav) => <AdminDashboard activeNavId={activeNavId} userName={user?.fullName} onSelectNav={onSelectNav} />}
               </LmsShell>
             </RoleGuard>
           }

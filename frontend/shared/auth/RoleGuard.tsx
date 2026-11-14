@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from './authContext';
 import type { UserRole } from '../types';
 import { detectCurrentShell, resolveShellForRole, shellOrigin } from './shellConfig';
@@ -24,29 +25,24 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
     <div className="p-8 text-center text-rose-500 font-semibold">Bạn không có quyền truy cập trang này.</div>
   ),
 }) => {
-  const { role, isLoggedIn, accessToken, refreshToken, user } = useAuth();
+  const { role, isLoggedIn, isInitializing, accessToken, refreshToken, user } = useAuth();
+  const target = resolveShellForRole(role);
+  const shouldTransfer = isLoggedIn && !!role && !allowedRoles.includes(role) && detectCurrentShell() !== target.app;
+  useEffect(() => {
+    if (!shouldTransfer || !accessToken) return;
+    window.location.assign(buildCrossAppUrl(shellOrigin(target.app), target.path, {
+      accessToken, refreshToken: refreshToken ?? undefined, role: role ?? undefined, user: user ?? undefined,
+    }));
+  }, [shouldTransfer, accessToken, refreshToken, role, user, target.app, target.path]);
+
+  if (isInitializing) return <div role="status">Đang xác thực phiên đăng nhập…</div>;
 
   if (!isLoggedIn || !role) {
-    return <>{fallback}</>;
+    return <Navigate to="/login" replace />;
   }
 
   if (!allowedRoles.includes(role)) {
-    const target = resolveShellForRole(role);
-    const currentApp = detectCurrentShell();
-
-    if (currentApp !== target.app && typeof window !== 'undefined') {
-      const redirectUrl = accessToken
-        ? buildCrossAppUrl(shellOrigin(target.app), target.path, {
-            accessToken,
-            refreshToken: refreshToken ?? undefined,
-            role,
-            user: user ?? undefined,
-          })
-        : `${shellOrigin(target.app)}${target.path}`;
-
-      window.location.assign(redirectUrl);
-      return null;
-    }
+    if (shouldTransfer) return <div role="status">Đang chuyển đến giao diện của bạn…</div>;
 
     return <>{fallback}</>;
   }

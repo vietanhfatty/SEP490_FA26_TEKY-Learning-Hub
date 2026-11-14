@@ -32,10 +32,11 @@ public class AuthTests
 
     [Theory]
     [InlineData(1, "student")]
-    [InlineData(2, "parent")]
-    [InlineData(3, "teacher")]
-    [InlineData(4, "academic_manager")]
-    [InlineData(5, "admin")]
+    [InlineData(2, "teacher")]
+    [InlineData(3, "admin")]
+    [InlineData(4, "parent")]
+    [InlineData(5, "staff")]
+    [InlineData(6, "academic_manager")]
     public void JwtTokenGenerator_ShouldGenerateValidTokenWithCorrectRole(byte roleId, string expectedRole)
     {
         // Arrange

@@ -6,7 +6,8 @@ import { Badge } from './Badge';
 interface NavbarProps {
   currentView: string;
   onNavigate: (view: string) => void;
-  currentRole: UserRole;
+  currentRole: UserRole | null;
+  userName?: string;
   isDarkMode: boolean;
   onToggleTheme: () => void;
   isLoggedIn: boolean;
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentView,
   onNavigate,
   currentRole,
+  userName,
   isDarkMode,
   onToggleTheme,
   isLoggedIn,
@@ -31,14 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     admin: { label: 'Quản trị hệ thống', badge: 'neutral' },
   };
 
-  const roleUserNames: Record<UserRole, string> = {
-    student: 'Nguyễn Minh Quân',
-    parent: 'Trần Thu Trang',
-    teacher: 'Thầy Hoàng Văn Nam',
-    staff: 'Nguyễn Thu Nga',
-    academic_manager: 'Đỗ Thị Hồng',
-    admin: 'Admin Kỹ Thuật',
-  };
+
 
   const handleCoursesClick = () => {
     if (currentView !== 'home') {
@@ -89,7 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* Dashboard Link only appears when logged in */}
-          {isLoggedIn && (
+          {isLoggedIn && currentRole && (
             <button
               onClick={() => onNavigate('dashboard')}
               className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
@@ -118,7 +113,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* User Status / Login State */}
-          {isLoggedIn ? (
+          {isLoggedIn && currentRole ? (
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
               {/* Notification icon */}
               <button
@@ -130,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-semibold text-slate-900 dark:text-white">{roleUserNames[currentRole]}</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-white">{userName || 'Tài khoản TEKY'}</p>
                 <Badge variant={roleDisplayNames[currentRole].badge} className="mt-0.5 text-[10px]">
                   {roleDisplayNames[currentRole].label}
                 </Badge>

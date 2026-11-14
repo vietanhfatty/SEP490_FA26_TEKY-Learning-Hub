@@ -17,8 +17,8 @@ interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigateHome }) => {
   const { login: syncSession } = useAuth();
-  const [email, setEmail] = useState('student@teky.edu.vn');
-  const [password, setPassword] = useState('Teky@2026!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,22 +29,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  // 6 standard roles supported by centralized login portal
-  const demoAccounts: { role: UserRole; name: string; email: string; roleLabel: string; desc: string }[] = [
-    { role: 'student', name: 'Nguyễn Minh Quân (Học sinh)', email: 'student@teky.edu.vn', roleLabel: 'Học sinh', desc: 'Lịch học, nộp dự án, huy hiệu STEAM' },
-    { role: 'parent', name: 'Trần Thu Trang (Phụ huynh)', email: 'parent@teky.edu.vn', roleLabel: 'Phụ huynh', desc: 'Theo dõi con, nhận xét GV, học phí' },
-    { role: 'teacher', name: 'Thầy Hoàng Văn Nam (Giáo viên)', email: 'teacher@teky.edu.vn', roleLabel: 'Giáo viên', desc: 'Điểm danh 1 chạm, giáo án, nhận xét' },
-    { role: 'staff', name: 'Nguyễn Thu Nga (Giáo vụ)', email: 'staff@teky.edu.vn', roleLabel: 'Giáo vụ', desc: 'Lớp học, xếp lịch học bù, chăm sóc học viên' },
-    { role: 'academic_manager', name: 'Đỗ Thị Hồng (QL Đào tạo)', email: 'manager@teky.edu.vn', roleLabel: 'QL Học thuật', desc: 'Ma trận xung đột, điều phối GV, khóa học' },
-    { role: 'admin', name: 'Admin Kỹ Thuật (System Admin)', email: 'admin@teky.edu.vn', roleLabel: 'Quản trị viên', desc: 'Phân quyền RBAC, Audit logs, an ninh' },
-  ];
-
-  const handleSelectDemoAccount = (acc: typeof demoAccounts[0]) => {
-    setEmail(acc.email);
-    setPassword('Teky@2026!');
-    setErrorMessage(null);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -53,64 +37,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
 
     try {
       const response = await loginApi(email, password, rememberMe);
-
-      if (response.success && response.data) {
-        // Ưu tiên giải mã CLAIM trong JWT Access Token (role_id > role_name > role).
-        // Chỉ fallback về body response khi token không phải JWT hợp lệ.
-        const claims = decodeJwtClaims(response.data.accessToken);
-        const claimRole = roleFromClaims(claims);
-        const resolvedRole = claimRole;
-        if (!resolvedRole) throw new Error('Vai trò trong phiên đăng nhập không hợp lệ.');
-
-        setTokenIssuedNotice('Đăng nhập thành công. Đang mở trang của bạn…');
-        const accessToken = response.data?.accessToken;
-        // Đồng bộ phiên vào AuthProvider để RoleGuard nhận đúng vai trò ngay lập tức.
-        syncSession(resolvedRole, accessToken ?? '', response.data?.refreshToken, {
-          email: response.data.user.email,
-          fullName: response.data.user.fullName,
-          role: resolvedRole,
-          roleId: response.data.user.roleId,
-        });
-        setTimeout(() => {
-          onLoginSuccess(resolvedRole, accessToken);
-        }, 600);
-      } else {
-        if (import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH === 'true' && response.errors?.some((err) => err.includes('Network error') || err.includes('Failed to fetch') || err.includes('kết nối'))) {
-          // Backend không chạy: chỉ dùng fallback khi khớp đúng tài khoản demo + mật khẩu chuẩn.
-          const matchedDemo = demoAccounts.find(
-            (acc) => acc.email.toLowerCase() === email.trim().toLowerCase()
-          );
-
-          if (!matchedDemo || password !== 'Teky@2026!') {
-            setErrorMessage('Tài khoản hoặc mật khẩu không chính xác.');
-            return;
-          }
-
-          const fallbackRole = matchedDemo.role;
-          localStorage.setItem('teky_role', fallbackRole);
-          localStorage.setItem('teky_token', 'jwt-demo-token-bcrypt-verified');
-          localStorage.setItem('teky_access_token', 'jwt-demo-token-bcrypt-verified');
-          localStorage.setItem('teky_refresh_token', 'rt-demo-token-active');
-          localStorage.setItem(
-            'teky_user',
-            JSON.stringify({
-              userId: 99,
-              email: matchedDemo.email,
-              fullName: matchedDemo.name,
-              role: fallbackRole,
-              status: 'Active',
-              themeMode: 'Light',
-            })
-          );
-
-          setTokenIssuedNotice(`[Chế độ dự phòng] Xác thực danh tính vai trò '${fallbackRole}' thành công.`);
-          setTimeout(() => {
-            onLoginSuccess(fallbackRole, 'jwt-demo-token-bcrypt-verified');
-          }, 400);
-        } else {
-          setErrorMessage(response.message || 'Tài khoản hoặc mật khẩu không chính xác.');
-        }
+      if (!response.success || !response.data) {
+        setErrorMessage(response.message || 'Tài khoản hoặc mật khẩu không chính xác.');
+        return;
       }
+      const { accessToken, refreshToken } = response.data;
+      const resolvedRole = roleFromClaims(decodeJwtClaims(accessToken));
+      if (!resolvedRole) throw new Error('Vai trò trong phiên đăng nhập không hợp lệ.');
+      await syncSession(resolvedRole, accessToken, refreshToken);
+      setTokenIssuedNotice('Đăng nhập thành công. Đang mở trang của bạn…');
+      onLoginSuccess(resolvedRole, accessToken);
     } catch (err: unknown) {
       setErrorMessage(
         err instanceof Error ? err.message : 'Đã xảy ra lỗi trong quá trình xác thực.'
@@ -257,13 +193,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                 <span>Ghi nhớ đăng nhập (30 ngày)</span>
               </label>
 
-              <span className="text-[11px] text-slate-400">
-                Vai trò nhận diện:{' '}
-                <span className="font-bold text-blue-600 dark:text-blue-400 uppercase">
-                  {demoAccounts.find((acc) => acc.email.toLowerCase() === email.trim().toLowerCase())
-                    ?.roleLabel ?? 'Sẽ xác thực qua JWT'}
-                </span>
-              </span>
             </div>
 
             <button
@@ -279,7 +208,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  Đang xác thực BCrypt & cấp Token...
+                  Đang đăng nhập…
                 </>
               ) : (
                 <>
@@ -289,32 +218,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
             </button>
           </form>
 
-          {/* Quick Demo Credentials Helper */}
-          <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                💡 Điền nhanh tài khoản mẫu thử nghiệm (5 vai trò):
-              </p>
-              <span className="text-[10px] text-slate-400 font-mono">PW: Teky@2026!</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {demoAccounts.map((acc) => (
-                <button
-                  key={acc.role}
-                  type="button"
-                  onClick={() => handleSelectDemoAccount(acc)}
-                  className={`p-2 rounded-xl text-left border text-[11px] transition-all ${
-                    email === acc.email
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                  }`}
-                >
-                  <div className="font-semibold truncate">{acc.roleLabel}</div>
-                  <div className="text-[10px] text-slate-400 truncate">{acc.email}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+
         </div>
       </div>
 

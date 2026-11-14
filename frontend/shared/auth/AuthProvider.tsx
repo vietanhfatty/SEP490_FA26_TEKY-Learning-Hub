@@ -1,231 +1,151 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthContext } from './authContext';
-import type { AuthContextType, AuthUser } from './authContext';
-import { refreshTokenApi, logoutApi, normalizeRole } from '../api-client/auth';
-import { decodeJwtClaims, roleFromClaims, isTokenExpired } from './jwt';
-import type { JwtClaims } from './jwt';
-import type { UserRole } from '../types';
+import type { AuthContextType } from './authContext';
+import { clearAuthSession, verifySession, refreshTokenApi, logoutApi } from '../api-client/auth';
+import type { VerifiedSession } from '../api-client/auth';
+import { isTokenExpired } from './jwt';
 import { consumeSsoPayload } from './shellTransfer';
 import { processShellHandshake, shellHandshakePending } from './shellHandshake';
+
+const readStored = (key: string) => localStorage.getItem(key) || sessionStorage.getItem(key);
+const readToken = () => readStored('teky_access_token') || readStored('teky_token');
 let handshakeStarted = false;
+let pendingRestore: Promise<VerifiedSession | null> | null = null;
 
-/**
- * Đọc token từ localStorage trước, sau đó tới sessionStorage.
- * `localStorage` được ưu tiên vì backend phân biệt "ghi nhớ đăng nhập" (30 ngày) với phiên tạm.
- */
-function readStoredToken(key: string): string | null {
-  return localStorage.getItem(key) || sessionStorage.getItem(key);
+// Share restoration across StrictMode mounts so rotating refresh tokens are used once.
+async function restoreStoredSession(forceRefresh = false): Promise<VerifiedSession | null> {
+  if (pendingRestore) return pendingRestore;
+  pendingRestore = (async () => {
+    let token = readToken();
+    let refreshToken = readStored('teky_refresh_token');
+    try {
+      if (!token && !refreshToken) return null;
+      if (forceRefresh || isTokenExpired(token)) {
+        if (!refreshToken || !await refreshTokenApi()) throw new Error('Phiên đăng nhập đã hết hạn.');
+        token = readToken();
+        refreshToken = readStored('teky_refresh_token');
+      }
+      if (!token) throw new Error('Thiếu phiên đăng nhập.');
+      const session = await verifySession(token, refreshToken);
+      return readToken() === token && readStored('teky_refresh_token') === refreshToken ? session : null;
+    } catch {
+      if (readToken() === token && readStored('teky_refresh_token') === refreshToken) clearAuthSession();
+      return null;
+    }
+  })().finally(() => { pendingRestore = null; });
+  return pendingRestore;
 }
 
-function readStoredUser(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem('teky_user') || sessionStorage.getItem('teky_user');
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Nhận phiên đăng nhập được chuyển từ ứng dụng khác qua hash fragment (`#sso=...`).
- *
- * Hàm này được gọi ở cấp module (chạy đúng một lần khi bundle được nạp) VÀ lại trong
- * effect của `AuthProvider`, vì việc đổi hash trên cùng một origin chỉ là
- * same-document navigation - module JavaScript KHÔNG được nạp lại.
- */
+// Legacy token-in-URL payloads are rejected; supported handoffs use a one-use code.
 consumeSsoPayload();
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [accessToken, setAccessToken] = useState<string | null>(() =>
-    readStoredToken('teky_access_token') || readStoredToken('teky_token')
-  );
-
-  const [refreshToken, setRefreshToken] = useState<string | null>(() =>
-    readStoredToken('teky_refresh_token')
-  );
-
-  const [claims, setClaims] = useState<JwtClaims | null>(() =>
-    decodeJwtClaims(readStoredToken('teky_access_token') || readStoredToken('teky_token'))
-  );
-
-  const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
+  const [session, setSession] = useState<VerifiedSession | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [handshakeError, setHandshakeError] = useState('');
+  const revision = useRef(0);
+
   useEffect(() => {
-    if (!shellHandshakePending() || handshakeStarted) return;
-    handshakeStarted = true;
-    processShellHandshake().catch(error => setHandshakeError(error instanceof Error ? error.message : 'Không thể chuyển phiên.'));
+    if (shellHandshakePending()) {
+      if (!handshakeStarted) {
+        handshakeStarted = true;
+        processShellHandshake().catch(error => setHandshakeError(error instanceof Error ? error.message : 'Không thể chuyển phiên.'));
+      }
+      return;
+    }
+    let active = true;
+    const current = revision.current;
+    void restoreStoredSession().then(restored => {
+      if (active && revision.current === current) {
+        setSession(restored);
+        setIsInitializing(false);
+      }
+    });
+    return () => { active = false; };
   }, []);
 
-  /**
-   * Vai trò luôn được suy ra từ CLAIM trong JWT (ưu tiên `role_id`),
-   * fallback về `localStorage` khi token demo / token không phải JWT.
-   */
-  const [role, setRole] = useState<UserRole | null>(() => {
-    const fromClaims = roleFromClaims(
-      decodeJwtClaims(readStoredToken('teky_access_token') || readStoredToken('teky_token'))
-    );
-    if (fromClaims) {
-      return fromClaims;
+  const login: AuthContextType['login'] = async (expectedRole, accessToken, refreshToken) => {
+    const current = ++revision.current;
+    try {
+      const verified = await verifySession(accessToken, refreshToken ?? null);
+      if (verified.role !== expectedRole) throw new Error('Vai trò trong phiên đăng nhập không hợp lệ.');
+      if (revision.current !== current || readToken() !== accessToken) throw new Error('Phiên đăng nhập đã thay đổi.');
+      setSession(verified);
+    } catch (error) {
+      if (revision.current === current) {
+        clearAuthSession();
+        setSession(null);
+      }
+      throw error;
     }
-
-    const stored = localStorage.getItem('teky_role') || sessionStorage.getItem('teky_role');
-    return import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH === 'true' ? (stored as AuthContextType['role']) || null : null;
-  });
-
-  const login = (
-    newRole: UserRole,
-    newAccessToken = 'teky-access-token',
-    newRefreshToken = 'teky-refresh-token',
-    newUser?: Partial<AuthUser>
-  ) => {
-    const decoded = decodeJwtClaims(newAccessToken);
-    const claimRole = roleFromClaims(decoded);
-    const finalRole = claimRole ?? (import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH === 'true' ? normalizeRole(newRole) : null);
-    if (!finalRole) throw new Error('Vai trò không hợp lệ.');
-    const storage = sessionStorage.getItem('teky_access_token') === newAccessToken ? sessionStorage : localStorage;
-
-    setRole(finalRole);
-    setAccessToken(newAccessToken);
-    setRefreshToken(newRefreshToken);
-    setClaims(decoded);
-
-    if (newUser) {
-      const merged = { ...(user ?? {}), ...newUser } as AuthUser;
-      setUser(merged);
-      storage.setItem('teky_user', JSON.stringify(merged));
-    }
-
-    storage.setItem('teky_role', finalRole);
-    storage.setItem('teky_access_token', newAccessToken);
-    storage.setItem('teky_refresh_token', newRefreshToken);
-    storage.setItem('teky_token', newAccessToken);
   };
 
   const logout = useCallback(async () => {
+    ++revision.current;
+    setSession(null);
+    // Clear UI immediately; logoutApi revokes the server refresh token and clears storage.
     await logoutApi();
-    setRole(null);
-    setAccessToken(null);
-    setRefreshToken(null);
-    setClaims(null);
-    setUser(null);
   }, []);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
-    const success = await refreshTokenApi();
-    if (success) {
-      const newToken = readStoredToken('teky_access_token') || readStoredToken('teky_token');
-      setAccessToken(newToken);
-      setRefreshToken(readStoredToken('teky_refresh_token'));
-      setUser(readStoredUser());
-      setClaims(decodeJwtClaims(newToken));
-      setRole(roleFromClaims(decodeJwtClaims(newToken)));
-    } else {
-      await logout();
-    }
-    return success;
-  }, [logout]);
-
-  /**
-   * Nhận phiên chuyển từ ứng dụng khác.
-   *
-   * Đổi hash fragment trên cùng origin là same-document navigation:
-   * module JavaScript KHÔNG được nạp lại, nên lệnh gọi ở cấp module không chạy lại.
-   * Vì vậy ta lắng nghe `hashchange` và đồng bộ lại toàn bộ phiên từ storage.
-   */
-  const applySsoSession = useCallback(() => {
-    const payload = consumeSsoPayload();
-    if (!payload) {
-      return false;
-    }
-
-    const token = payload.accessToken;
-    const decoded = decodeJwtClaims(token);
-
-    setAccessToken(token);
-    setRefreshToken(payload.refreshToken ?? readStoredToken('teky_refresh_token'));
-    setClaims(decoded);
-    setRole(roleFromClaims(decoded) ?? (payload.role as UserRole | undefined) ?? null);
-    setUser((payload.user as AuthUser | undefined) ?? readStoredUser());
-
-    return true;
+    const current = ++revision.current;
+    const restored = await restoreStoredSession(true);
+    if (revision.current !== current) return false;
+    setSession(restored);
+    return !!restored;
   }, []);
 
   useEffect(() => {
-    // Phiên từ ứng dụng khác đã được `consumeSsoPayload()` xử lý ở cấp module,
-    // nên state khởi tạo đã nạp đúng token -> không cần setState trong effect.
-    const onHashChange = () => {
-      if (applySsoSession()) {
-        // Token mới đã có trong storage -> buộc React đọc lại state.
-        setAccessToken((prev) => prev ?? readStoredToken('teky_access_token'));
-      }
-    };
+    if (!session) return;
+    const remaining = (session.claims.expiresAt ?? 0) * 1000 - Date.now();
+    const delay = session.refreshToken ? Math.max(1000, Math.min(remaining - 30000, 30 * 60 * 1000)) : Math.max(0, remaining);
+    const timer = setTimeout(() => {
+      if (session.refreshToken) void refreshSession();
+      else { ++revision.current; clearAuthSession(); setSession(null); }
+    }, Math.min(delay, 2147483647));
+    return () => clearTimeout(timer);
+  }, [session, refreshSession]);
 
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, [applySsoSession]);
-
-  // Đồng bộ đa tab: Lắng nghe sự kiện đăng xuất từ tab khác qua localStorage
   useEffect(() => {
-    const handleStorageEvent = (event: StorageEvent) => {
-      if (
-        event.key === 'teky_logout_event' ||
-        (event.key === 'teky_access_token' && !event.newValue)
-      ) {
-        setRole(null);
-        setAccessToken(null);
-        setRefreshToken(null);
-        setClaims(null);
-        setUser(null);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'teky_logout_event' || event.key === null || event.key === 'teky_access_token' || event.key === 'teky_token') {
+        const current = ++revision.current;
+        setSession(null);
+        if (event.key === 'teky_logout_event') clearAuthSession();
+        if (event.key !== 'teky_logout_event') {
+          void restoreStoredSession().then(restored => {
+            if (revision.current === current) setSession(restored);
+          });
+        }
       }
     };
-
-    window.addEventListener('storage', handleStorageEvent);
-    return () => window.removeEventListener('storage', handleStorageEvent);
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
-
-  // Tự động làm mới token định kỳ, đồng bộ lại claim sau mỗi lần refresh.
-  useEffect(() => {
-    if (accessToken && refreshToken) {
-      const interval = setInterval(() => {
-        refreshSession().catch(() => {});
-      }, 30 * 60 * 1000); // 30 phút
-      return () => clearInterval(interval);
-    }
-  }, [accessToken, refreshToken, refreshSession]);
-
-  // Khi access token hết hạn, tự động làm mới ngay lập tức thay vì chờ chu kỳ 30 phút.
-  useEffect(() => {
-    if (!accessToken || !refreshToken) {
-      return;
-    }
-
-    if (isTokenExpired(accessToken)) {
-      const timer = setTimeout(() => {
-        refreshSession().catch(() => {});
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [accessToken, refreshToken, refreshSession]);
 
   const value: AuthContextType = {
-    role,
-    user,
-    claims,
-    isLoggedIn: !!accessToken && !!role,
-    accessToken,
-    refreshToken,
+    role: session?.role ?? null,
+    user: session?.user ?? null,
+    claims: session?.claims ?? null,
+    isLoggedIn: !!session && !isTokenExpired(session.accessToken),
+    isInitializing,
+    accessToken: session?.accessToken ?? null,
+    refreshToken: session?.refreshToken ?? null,
     login,
     logout,
     refreshSession,
     updateUser: (profile) => {
-      setUser(previous => previous ? { ...previous, ...profile } : previous);
-      for (const storage of [localStorage, sessionStorage]) {
-        const raw=storage.getItem('teky_user');
-        if (raw) { try { storage.setItem('teky_user',JSON.stringify({...JSON.parse(raw),...profile})); } catch { storage.removeItem('teky_user'); } }
-      }
+      // Profile edits cannot change the identity or the authorization of a session.
+      setSession(previous => previous ? { ...previous, user: { ...previous.user,
+        fullName: profile.fullName ?? previous.user.fullName,
+        phone: profile.phone ?? previous.user.phone,
+        avatarUrl: profile.avatarUrl ?? previous.user.avatarUrl,
+        themeMode: profile.themeMode ?? previous.user.themeMode,
+      } } : null);
     },
   };
 
-  if (shellHandshakePending()) return <main className="p-8" role="status">{handshakeError || "Đang chuyển đến giao diện của bạn…"}{handshakeError && <a href="/login"> Đăng nhập lại</a>}</main>;
+  if (shellHandshakePending()) return <main className="p-8" role="status">{handshakeError || 'Đang chuyển đến giao diện của bạn…'}{handshakeError && <a href="/login"> Đăng nhập lại</a>}</main>;
+  if (isInitializing) return <main className="p-8" role="status">Đang xác thực phiên đăng nhập…</main>;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

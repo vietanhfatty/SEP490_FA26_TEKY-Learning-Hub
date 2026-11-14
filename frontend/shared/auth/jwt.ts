@@ -79,12 +79,13 @@ export function decodeJwtClaims(token: string | null | undefined): JwtClaims | n
   }
 
   const segments = token.split('.');
-  if (segments.length < 2) {
+  if (segments.length !== 3 || segments.some(segment => !segment)) {
     return null;
   }
 
   try {
     const payload = JSON.parse(base64UrlDecode(segments[1])) as Record<string, unknown>;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
 
     const roleIdRaw = readClaim(payload, 'role_id');
     const parsedRoleId = roleIdRaw !== undefined ? Number(roleIdRaw) : typeof payload.role_id === 'number' ? payload.role_id : Number.NaN;
@@ -97,9 +98,9 @@ export function decodeJwtClaims(token: string | null | undefined): JwtClaims | n
       email: readClaim(payload, 'email', EMAIL_CLAIM_URI),
       fullName: readClaim(payload, 'unique_name', 'name', UNIQUE_NAME_CLAIM_URI),
       role: readClaim(payload, 'role', ROLE_CLAIM_URI),
-      roleId: Number.isNaN(parsedRoleId) ? undefined : parsedRoleId,
+      roleId: Number.isFinite(parsedRoleId) ? parsedRoleId : undefined,
       roleName: readClaim(payload, 'role_name'),
-      expiresAt: Number.isNaN(parsedExp) ? undefined : parsedExp,
+      expiresAt: Number.isFinite(parsedExp) ? parsedExp : undefined,
       jwtId: readClaim(payload, 'jti'),
     };
   } catch {
@@ -135,10 +136,7 @@ export function roleFromClaims(claims: JwtClaims | null | undefined): UserRole |
   }
 
   if (claims.roleId !== undefined) {
-    const mapped = ROLE_ID_MAP[claims.roleId];
-    if (mapped) {
-      return mapped;
-    }
+    return ROLE_ID_MAP[claims.roleId] ?? null;
   }
 
   const fromName = normalizeRoleString(claims.roleName);

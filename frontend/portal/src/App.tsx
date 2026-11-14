@@ -1,7 +1,7 @@
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { HomePage } from './pages/home/HomePage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -21,10 +21,14 @@ import type { UserRole } from '@teky/shared/types';
 function RoleRedirect() {
   const { role } = useAuth();
   const target = resolveShellForRole(role);
-  return <Navigate to={target.path} replace />;
+  return <RoleGuard allowedRoles={['student', 'parent']}><Navigate to={target.path} replace /></RoleGuard>;
 }
 
 export function App() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
   const navigate = useNavigate();
   const isAccountVisible = useAuth().isLoggedIn;
   const { isLoggedIn, role, accessToken, refreshToken, user, logout } = useAuth();
@@ -110,7 +114,7 @@ export function App() {
                 <Forbidden
                   currentRoleLabel={role ? resolveShellForRole(role).label : undefined}
                   targetShellLabel={resolveShellForRole('student').label}
-                  onRedirect={() => navigateToShell('student')}
+                  onRedirect={() => role ? navigateToShell(role) : navigate('/login')}
                 />
               }
             >
@@ -118,12 +122,11 @@ export function App() {
                 currentRole="student"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
               >
-                {(activeNavId) => <StudentDashboard activeNavId={activeNavId} />}
+                {(activeNavId, onSelectNav) => <StudentDashboard key={activeNavId} activeNavId={activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>
             </RoleGuard>
           }
@@ -139,7 +142,7 @@ export function App() {
                 <Forbidden
                   currentRoleLabel={role ? resolveShellForRole(role).label : undefined}
                   targetShellLabel={resolveShellForRole('parent').label}
-                  onRedirect={() => navigateToShell('parent')}
+                  onRedirect={() => role ? navigateToShell(role) : navigate('/login')}
                 />
               }
             >
@@ -147,10 +150,9 @@ export function App() {
                 currentRole="parent"
                 userName={user?.fullName}
                 userEmail={user?.email}
-                isDarkMode={false}
-                onToggleTheme={() => {}}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
-                onRoleChange={(newRole) => navigateToShell(newRole)}
               >
                 {(activeNavId) => <ParentDashboard activeNavId={activeNavId} />}
               </LmsShell>

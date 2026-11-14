@@ -58,7 +58,7 @@ builder.Services.AddAuthentication(options =>
         var db=context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
         if(!int.TryParse(id,out var userId) || !int.TryParse(version,out var tokenVersion)) {context.Fail("Invalid session");return;}
         var user=await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(db.Users, x=>x.UserId==userId);
-        if(user==null || user.Status!="Active" || user.SecurityVersion!=tokenVersion) context.Fail("Session revoked");
+        if (!TekyLearningHub.Infrastructure.Security.SessionAuthorization.MatchesCurrentUser(context.Principal, user)) context.Fail("Session revoked or role changed");
     }};
     options.TokenValidationParameters = new TokenValidationParameters
     {

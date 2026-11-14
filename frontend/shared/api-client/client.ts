@@ -7,7 +7,8 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('teky_token');
+  const token = localStorage.getItem('teky_access_token') || sessionStorage.getItem('teky_access_token') ||
+    localStorage.getItem('teky_token') || sessionStorage.getItem('teky_token');
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
