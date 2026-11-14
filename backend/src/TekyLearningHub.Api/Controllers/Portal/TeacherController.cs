@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -29,6 +30,8 @@ public class TeacherController : ControllerBase
         _aiAssistantService = aiAssistantService;
     }
 
+    // ==================== SCR-TEA-01: BÀN LÀM VIỆC & LỊCH DẠY TUẦN ====================
+
     /// <summary>
     /// SCR-TEA-01: Lấy thông tin Bàn làm việc giáo viên, thời khóa biểu tuần & cảnh báo vắng mặt
     /// </summary>
@@ -38,6 +41,18 @@ public class TeacherController : ControllerBase
         var result = await _teacherService.GetTeacherWorkspaceAsync(teacherId, weekStart, ct);
         return Ok(result);
     }
+
+    /// <summary>
+    /// SCR-TEA-01: Danh sách lớp giáo viên đang phụ trách
+    /// </summary>
+    [HttpGet("classes")]
+    public async Task<ActionResult<List<TeacherClassSummaryDto>>> GetClasses([FromQuery] int teacherId, CancellationToken ct)
+    {
+        var result = await _teacherService.GetTeacherClassesAsync(teacherId, ct);
+        return Ok(result);
+    }
+
+    // ==================== SCR-TEA-02: ĐIỂM DANH 1-CHẠM, ĐỒNG BỘ MÁY TRẠM & HỌC BÙ ====================
 
     /// <summary>
     /// SCR-TEA-02: Lấy danh sách điểm danh 1-chạm của buổi học
@@ -70,6 +85,16 @@ public class TeacherController : ControllerBase
     }
 
     /// <summary>
+    /// SCR-TEA-02: Danh sách đơn xin học bù của các lớp giáo viên phụ trách
+    /// </summary>
+    [HttpGet("makeup")]
+    public async Task<ActionResult<List<MakeupRequestItemDto>>> GetMakeupRequests([FromQuery] int teacherId, CancellationToken ct)
+    {
+        var result = await _teacherService.GetMakeupRequestsAsync(teacherId, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// SCR-TEA-02: Duyệt đơn xin học bù của học sinh
     /// </summary>
     [HttpPost("makeup/review")]
@@ -78,6 +103,8 @@ public class TeacherController : ControllerBase
         var success = await _teacherService.ReviewMakeupRequestAsync(request, teacherId, ct);
         return Ok(new { success, message = "Đã xử lý đơn học bù thành công." });
     }
+
+    // ==================== SCR-TEA-03: ĐIỀU KHIỂN PHÒNG LAB (FOCUS MODE & SPOTLIGHT) ====================
 
     /// <summary>
     /// SCR-TEA-03: Kích hoạt Chế độ tập trung phòng Lab (Khóa / Mở màn hình học sinh qua SignalR)
@@ -99,6 +126,8 @@ public class TeacherController : ControllerBase
         return Ok(new { success = true, message = $"Đã phát sóng bài làm của {studentName} lên máy chiếu và máy trạm phòng Lab." });
     }
 
+    // ==================== SCR-TEA-04: THIẾT KẾ SA BÀN 2D & KHỞI TẠO ĐỀ BÀI AI ====================
+
     /// <summary>
     /// SCR-TEA-04: Tạo sa bàn bản đồ thử thách STEM mới
     /// </summary>
@@ -119,6 +148,18 @@ public class TeacherController : ControllerBase
         return Ok(result);
     }
 
+    // ==================== SCR-TEA-05: CHẤM ĐIỂM KẾT HỢP 60/40 & GHI ÂM NHẬN XÉT ====================
+
+    /// <summary>
+    /// SCR-TEA-05: Hàng chờ chấm bài Hybrid 60/40
+    /// </summary>
+    [HttpGet("submissions")]
+    public async Task<ActionResult<List<GradingQueueItemDto>>> GetGradingQueue([FromQuery] int teacherId, [FromQuery] int? classId, CancellationToken ct)
+    {
+        var result = await _teacherService.GetGradingQueueAsync(teacherId, classId, ct);
+        return Ok(result);
+    }
+
     /// <summary>
     /// SCR-TEA-05: Chấm điểm Hybrid 60/40 (AST 60% + Rubric Quick-Pills 40% + Voice memo nhận xét)
     /// </summary>
@@ -128,6 +169,8 @@ public class TeacherController : ControllerBase
         var result = await _teacherService.GradeSubmissionAsync(request, teacherId, ct);
         return Ok(result);
     }
+
+    // ==================== SCR-TEA-06: PHÂN TÍCH PHỔ ĐIỂM & XUẤT BÁO CÁO EXCEL ====================
 
     /// <summary>
     /// SCR-TEA-06: Phân tích hiệu suất lớp học & biểu đồ phân phối điểm số
@@ -148,35 +191,5 @@ public class TeacherController : ControllerBase
         var fileBytes = await _excelExportService.ExportClassGradebookAsync(classId, ct);
         var fileName = $"Bang_Diem_TEKY_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
-    }
-
-    /// <summary>
-    /// SCR-TEA-01: Danh sách lớp giáo viên đang phụ trách
-    /// </summary>
-    [HttpGet("classes")]
-    public async Task<ActionResult<List<TeacherClassSummaryDto>>> GetClasses([FromQuery] int teacherId, CancellationToken ct)
-    {
-        var result = await _teacherService.GetTeacherClassesAsync(teacherId, ct);
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// SCR-TEA-05: Hàng chờ chấm bài Hybrid 60/40
-    /// </summary>
-    [HttpGet("submissions")]
-    public async Task<ActionResult<List<GradingQueueItemDto>>> GetGradingQueue([FromQuery] int teacherId, [FromQuery] int? classId, CancellationToken ct)
-    {
-        var result = await _teacherService.GetGradingQueueAsync(teacherId, classId, ct);
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// SCR-TEA-02: Danh sách đơn xin học bù của các lớp giáo viên phụ trách
-    /// </summary>
-    [HttpGet("makeup")]
-    public async Task<ActionResult<List<MakeupRequestItemDto>>> GetMakeupRequests([FromQuery] int teacherId, CancellationToken ct)
-    {
-        var result = await _teacherService.GetMakeupRequestsAsync(teacherId, ct);
-        return Ok(result);
     }
 }

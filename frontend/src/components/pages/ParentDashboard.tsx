@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { IconTrophy, IconCheckCircle, IconClock } from '../common/Icons';
-import { Badge } from '../common/Badge';
 import {
+  IconTrophy,
+  IconCheckCircle,
+  IconClock,
+  Badge,
   parentApi,
   emitRealtimeEvent,
   subscribeRealtimeEvents,
@@ -11,7 +13,7 @@ import {
   type CheerStickerDto,
   type StudentPortfolioDetailDto,
   type ClassLeaderboardDto,
-} from '../../services/lmsApi';
+} from '@teky/shared';
 
 type ParentSectionTab = 'all' | 'par01_overview' | 'par02_contact' | 'par03_portfolio' | 'par04_cheer';
 

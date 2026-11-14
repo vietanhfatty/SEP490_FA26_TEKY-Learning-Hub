@@ -99,6 +99,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [livePushAlert, setLivePushAlert] = useState<string | null>(null);
 
+  // SCR-PAR-01: Hồ sơ Đa Học sinh & Giám sát Điểm danh Thời gian thực
   const [dashboard, setDashboard] = useState<ParentDashboardDto>({
     parentId: 5,
     parentName: 'Bà Nguyễn Thị Lan',
@@ -122,6 +123,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
     },
   ]);
 
+  // SCR-PAR-02: Sổ liên lạc Điện tử (60/40 Hybrid), Ghi âm Giọng nói GV, Đánh giá 5 Sao & Bản tin AI 60 Giây
   const [contactBook, setContactBook] = useState<EContactBookItemDto[]>([]);
   const [playingTeacherVoiceSessionId, setPlayingTeacherVoiceSessionId] = useState<number | null>(null);
   const [digestText, setDigestText] = useState<string>('');
@@ -134,11 +136,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
   );
   const [submittingFeedback, setSubmittingFeedback] = useState<boolean>(false);
 
+  // SCR-PAR-03: Hồ sơ Năng lực Số (2D Robot Simulation Viewer) & Mã QR Xác thực Công khai
   const [portfolios, setPortfolios] = useState<StudentPortfolioDetailDto[]>([]);
   const [verifiedPortfolio, setVerifiedPortfolio] = useState<StudentPortfolioDetailDto | null>(null);
   const [simStepIndex, setSimStepIndex] = useState<number>(5);
   const [isSimulatingRobot, setIsSimulatingRobot] = useState<boolean>(false);
 
+  // SCR-PAR-04: Cổ vũ Trực tuyến (SignalR CheerHub Confetti) & Bảng Xếp hạng Tuần (CRON-03)
   const [stickers, setStickers] = useState<CheerStickerDto[]>([
     { stickerId: 1, code: 'PROUD', name: 'Bố mẹ tự hào về con', imageUrl: '/assets/stickers/proud.svg' },
     { stickerId: 2, code: 'SUPER_CODER', name: 'Siêu lập trình viên', imageUrl: '/assets/stickers/supercoder.svg' },
@@ -209,6 +213,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
     return () => window.clearTimeout(timer);
   }, [loadParentHub]);
 
+  // Lắng nghe sự kiện đồng bộ máy trạm phòng Lab thời gian thực (SCR-PAR-01 Real-Time Attendance Monitoring)
   useEffect(() => {
     return subscribeRealtimeEvents((ev) => {
       if (ev.type === 'WORKSTATION_CHECKIN') {
@@ -232,6 +237,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
     });
   }, [dashboard.children, loadParentHub]);
 
+  // Chạy mô phỏng hành trình Robot 2D trên Sa bàn (SCR-PAR-03)
   useEffect(() => {
     if (!isSimulatingRobot) return;
     const timer = window.setInterval(() => {
@@ -400,6 +406,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
 
   return (
     <div className="space-y-6 py-4">
+      {/* Thông báo trạng thái (Toast Notification) */}
       {toastMsg && (
         <div
           role="status"
@@ -410,6 +417,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
         </div>
       )}
 
+      {/* Thông báo Đẩy Điểm danh Thời gian thực (SCR-PAR-01 Real-Time Push Notification Banner) */}
       {livePushAlert && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between gap-3 text-xs text-emerald-950 dark:text-emerald-100 shadow-sm">
           <div className="flex items-center gap-2.5 font-semibold">
@@ -426,6 +434,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
         </div>
       )}
 
+      {/* Cảnh báo lỗi kết nối kèm nút khôi phục */}
       {errorMsg && (
         <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center justify-between gap-3 text-xs text-rose-900 dark:text-rose-200">
           <span>{errorMsg}</span>
@@ -439,7 +448,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
         </div>
       )}
 
-      {/* BANNER CỔNG THÔNG TIN PHỤ HUYNH & CHUYỂN ĐỔI HỒ SƠ CON */}
+      {/* ==================== SCR-PAR-01: BANNER CỔNG THÔNG TIN PHỤ HUYNH & CHUYỂN ĐỔI HỒ SƠ CON ==================== */}
       <div className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="px-6 py-2.5 bg-slate-900 text-slate-100 text-[11px] flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
           <div className="flex items-center gap-2 font-semibold tracking-wide uppercase">
@@ -473,6 +482,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
             </p>
           </div>
 
+          {/* Bộ chuyển đổi nhanh hồ sơ học viên (Multi-Child Switcher — Touch Target >= 44px) */}
           <div
             role="tablist"
             aria-label="Chuyển đổi hồ sơ học viên"
@@ -552,7 +562,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
         })}
       </div>
 
-      {/* SCR-PAR-01 */}
+      {/* ==================== SCR-PAR-01: THẺ TRẠNG THÁI LỚP HỌC & NHẬT KÝ ĐIỂM DANH THỜI GIAN THỰC ==================== */}
       {!loading && (activeSection === 'all' || activeSection === 'par01_overview') && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -621,6 +631,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
             </div>
           </div>
 
+          {/* Bảng Giám sát Điểm danh & Thông báo Đẩy Thời gian thực */}
           <div className="p-5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-700">
               <div>
@@ -658,9 +669,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
         </div>
       )}
 
-      {/* SCR-PAR-02 */}
+      {/* ==================== SCR-PAR-02: BẢN TIN ÂM THANH AI 60 GIÂY & SỔ LIÊN LẠC ĐIỆN TỬ 60/40 ==================== */}
       {!loading && (activeSection === 'all' || activeSection === 'par02_contact') && (
         <div className="space-y-6">
+          {/* Bản tin Âm thanh AI 60 Giây (Parent 60-Second AI Audio Digest) */}
           <div className="p-6 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-700">
               <div>
@@ -708,6 +720,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
               </p>
             </div>
 
+            {/* Thanh tiến trình âm thanh */}
             <div className="flex items-center gap-3 px-1">
               <span className="font-mono text-[11px] text-slate-500 tabular-nums">
                 {isPlayingAudio ? 'Đang phát...' : '00:00'}
@@ -727,6 +740,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
             </div>
           </div>
 
+          {/* Sổ liên lạc điện tử 60/40 + Nghe file ghi âm GV + Biểu mẫu Đánh giá 5 sao */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 p-6 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
@@ -796,6 +810,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
                         </div>
                       )}
 
+                      {/* Danh mục Kỹ năng đạt được trong buổi học */}
                       <div className="space-y-1">
                         <p className="font-bold text-slate-800 dark:text-slate-200">
                           Kỹ năng chuyên môn đạt được trong buổi học:
@@ -838,6 +853,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
               )}
             </div>
 
+            {/* Biểu mẫu Phụ huynh đánh giá 5 sao về tiết học */}
             <div className="p-6 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 flex flex-col justify-between">
               <div className="space-y-3">
                 <div className="pb-2.5 border-b border-slate-200 dark:border-slate-700">
@@ -916,7 +932,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
         </div>
       )}
 
-      {/* SCR-PAR-03 */}
+      {/* ==================== SCR-PAR-03: HỒ SƠ NĂNG LỰC SỐ (MÔ HÌNH ROBOT 2D & XÁC THỰC MÃ QR) ==================== */}
       {!loading && (activeSection === 'all' || activeSection === 'par03_portfolio') && (
         <div className="p-6 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-700">
@@ -936,6 +952,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Trình mô phỏng trực quan Mô hình Robot 2D do con lập trình (2D Canvas Viewer) */}
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-700 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -943,7 +960,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
                     Mô phỏng Hành trình Robot 2D của {currentChild.fullName}
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Tái hiện thuật toán đường đi của Robot trên lưới tọa độ sa bàn thực hành
+                     Tái hiện thuật toán đường đi của Robot trên lưới tọa độ sa bàn thực hành
                   </p>
                 </div>
                 <button
@@ -995,6 +1012,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
               </div>
             </div>
 
+            {/* Danh sách Chứng nhận Hồ sơ năng lực & Mã QR xác thực công khai */}
             <div className="space-y-4">
               {portfolios.length === 0 ? (
                 <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-700/40 text-xs text-slate-500 text-center">
@@ -1036,6 +1054,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
                         </div>
                       </div>
 
+                      {/* Mã QR chuẩn định danh học thuật */}
                       <div className="w-28 h-28 rounded-lg bg-white p-2.5 border border-slate-300 shrink-0 flex flex-col items-center justify-center text-center shadow-sm">
                         <div className="grid grid-cols-5 gap-0.5 w-16 h-16">
                           {Array.from({ length: 25 }).map((_, i) => (
@@ -1083,9 +1102,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
         </div>
       )}
 
-      {/* SCR-PAR-04 */}
+      {/* ==================== SCR-PAR-04: TUYÊN DƯƠNG TRỰC TUYẾN & BẢNG XẾP HẠNG TUẦN (CRON-03) ==================== */}
       {!loading && (activeSection === 'all' || activeSection === 'par04_cheer') && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Gửi Huy hiệu Tuyên dương & Hiệu ứng Pháo hoa tới Máy trạm của con */}
           <div className="p-6 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
               <div>
@@ -1170,6 +1190,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ activeNavId = 
             )}
           </div>
 
+          {/* CRON-03: Bảng Xếp hạng Top 10 Học viên Tiêu biểu trong Tuần */}
           <div className="p-6 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
               <div>

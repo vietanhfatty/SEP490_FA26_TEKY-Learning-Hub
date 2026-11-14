@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { IconCalendar, IconDownload } from '../common/Icons';
-import { Badge } from '../common/Badge';
 import {
+  IconCalendar,
+  IconDownload,
+  Badge,
   teacherApi,
   emitRealtimeEvent,
   type TeacherWorkspaceDto,
@@ -12,7 +13,7 @@ import {
   type CreateMapCheckpointDto,
   type GradingQueueItemDto,
   type ClassPerformanceAnalyticsDto,
-} from '../../services/lmsApi';
+} from '@teky/shared';
 
 type TeacherTab =
   | 'workspace'

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 namespace TekyLearningHub.Application.DTOs;
 
+// ==================== SCR-PAR-01: TỔNG QUAN HỒ SƠ CON & ĐIỂM DANH THỜI GIAN THỰC ====================
+
 public class ParentDashboardDto
 {
     public int ParentId { get; set; }
@@ -24,6 +26,8 @@ public class ChildOverviewDto
     public DateTime? TodayMarkedAt { get; set; }
     public bool IsInActiveSession { get; set; }
 }
+
+// ==================== SCR-PAR-02: SỔ LIÊN LẠC ĐIỆN TỬ & ĐÁNH GIÁ 5 SAO ====================
 
 public class EContactBookItemDto
 {
@@ -47,14 +51,7 @@ public class SubmitParentFeedbackRequest
     public string? FeedbackNote { get; set; }
 }
 
-public class SendCheerMessageRequest
-{
-    public int ParentId { get; set; }
-    public int StudentId { get; set; }
-    public int? StickerId { get; set; }
-    public int? SessionId { get; set; }
-    public string Message { get; set; } = string.Empty;
-}
+// ==================== SCR-PAR-03: HỒ SƠ NĂNG LỰC SỐ STEM & MÃ XÁC THỰC QR ====================
 
 public class StudentPortfolioDetailDto
 {
@@ -69,6 +66,26 @@ public class StudentPortfolioDetailDto
     public string QrCodeShareUrl { get; set; } = string.Empty;
     public int ViewCount { get; set; }
     public DateTime CompletedAt { get; set; }
+}
+
+// ==================== SCR-PAR-04: TUYÊN DƯƠNG TRỰC TUYẾN & BẢNG XẾP HẠNG TUẦN ====================
+
+/// <summary>SCR-PAR-04: Danh mục nhãn dán cổ vũ</summary>
+public class CheerStickerDto
+{
+    public int StickerId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+}
+
+public class SendCheerMessageRequest
+{
+    public int ParentId { get; set; }
+    public int StudentId { get; set; }
+    public int? StickerId { get; set; }
+    public int? SessionId { get; set; }
+    public string Message { get; set; } = string.Empty;
 }
 
 public class ClassLeaderboardDto
@@ -89,13 +106,4 @@ public class LeaderboardRankItemDto
     public int XpEarned { get; set; }
     public int BestTimeMs { get; set; }
     public int BestBlockCount { get; set; }
-}
-
-/// <summary>SCR-PAR-04: Danh mục nhãn dán cổ vũ</summary>
-public class CheerStickerDto
-{
-    public int StickerId { get; set; }
-    public string Code { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string ImageUrl { get; set; } = string.Empty;
 }

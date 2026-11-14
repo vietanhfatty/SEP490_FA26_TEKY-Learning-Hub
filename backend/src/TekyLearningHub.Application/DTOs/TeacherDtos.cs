@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 namespace TekyLearningHub.Application.DTOs;
 
+// ==================== SCR-TEA-01: BÀN LÀM VIỆC & LỊCH DẠY TUẦN ====================
+
 public class TeacherWorkspaceDto
 {
     public int TeacherId { get; set; }
@@ -39,6 +41,18 @@ public class AbsentAlertDto
     public string Reason { get; set; } = "Chưa có mặt";
 }
 
+/// <summary>Danh sách lớp giáo viên đang phụ trách (bộ lọc cho Analytics / Focus Mode)</summary>
+public class TeacherClassSummaryDto
+{
+    public int ClassId { get; set; }
+    public string ClassCode { get; set; } = string.Empty;
+    public string ClassName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public int StudentCount { get; set; }
+}
+
+// ==================== SCR-TEA-02: ĐIỂM DANH 1-CHẠM & ĐƠN HỌC BÙ ====================
+
 public class ClassAttendanceSessionDto
 {
     public int SessionId { get; set; }
@@ -72,12 +86,29 @@ public class UpdateClassAttendanceRequest
     public List<UpdateAttendanceItemRequest> AttendanceList { get; set; } = new();
 }
 
+/// <summary>SCR-TEA-02: Đơn xin học bù chờ giáo viên duyệt</summary>
+public class MakeupRequestItemDto
+{
+    public int MakeupId { get; set; }
+    public int StudentId { get; set; }
+    public string StudentName { get; set; } = string.Empty;
+    public string ClassCode { get; set; } = string.Empty;
+    public DateOnly MissedDate { get; set; }
+    public int? PreferredSessionId { get; set; }
+    public DateOnly? PreferredDate { get; set; }
+    public string? Reason { get; set; }
+    public string Status { get; set; } = "Pending";
+    public DateTime CreatedAt { get; set; }
+}
+
 public class ReviewMakeupRequestDto
 {
     public int MakeupId { get; set; }
     public bool IsApproved { get; set; }
     public string? TeacherNote { get; set; }
 }
+
+// ==================== SCR-TEA-04: THIẾT KẾ SA BÀN 2D & TRẠM KIỂM SOÁT ====================
 
 public class CreateStemMapRequest
 {
@@ -98,43 +129,7 @@ public class CreateMapCheckpointDto
     public bool IsFinish { get; set; } = false;
 }
 
-public class GradeSubmissionRequest
-{
-    public long SubmissionId { get; set; }
-    public decimal AssemblyScore { get; set; }         // 0 - 10
-    public decimal AlgorithmExplainScore { get; set; } // 0 - 10
-    public decimal TeamworkScore { get; set; }         // 0 - 10
-    public string? RemarkText { get; set; }
-    public string? RemarkSource { get; set; }          // "Text", "Voice"
-}
-
-public class SubmissionGradingResultDto
-{
-    public long SubmissionId { get; set; }
-    public decimal AutoAstScore { get; set; }
-    public decimal HardwareScore { get; set; }
-    public decimal FinalScore { get; set; }
-    public string Status { get; set; } = string.Empty;
-}
-
-public class ClassPerformanceAnalyticsDto
-{
-    public int ClassId { get; set; }
-    public string ClassName { get; set; } = string.Empty;
-    public int TotalStudents { get; set; }
-    public decimal AverageScore { get; set; }
-    public decimal MinScore { get; set; }
-    public decimal MaxScore { get; set; }
-    public decimal HardwareAverage { get; set; }
-    public decimal AstAverage { get; set; }
-    public List<ScoreDistributionBucketDto> ScoreBuckets { get; set; } = new();
-}
-
-public class ScoreDistributionBucketDto
-{
-    public string Range { get; set; } = string.Empty;
-    public int Count { get; set; }
-}
+// ==================== SCR-TEA-05: CHẤM ĐIỂM KẾT HỢP 60/40 & GHI ÂM NHẬN XÉT ====================
 
 /// <summary>SCR-TEA-05: Hàng chờ chấm bài Hybrid (bài nộp của học sinh trong các lớp giáo viên phụ trách)</summary>
 public class GradingQueueItemDto
@@ -159,26 +154,42 @@ public class GradingQueueItemDto
     public string? RemarkSource { get; set; }
 }
 
-/// <summary>Danh sách lớp giáo viên đang phụ trách (bộ lọc cho Analytics / Focus Mode)</summary>
-public class TeacherClassSummaryDto
+public class GradeSubmissionRequest
+{
+    public long SubmissionId { get; set; }
+    public decimal AssemblyScore { get; set; }         // 0 - 10
+    public decimal AlgorithmExplainScore { get; set; } // 0 - 10
+    public decimal TeamworkScore { get; set; }         // 0 - 10
+    public string? RemarkText { get; set; }
+    public string? RemarkSource { get; set; }          // "Typed", "Voice"
+}
+
+public class SubmissionGradingResultDto
+{
+    public long SubmissionId { get; set; }
+    public decimal AutoAstScore { get; set; }
+    public decimal HardwareScore { get; set; }
+    public decimal FinalScore { get; set; }
+    public string Status { get; set; } = string.Empty;
+}
+
+// ==================== SCR-TEA-06: PHÂN TÍCH PHỔ ĐIỂM LỚP HỌC ====================
+
+public class ClassPerformanceAnalyticsDto
 {
     public int ClassId { get; set; }
-    public string ClassCode { get; set; } = string.Empty;
     public string ClassName { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public int StudentCount { get; set; }
+    public int TotalStudents { get; set; }
+    public decimal AverageScore { get; set; }
+    public decimal MinScore { get; set; }
+    public decimal MaxScore { get; set; }
+    public decimal HardwareAverage { get; set; }
+    public decimal AstAverage { get; set; }
+    public List<ScoreDistributionBucketDto> ScoreBuckets { get; set; } = new();
 }
-/// <summary>SCR-TEA-02: Đơn xin học bù chờ giáo viên duyệt</summary>
-public class MakeupRequestItemDto
+
+public class ScoreDistributionBucketDto
 {
-    public int MakeupId { get; set; }
-    public int StudentId { get; set; }
-    public string StudentName { get; set; } = string.Empty;
-    public string ClassCode { get; set; } = string.Empty;
-    public DateOnly MissedDate { get; set; }
-    public int? PreferredSessionId { get; set; }
-    public DateOnly? PreferredDate { get; set; }
-    public string? Reason { get; set; }
-    public string Status { get; set; } = "Pending";
-    public DateTime CreatedAt { get; set; }
+    public string Range { get; set; } = string.Empty;
+    public int Count { get; set; }
 }

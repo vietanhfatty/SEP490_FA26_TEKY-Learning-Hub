@@ -1,8 +1,12 @@
+using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
-using TekyLearningHub.Domain.Enums;
 
 namespace TekyLearningHub.Infrastructure.Hubs;
 
+/// <summary>
+/// SCR-TEA-02 & SCR-TEA-03: Hub thời gian thực điều phối phòng Lab (Focus Mode, Spotlight, Workstation Check-in)
+/// </summary>
 public class ClassroomHub : Hub
 {
     public async Task JoinClassroom(string classId)
@@ -26,6 +30,9 @@ public class ClassroomHub : Hub
     }
 }
 
+/// <summary>
+/// SCR-PAR-04: Hub thời gian thực truyền tín hiệu cổ vũ & pháo hoa Confetti từ Phụ huynh tới Máy trạm của con
+/// </summary>
 public class CheerHub : Hub
 {
     public async Task JoinStudentChannel(string studentId)
@@ -44,6 +51,9 @@ public class CheerHub : Hub
     }
 }
 
+/// <summary>
+/// SERVICE-04: Hub điều phối thông báo thời gian thực cho toàn hệ thống
+/// </summary>
 public class NotificationHub : Hub
 {
     public async Task JoinUserNotifications(string userId)

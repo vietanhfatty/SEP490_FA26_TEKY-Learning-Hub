@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +23,8 @@ public class ParentController : ControllerBase
         _aiAssistantService = aiAssistantService;
     }
 
+    // ==================== SCR-PAR-01: TỔNG QUAN HỒ SƠ CON & ĐIỂM DANH THỜI GIAN THỰC ====================
+
     /// <summary>
     /// SCR-PAR-01: Bảng điều khiển phụ huynh & Chuyển đổi nhanh giữa các con (Multi-Child Switcher)
     /// </summary>
@@ -33,6 +34,8 @@ public class ParentController : ControllerBase
         var result = await _parentService.GetParentDashboardAsync(parentId, ct);
         return Ok(result);
     }
+
+    // ==================== SCR-PAR-02: SỔ LIÊN LẠC ĐIỆN TỬ & BẢN TIN ÂM THANH AI 60S ====================
 
     /// <summary>
     /// SCR-PAR-02: Xem sổ liên lạc điện tử & tiến độ học tập (Hybrid Progress 60/40)
@@ -45,19 +48,6 @@ public class ParentController : ControllerBase
     {
         var result = await _parentService.GetChildContactBookHistoryAsync(studentId, parentId, ct);
         return Ok(result);
-    }
-
-    /// <summary>
-    /// SCR-PAR-02: Phụ huynh đánh giá 5 sao & gửi phản hồi về buổi học
-    /// </summary>
-    [HttpPost("feedback")]
-    public async Task<ActionResult> SubmitFeedback(
-        [FromBody] SubmitParentFeedbackRequest request,
-        [FromQuery] int parentId,
-        CancellationToken ct)
-    {
-        var success = await _parentService.SubmitParentFeedbackAsync(request, parentId, ct);
-        return Ok(new { success, message = "Cảm ơn phụ huynh đã gửi đánh giá buổi học." });
     }
 
     /// <summary>
@@ -74,16 +64,19 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
-    /// SCR-PAR-04: Gửi Cheer Box & kích hoạt pháo hoa Confetti tức thời trên màn hình máy trạm của con qua SignalR
+    /// SCR-PAR-02: Phụ huynh đánh giá 5 sao & gửi phản hồi về buổi học
     /// </summary>
-    [HttpPost("cheer")]
-    public async Task<ActionResult> SendCheer(
-        [FromBody] SendCheerMessageRequest request,
+    [HttpPost("feedback")]
+    public async Task<ActionResult> SubmitFeedback(
+        [FromBody] SubmitParentFeedbackRequest request,
+        [FromQuery] int parentId,
         CancellationToken ct)
     {
-        var success = await _parentService.SendCheerMessageAsync(request, ct);
-        return Ok(new { success, message = "Lời động viên và pháo hoa đã được gửi tới bàn học của con!" });
+        var success = await _parentService.SubmitParentFeedbackAsync(request, parentId, ct);
+        return Ok(new { success, message = "Cảm ơn phụ huynh đã gửi đánh giá buổi học." });
     }
+
+    // ==================== SCR-PAR-03: HỒ SƠ NĂNG LỰC SỐ STEM & CHỨNG NHẬN QR ====================
 
     /// <summary>
     /// SCR-PAR-03: Xem danh sách sản phẩm STEM số hóa của con
@@ -97,6 +90,30 @@ public class ParentController : ControllerBase
         return Ok(result);
     }
 
+    // ==================== SCR-PAR-04: TUYÊN DƯƠNG TRỰC TUYẾN & BẢNG XẾP HẠNG TUẦN ====================
+
+    /// <summary>
+    /// SCR-PAR-04: Danh mục nhãn dán cổ vũ (Cheer Stickers)
+    /// </summary>
+    [HttpGet("stickers")]
+    public async Task<ActionResult<List<CheerStickerDto>>> GetStickers(CancellationToken ct)
+    {
+        var result = await _parentService.GetCheerStickersAsync(ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// SCR-PAR-04: Gửi Cheer Box & kích hoạt pháo hoa Confetti tức thời trên màn hình máy trạm của con qua SignalR
+    /// </summary>
+    [HttpPost("cheer")]
+    public async Task<ActionResult> SendCheer(
+        [FromBody] SendCheerMessageRequest request,
+        CancellationToken ct)
+    {
+        var success = await _parentService.SendCheerMessageAsync(request, ct);
+        return Ok(new { success, message = "Lời động viên và pháo hoa đã được gửi tới bàn học của con!" });
+    }
+
     /// <summary>
     /// CRON-03: Xem Bảng xếp hạng Top 10 của lớp tuần này
     /// </summary>
@@ -106,16 +123,6 @@ public class ParentController : ControllerBase
         CancellationToken ct)
     {
         var result = await _parentService.GetClassLeaderboardAsync(classId, ct);
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// SCR-PAR-04: Danh mục nhãn dán cổ vũ (Cheer Stickers)
-    /// </summary>
-    [HttpGet("stickers")]
-    public async Task<ActionResult<List<CheerStickerDto>>> GetStickers(CancellationToken ct)
-    {
-        var result = await _parentService.GetCheerStickersAsync(ct);
         return Ok(result);
     }
 }

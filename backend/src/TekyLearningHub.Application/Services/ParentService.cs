@@ -12,14 +12,21 @@ namespace TekyLearningHub.Application.Services;
 
 public interface IParentService
 {
+    // SCR-PAR-01: Tổng quan hồ sơ con & Điểm danh thời gian thực
     Task<ParentDashboardDto> GetParentDashboardAsync(int parentId, CancellationToken ct = default);
+
+    // SCR-PAR-02: Sổ liên lạc điện tử 60/40 & Đánh giá 5 sao
     Task<List<EContactBookItemDto>> GetChildContactBookHistoryAsync(int studentId, int parentId, CancellationToken ct = default);
     Task<bool> SubmitParentFeedbackAsync(SubmitParentFeedbackRequest request, int parentId, CancellationToken ct = default);
-    Task<bool> SendCheerMessageAsync(SendCheerMessageRequest request, CancellationToken ct = default);
+
+    // SCR-PAR-03: Hồ sơ năng lực số STEM & Xác thực chứng nhận QR
     Task<List<StudentPortfolioDetailDto>> GetStudentPortfoliosAsync(int studentId, CancellationToken ct = default);
     Task<StudentPortfolioDetailDto> GetPublicPortfolioByQrTokenAsync(Guid qrToken, CancellationToken ct = default);
-    Task<ClassLeaderboardDto> GetClassLeaderboardAsync(int classId, CancellationToken ct = default);
+
+    // SCR-PAR-04 & CRON-03: Tuyên dương trực tuyến (Cheer Box) & Bảng xếp hạng tuần
     Task<List<CheerStickerDto>> GetCheerStickersAsync(CancellationToken ct = default);
+    Task<bool> SendCheerMessageAsync(SendCheerMessageRequest request, CancellationToken ct = default);
+    Task<ClassLeaderboardDto> GetClassLeaderboardAsync(int classId, CancellationToken ct = default);
 }
 
 public class ParentService : IParentService
@@ -34,6 +41,8 @@ public class ParentService : IParentService
         _context = context;
         _realtimeService = realtimeService;
     }
+
+    // ==================== SCR-PAR-01: TỔNG QUAN HỒ SƠ CON & ĐIỂM DANH THỜI GIAN THỰC ====================
 
     public async Task<ParentDashboardDto> GetParentDashboardAsync(int parentId, CancellationToken ct = default)
     {
@@ -69,7 +78,6 @@ public class ParentService : IParentService
                 .FirstOrDefaultAsync(ct);
 
             var todaySession = activeClass?.ClassSessions.FirstOrDefault(s => s.SessionDate == today);
-            // ClassSessions.Status chỉ cho phép Scheduled/Done/Cancelled → "đang học" được suy ra theo khung giờ thực tế
             var nowTime = TimeOnly.FromDateTime(DateTime.Now);
             bool isInActive = todaySession != null
                 && todaySession.Status == "Scheduled"
@@ -100,6 +108,8 @@ public class ParentService : IParentService
         };
     }
 
+    // ==================== SCR-PAR-02: SỔ LIÊN LẠC ĐIỆN TỬ & ĐÁNH GIÁ 5 SAO ====================
+
     public async Task<List<EContactBookItemDto>> GetChildContactBookHistoryAsync(int studentId, int parentId, CancellationToken ct = default)
     {
         var hasRelation = await _context.ParentStudentLinks
@@ -127,7 +137,6 @@ public class ParentService : IParentService
         var result = new List<EContactBookItemDto>();
         foreach (var att in attendances)
         {
-            // Gắn điểm của bài nộp trong đúng lớp và đúng ngày diễn ra buổi học
             var grade = grades
                 .Where(g => g.Submission.Assignment.ClassId == att.Session.ClassId
                             && DateOnly.FromDateTime(g.Submission.SubmittedAt) == att.Session.SessionDate)
@@ -154,7 +163,6 @@ public class ParentService : IParentService
 
     public async Task<bool> SubmitParentFeedbackAsync(SubmitParentFeedbackRequest request, int parentId, CancellationToken ct = default)
     {
-        // Log feedback into CheerMessages or Notification
         var cheer = new CheerMessage
         {
             ParentId = parentId,
@@ -169,35 +177,7 @@ public class ParentService : IParentService
         return true;
     }
 
-    public async Task<bool> SendCheerMessageAsync(SendCheerMessageRequest request, CancellationToken ct = default)
-    {
-        var cheer = new CheerMessage
-        {
-            ParentId = request.ParentId,
-            StudentId = request.StudentId,
-            StickerId = request.StickerId,
-            SessionId = request.SessionId,
-            Message = request.Message,
-            SentAt = DateTime.UtcNow
-        };
-
-        await _context.CheerMessages.AddAsync(cheer, ct);
-
-        // SignalR trigger
-        var studentClass = await _context.Enrollments
-            .Where(e => e.StudentId == request.StudentId && e.Status == "Active")
-            .Select(e => e.ClassId)
-            .FirstOrDefaultAsync(ct);
-
-        var stickerCode = request.StickerId.HasValue
-            ? await _context.CheerStickers.Where(s => s.StickerId == request.StickerId.Value).Select(s => s.Code).FirstOrDefaultAsync(ct)
-            : null;
-
-        await _realtimeService.SendCheerConfettiAsync(studentClass, request.StudentId, stickerCode ?? "PROUD", request.Message, ct);
-
-        await _context.SaveChangesAsync(ct);
-        return true;
-    }
+    // ==================== SCR-PAR-03: HỒ SƠ NĂNG LỰC SỐ STEM & MÃ XÁC THỰC QR ====================
 
     public async Task<List<StudentPortfolioDetailDto>> GetStudentPortfoliosAsync(int studentId, CancellationToken ct = default)
     {
@@ -255,6 +235,52 @@ public class ParentService : IParentService
         };
     }
 
+    // ==================== SCR-PAR-04 & CRON-03: TUYÊN DƯƠNG TRỰC TUYẾN & BẢNG XẾP HẠNG TUẦN ====================
+
+    public async Task<List<CheerStickerDto>> GetCheerStickersAsync(CancellationToken ct = default)
+    {
+        return await _context.CheerStickers
+            .AsNoTracking()
+            .OrderBy(s => s.StickerId)
+            .Select(s => new CheerStickerDto
+            {
+                StickerId = s.StickerId,
+                Code = s.Code,
+                Name = s.Name,
+                ImageUrl = s.ImageUrl
+            })
+            .ToListAsync(ct);
+    }
+
+    public async Task<bool> SendCheerMessageAsync(SendCheerMessageRequest request, CancellationToken ct = default)
+    {
+        var cheer = new CheerMessage
+        {
+            ParentId = request.ParentId,
+            StudentId = request.StudentId,
+            StickerId = request.StickerId,
+            SessionId = request.SessionId,
+            Message = request.Message,
+            SentAt = DateTime.UtcNow
+        };
+
+        await _context.CheerMessages.AddAsync(cheer, ct);
+
+        var studentClass = await _context.Enrollments
+            .Where(e => e.StudentId == request.StudentId && e.Status == "Active")
+            .Select(e => e.ClassId)
+            .FirstOrDefaultAsync(ct);
+
+        var stickerCode = request.StickerId.HasValue
+            ? await _context.CheerStickers.Where(s => s.StickerId == request.StickerId.Value).Select(s => s.Code).FirstOrDefaultAsync(ct)
+            : null;
+
+        await _realtimeService.SendCheerConfettiAsync(studentClass, request.StudentId, stickerCode ?? "PROUD", request.Message, ct);
+
+        await _context.SaveChangesAsync(ct);
+        return true;
+    }
+
     public async Task<ClassLeaderboardDto> GetClassLeaderboardAsync(int classId, CancellationToken ct = default)
     {
         var classroom = await _context.Classes
@@ -271,7 +297,6 @@ public class ParentService : IParentService
         var weekStart = activeCycle?.WeekStart ?? today.AddDays(-(int)today.DayOfWeek);
         var weekEnd = activeCycle?.WeekEnd ?? weekStart.AddDays(7);
 
-        // Chỉ xếp hạng học sinh đang học trong lớp này
         var classStudentIds = await _context.Enrollments
             .AsNoTracking()
             .Where(e => e.ClassId == classId && e.Status == "Active")
@@ -305,20 +330,5 @@ public class ParentService : IParentService
             WeekEndDate = weekEnd,
             TopRankings = entries
         };
-    }
-
-    public async Task<List<CheerStickerDto>> GetCheerStickersAsync(CancellationToken ct = default)
-    {
-        return await _context.CheerStickers
-            .AsNoTracking()
-            .OrderBy(s => s.StickerId)
-            .Select(s => new CheerStickerDto
-            {
-                StickerId = s.StickerId,
-                Code = s.Code,
-                Name = s.Name,
-                ImageUrl = s.ImageUrl
-            })
-            .ToListAsync(ct);
     }
 }
