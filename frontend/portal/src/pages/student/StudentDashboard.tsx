@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { IconArrowRight, IconBookOpen, IconCalendar, IconCheckCircle, IconClock, IconCode, IconGrid, IconMenu, IconSearch, IconTrophy, IconVideo, IconX } from '../common/Icons';
 import { Badge } from '../common/Badge';
-import { getStudentData, sessionStatus } from '../../services/studentClasses';
-import type { StudentClasses, StudentSession } from '../../services/studentClasses';
+import { getStudentData, sessionStatus } from '@teky/shared/api-client/studentClasses';
+import type { StudentClasses, StudentSession } from '@teky/shared/api-client/studentClasses';
 import './StudentClasses.css';
 
 interface CourseSummary {

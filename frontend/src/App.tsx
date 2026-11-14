@@ -7,6 +7,7 @@ import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
 import { LmsShell } from './components/common/LmsShell';
 import { HomePage } from './components/pages/HomePage';
+import { CourseCatalogPage, CourseDetailPage } from '@teky/shared/public/CourseCatalogPage';
 import { LoginPage } from './components/pages/LoginPage';
 import { StudentDashboard } from './components/pages/StudentDashboard';
 import { ParentDashboard } from './components/pages/ParentDashboard';
@@ -30,7 +31,13 @@ function AppRoutes() {
   const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { isLoggedIn, role: currentRole, user: currentUser, logout } = useAuth();
-  const isDashboardRoute = location.pathname.startsWith('/dashboard') || location.pathname === '/';
+  const isDashboardRoute = location.pathname.startsWith('/dashboard');
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (location.pathname === '/login') document.title = 'Đăng nhập | TEKY Learning Hub';
+    if (location.pathname === '/forgot-password') document.title = 'Khôi phục mật khẩu | TEKY Learning Hub';
+  }, [location.pathname]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -66,6 +73,8 @@ function AppRoutes() {
       if (view === 'dashboard') {
         if (currentRole) goToDashboard(currentRole);
         else navigate('/login');
+      } else if (view === 'courses') {
+        navigate('/courses');
       } else if (view === 'login') {
         navigate('/login');
       } else {
@@ -114,7 +123,7 @@ function AppRoutes() {
 
   // 2. GIAO DIỆN TRANG CHỦ & ĐĂNG NHẬP (Công khai khi chủ động đăng xuất hoặc xem trang Landing)
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-150">
+    <div className={`public-site${isDarkMode ? ' public-dark' : ''}`}>
       {/* Universal Polished Navbar */}
       <Navbar
         currentView={location.pathname}
@@ -128,11 +137,13 @@ function AppRoutes() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <main id="public-content" className="public-main">
         <Routes>
           {/* Trang chủ giới thiệu */}
-          <Route path="/" element={<Navigate to={currentRole ? DASHBOARD_PATH_BY_ROLE[currentRole] : "/login"} replace />} />
+          <Route path="/" element={<Navigate to="/landing" replace />} />
           <Route path="/landing" element={<HomePage onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />} />
+          <Route path="/courses" element={<CourseCatalogPage />} />
+          <Route path="/courses/:courseId" element={<CourseDetailPage isLoggedIn={isLoggedIn} onAccessLearning={() => handleNavigate('dashboard')} />} />
 
           {/* Trang đăng nhập */}
           <Route
@@ -143,7 +154,7 @@ function AppRoutes() {
           <Route path="/dashboard/*" element={<Navigate to="/login" replace />} />
 
           {/* Đường dẫn lạ */}
-          <Route path="*" element={<Navigate to={currentRole ? DASHBOARD_PATH_BY_ROLE[currentRole] : "/login"} replace />} />
+          <Route path="*" element={<Navigate to="/landing" replace />} />
         </Routes>
       </main>
 

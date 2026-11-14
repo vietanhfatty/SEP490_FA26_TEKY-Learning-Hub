@@ -1,259 +1,189 @@
-import React, { useState } from 'react';
-import { IconCode, IconCpu, IconSparkles, IconChevronRight, IconGraduationCap, IconCheckCircle } from '../common/Icons';
-import { Badge } from '../common/Badge';
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { IconArrowRight, IconCheckCircle, IconCode, IconCpu, IconGraduationCap, IconSparkles } from '@teky/shared/ui/Icons';
+import { CourseCard } from '@teky/shared/public/CourseCard';
+import { courseCategories, publicCourses } from '@teky/shared/public/courseCatalog';
+import '@teky/shared/public/public.css';
 
-interface HomePageProps {
-  onNavigate: (view: string) => void;
-  isLoggedIn?: boolean;
-}
+interface HomePageProps { onNavigate: (view: string) => void; isLoggedIn?: boolean; }
+const categoryIcons = { coding: IconCode, robotics: IconCpu, design: IconSparkles, ai: IconGraduationCap };
 
-export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-  const [selectedAge, setSelectedAge] = useState<'All' | '7-9' | '10-12' | '13-16'>('All');
-
-  const steamTracks = [
-    {
-      title: 'Lập trình & Phát triển ứng dụng',
-      icon: <IconCode size={24} className="text-blue-600 dark:text-blue-400" />,
-      desc: 'Từ thuật toán Scratch trực quan đến ngôn ngữ Python, JavaScript và phát triển Web/Game.',
-      courses: ['Scratch Jr & Game Maker', 'Python Ứng dụng & OOP', 'Web Frontend Fullstack'],
-      age: '7-16',
-      badge: 'Phổ biến nhất',
-    },
-    {
-      title: 'Robotics & Tự động hóa IoT',
-      icon: <IconCpu size={24} className="text-cyan-600 dark:text-cyan-400" />,
-      desc: 'Lắp ráp mô hình LEGO Education, lập trình vi điều khiển Arduino/Micro:bit, thi đấu WRO.',
-      courses: ['LEGO WeDo Robotics', 'Arduino Smart City', 'Thi đấu VEX IQ Robotics'],
-      age: '8-15',
-      badge: 'Thực hành 100%',
-    },
-    {
-      title: 'Thiết kế 3D & Truyền thông số',
-      icon: <IconSparkles size={24} className="text-orange-600 dark:text-orange-400" />,
-      desc: 'Tư duy tạo hình không gian với Tinkercad, Blender 3D, thiết kế đồ họa và in 3D thực tế.',
-      courses: ['3D Modeling Tinkercad', 'Thiết kế đồ họa Photoshop/Illustrator', 'Làm phim hoạt hình 2D'],
-      age: '9-16',
-      badge: 'Khơi gợi sáng tạo',
-    },
-    {
-      title: 'Trí tuệ nhân tạo (AI) & Dữ liệu',
-      icon: <IconGraduationCap size={24} className="text-emerald-600 dark:text-emerald-400" />,
-      desc: 'Khám phá Machine Learning, Computer Vision nhận diện hình ảnh và ứng dụng AI an toàn.',
-      courses: ['Nhập môn AI với Teachable Machine', 'Python Machine Learning cơ bản', 'AI Chatbot & Prompt Engineering'],
-      age: '11-16',
-      badge: 'Đón đầu xu thế',
-    },
-  ];
-
-  const studentProjects = [
-    {
-      title: 'Game Giải cứu Đại dương',
-      author: 'Trần Bảo Nam (9 tuổi)',
-      subject: 'Scratch 3.0',
-      tag: 'Game Sáng tạo',
-      rating: 5,
-      comment: 'Lập trình vật lý va chạm và hệ thống điểm số rất ấn tượng!',
-    },
-    {
-      title: 'Xe Robot Tự hành Tránh vật cản',
-      author: 'Lê Hoàng Minh (12 tuổi)',
-      subject: 'Arduino & C++',
-      tag: 'Robotics & IoT',
-      rating: 5,
-      comment: 'Cảm biến siêu âm hoạt động chính xác với độ trễ thấp.',
-    },
-    {
-      title: 'Web Tra cứu Thời tiết bằng Python',
-      author: 'Phạm Quỳnh Anh (14 tuổi)',
-      subject: 'Python & Flask',
-      tag: 'Web Application',
-      rating: 5,
-      comment: 'Tích hợp OpenWeather API mượt mà, giao diện tối ưu responsive.',
-    },
-  ];
-
-  return (
-    <div className="space-y-16 py-8">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-900 via-blue-800 to-slate-900 text-white p-8 sm:p-12 lg:p-16 shadow-xl">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.2),transparent_50%)]"></div>
-        <div className="relative max-w-3xl space-y-6">
-          <Badge variant="accent" className="bg-orange-500/20 text-orange-300 border-orange-400/30 text-xs px-3 py-1">
-            🔥 Học viện STEAM số 1 cho trẻ em tại Việt Nam
-          </Badge>
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
-            Khơi dậy đam mê <span className="text-sky-300">Công nghệ</span> & Sáng tạo tương lai
-          </h1>
-          <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
-            Nền tảng quản lý học tập và gia sư trực tuyến tích hợp của TEKY. Lộ trình chuẩn quốc tế, theo dõi sát sao tiến độ học tập cho phụ huynh, tối ưu giảng dạy cho giáo viên.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-4 pt-2">
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className="px-6 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2"
-            >
-              🚀 Vào Bảng điều khiển LMS <IconChevronRight size={18} />
-            </button>
-            <button
-              onClick={() => onNavigate('login')}
-              className="px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-md border border-white/20 transition-all flex items-center gap-2"
-            >
-              Cổng Đăng nhập Phân quyền
-            </button>
-          </div>
-
-          {/* Social Proof Stats */}
-          <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-white/10 text-slate-200">
-            <div>
-              <p className="text-2xl font-bold text-white tabular-nums">50.000+</p>
-              <p className="text-xs text-slate-400">Học sinh đã theo học</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white tabular-nums">100+</p>
-              <p className="text-xs text-slate-400">Khóa học chuẩn CSTA</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white tabular-nums">30+</p>
-              <p className="text-xs text-slate-400">Cơ sở toàn quốc</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white tabular-nums">98.5%</p>
-              <p className="text-xs text-slate-400">Phụ huynh hài lòng</p>
-            </div>
-          </div>
+export function HomePage({ onNavigate, isLoggedIn = false }: HomePageProps) {
+  useEffect(() => { document.title = 'Trang chủ | TEKY Learning Hub'; }, []);
+  return <div className="public-home">
+    <section className="public-container public-hero">
+      <div className="public-hero-copy">
+        <span className="public-eyebrow public-orange">HỌC VIỆN CÔNG NGHỆ SÁNG TẠO TEKY</span>
+        <h1>Tò mò hôm nay.<br />Sáng tạo <span>ngày mai.</span>
+        </h1>
+        <p>Cho con không gian khám phá công nghệ, tự tay làm nên những điều mới và tự tin theo đuổi ý tưởng của mình.</p>
+        <div className="public-hero-actions">
+          <Link className="public-button primary" to="/courses">Khám phá khóa học<IconArrowRight size={19} />
+          </Link>
+          <button className="public-button secondary" onClick={() => onNavigate(isLoggedIn ? 'dashboard' : 'login')}>{isLoggedIn ? 'Vào không gian học tập' : 'Đăng nhập TEKY Hub'}</button>
         </div>
-      </section>
-
-      {/* STEAM Tracks */}
-      <section id="courses-section" className="space-y-6 scroll-mt-20">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <Badge variant="info">4 Trục Đào Tạo Nòng Cốt</Badge>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white mt-2">
-              Hệ thống chương trình chuẩn quốc tế
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md">
-            Giáo trình biên soạn theo chuẩn K-12 Computer Science Standards của Hiệp hội Giáo viên Khoa học Máy tính Hoa Kỳ (CSTA).
-          </p>
+        <div className="public-hero-footnote">
+          <span>
+            <IconCheckCircle size={17} />Dành cho trẻ 7–16 tuổi</span>
+          <span>
+            <IconCheckCircle size={17} />Học bằng thực hành</span>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {steamTracks.map((track, idx) => (
-            <div
-              key={idx}
-              className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/60 w-fit">
-                    {track.icon}
-                  </div>
-                  <Badge variant="accent">{track.badge}</Badge>
-                </div>
-                <h3 className="font-bold text-base text-slate-900 dark:text-white mb-2">{track.title}</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">{track.desc}</p>
-                
-                <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-700">
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Khóa học tiêu biểu:</p>
-                  {track.courses.map((c, i) => (
-                    <div key={i} className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
-                      <IconCheckCircle size={14} className="text-emerald-500 shrink-0" />
-                      <span>{c}</span>
-                    </div>
-                  ))}
-                </div>
+      </div>
+      <div className="public-hero-art" aria-hidden="true">
+        <span className="hero-art-label">
+          <span /> KHÔNG GIAN CHO MỌI Ý TƯỞNG</span>
+        <div className="hero-project">
+          <div className="hero-project-title">
+            <span className="hero-project-dots">● ● ●</span>
+            <span>my_first_idea.sb3</span>
+            <IconCode size={18} />
+          </div>
+          <div className="hero-project-content">
+            <div className="hero-code-blocks">
+              <span>khi bấm vào <b>⚑</b>
+              </span>
+              <span>lặp lại <b>10</b> lần</span>
+              <span>di chuyển <b>10</b> bước</span>
+              <span>nói <b>Xin chào, thế giới!</b>
+              </span>
+            </div>
+            <div className="hero-robot">
+              <span className="robot-antenna" />
+              <div className="robot-head">
+                <i />
+                <i />
               </div>
-
-              <div className="pt-6 mt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-500">Độ tuổi: {track.age}</span>
-                <span className="font-semibold text-blue-600 dark:text-blue-400 cursor-pointer flex items-center gap-1">
-                  Chi tiết <IconChevronRight size={14} />
-                </span>
+              <div className="robot-body">
+                <IconCpu size={33} />
               </div>
+              <span className="robot-feet" />
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Course Finder by Age */}
-      <section className="p-8 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Tìm khóa học phù hợp với độ tuổi của con</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Lộ trình cá nhân hóa theo từng giai đoạn phát triển tư duy của trẻ</p>
           </div>
-          <div className="flex gap-2">
-            {(['All', '7-9', '10-12', '13-16'] as const).map((age) => (
-              <button
-                key={age}
-                onClick={() => setSelectedAge(age)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  selectedAge === age
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-                }`}
-              >
-                {age === 'All' ? 'Tất cả lứa tuổi' : `${age} tuổi`}
-              </button>
-            ))}
+          <div className="hero-project-footer">
+            <span>
+              <IconCheckCircle size={16} />Ý tưởng đã sẵn sàng</span>
+            <span>Đến lượt con sáng tạo!</span>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <Badge variant="info">Lứa tuổi 7–9 tuổi</Badge>
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-2">Bé làm quen lập trình & Robotics</h4>
-            <p className="text-xs text-slate-500 mt-1">Kích thích tư duy logic trực quan qua các khối lệnh kéo thả, chế tạo mô hình cơ học đơn giản.</p>
-          </div>
-          <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <Badge variant="accent">Lứa tuổi 10–12 tuổi</Badge>
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-2">Lập trình Game & Thiết kế 3D</h4>
-            <p className="text-xs text-slate-500 mt-1">Chuyển đổi từ kéo thả sang viết mã lệnh Python, làm quen với không gian 3 chiều và vi điều khiển.</p>
-          </div>
-          <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <Badge variant="success">Lứa tuổi 13–16 tuổi</Badge>
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-2">Chuyên sâu Web, AI & Thi đấu Quốc tế</h4>
-            <p className="text-xs text-slate-500 mt-1">Xây dựng ứng dụng thực tế, sản phẩm hoàn chỉnh phục vụ hồ sơ du học và các giải đấu lập trình.</p>
-          </div>
+        <div className="hero-art-sticker">
+          <IconSparkles size={27} />
+          <span>Từ một câu hỏi nhỏ<br />
+            <strong>đến một ý tưởng lớn.</strong>
+          </span>
         </div>
-      </section>
-
-      {/* Student Project Spotlight */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Badge variant="accent">Góc Sáng Tạo TEKY</Badge>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
-              Dự án xuất sắc từ học sinh
-            </h2>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {studentProjects.map((item, idx) => (
-            <div key={idx} className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <Badge variant="neutral">{item.subject}</Badge>
-                  <span className="text-amber-500 text-xs">★★★★★</span>
-                </div>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">{item.title}</h3>
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-3">Tác giả: {item.author}</p>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-xs text-slate-600 dark:text-slate-300 italic">
-                  "{item.comment}"
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs text-slate-400">
-                <span>Trạng thái: Đã nghiệm thu</span>
-                <span className="text-blue-600 font-semibold cursor-pointer">Xem demo →</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+        <span className="hero-art-number">01 — EXPLORE & CREATE</span>
+      </div>
+    </section>
+    <div className="public-intro-strip">
+      <div className="public-container">
+        <span>Một hành trình, nhiều điều để khám phá</span>
+        <strong>
+          <IconCode size={22} />Lập trình</strong>
+        <strong>
+          <IconCpu size={22} />Robotics</strong>
+        <strong>
+          <IconSparkles size={22} />Thiết kế số</strong>
+        <strong>
+          <IconGraduationCap size={22} />Trí tuệ nhân tạo</strong>
+      </div>
     </div>
-  );
-};
-
+    <section className="public-container public-section" id="courses-section">
+      <div className="public-section-heading">
+        <div>
+          <span className="public-eyebrow">BẮT ĐẦU TỪ ĐIỀU CON THÍCH</span>
+          <h2>Mở một cánh cửa công nghệ</h2>
+          <p>Bốn lĩnh vực để con thử sức, khám phá và tìm thấy thế mạnh của mình.</p>
+        </div>
+        <Link className="public-text-link" to="/courses">Tất cả khóa học<IconArrowRight size={18} />
+        </Link>
+      </div>
+      <div className="public-track-grid">{courseCategories.map((category, index) => {
+        const Icon = categoryIcons[category.id]; return <Link key={category.id} to={`/courses?category=${category.id}`} className={`public-track track-${category.id}`}>
+          <div className="public-track-top">
+            <Icon size={31} strokeWidth={1.6} />
+            <span>0{index + 1}</span>
+          </div>
+          <h3>{category.name}</h3>
+          <p>{category.description}</p>
+          <span className="public-track-link">Khám phá lĩnh vực<IconArrowRight size={18} />
+          </span>
+        </Link>;
+      })}</div>
+    </section>
+    <section className="public-featured">
+      <div className="public-container public-section">
+        <div className="public-section-heading">
+          <div>
+            <span className="public-eyebrow">MỖI KHÓA HỌC, MỘT KHỞI ĐẦU MỚI</span>
+            <h2>Chọn hành trình đầu tiên</h2>
+            <p>Từ kéo thả khối lệnh đến lắp ráp robot. Bắt đầu với điều khiến con tò mò.</p>
+          </div>
+          <Link className="public-text-link" to="/courses">Xem danh mục<IconArrowRight size={18} />
+          </Link>
+        </div>
+        <div className="public-course-grid public-featured-grid">{[publicCourses[0], publicCourses[2], publicCourses[4]].map(course => <CourseCard key={course.id} course={course} />)}</div>
+        <p className="public-program-note">Chương trình giới thiệu. Nội dung và lịch học được xác nhận theo từng lớp.</p>
+      </div>
+    </section>
+    <section className="public-container public-section public-learning-method" id="how-it-works">
+      <div className="public-method-intro">
+        <span className="public-eyebrow">CÁCH CON HỌC TẠI TEKY</span>
+        <h2>Không chỉ học công nghệ.<br />Học cách tạo ra điều mới.</h2>
+        <p>Mỗi ý tưởng đều xứng đáng được thử. Con học qua việc đặt câu hỏi, thực hành và từng bước hoàn thiện sản phẩm của mình.</p>
+        <Link className="public-text-link" to="/courses">Tìm chương trình cho con<IconArrowRight size={18} />
+        </Link>
+      </div>
+      <ol className="public-method-steps">
+        <li>
+          <span>01</span>
+          <div>
+            <h3>Khám phá bằng sự tò mò</h3>
+            <p>Làm quen với một vấn đề, một công cụ hay một ý tưởng mới theo cách dễ hiểu.</p>
+          </div>
+        </li>
+        <li>
+          <span>02</span>
+          <div>
+            <h3>Tự tay làm, tự mình hiểu</h3>
+            <p>Thử nghiệm, sửa lỗi và tìm lời giải qua những dự án vừa sức.</p>
+          </div>
+        </li>
+        <li>
+          <span>03</span>
+          <div>
+            <h3>Chia sẻ điều con tạo ra</h3>
+            <p>Giới thiệu sản phẩm, lắng nghe góp ý và tự tin với sự tiến bộ của bản thân.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+    <section className="public-container public-section public-faq">
+      <div>
+        <span className="public-eyebrow">CÙNG PHỤ HUYNH TÌM HIỂU</span>
+        <h2>Một vài điều<br />ba mẹ muốn biết</h2>
+      </div>
+      <div>
+        <details>
+          <summary>Con chưa từng học lập trình có tham gia được không?</summary>
+          <p>Các chương trình ở mức Khởi đầu giúp con làm quen từ những thao tác cơ bản. Ba mẹ có thể lọc theo độ tuổi và xem nội dung trước khi lựa chọn.</p>
+        </details>
+        <details>
+          <summary>Làm sao để chọn chương trình phù hợp?</summary>
+          <p>Bắt đầu với độ tuổi, sở thích và kinh nghiệm của con. Trong danh mục, mỗi khóa học có thông tin độ tuổi, kỹ năng và sản phẩm đầu ra để ba mẹ tham khảo.</p>
+        </details>
+        <details>
+          <summary>Đã có tài khoản TEKY, con vào học ở đâu?</summary>
+          <p>Chọn Đăng nhập trên thanh điều hướng. Sau khi xác thực, tài khoản được đưa đến không gian học tập với các lớp và quyền truy cập đã được cấp.</p>
+        </details>
+      </div>
+    </section>
+    <section className="public-container public-start">
+      <div>
+        <span className="public-eyebrow">Ý TƯỞNG TIẾP THEO ĐANG CHỜ CON</span>
+        <h2>Hành trình lớn bắt đầu<br />từ một lần thử.</h2>
+      </div>
+      <Link className="public-button primary" to="/courses">Tìm khóa học phù hợp<IconArrowRight size={19} />
+      </Link>
+    </section>
+  </div>;
+}
