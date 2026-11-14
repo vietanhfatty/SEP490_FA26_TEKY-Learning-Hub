@@ -1,6 +1,6 @@
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useCallback } from 'react';
 import { HomePage } from './pages/home/HomePage';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -26,6 +26,7 @@ function RoleRedirect() {
 
 export function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const isAccountVisible = useAuth().isLoggedIn;
   const { isLoggedIn, role, accessToken, refreshToken, user, logout } = useAuth();
 
@@ -101,9 +102,8 @@ export function App() {
         />
 
         {/* Dashboard Học sinh - chỉ dành cho role student */}
-        <Route
-          path="/student"
-          element={
+        {['/student', '/dashboard/timetable/*'].map(path => (
+          <Route key={path} path={path} element={
             <RoleGuard
               allowedRoles={['student']}
               fallback={
@@ -122,12 +122,15 @@ export function App() {
                 onToggleTheme={() => {}}
                 onLogout={logout}
                 onRoleChange={(newRole) => navigateToShell(newRole)}
+                onSelectNav={() => {
+                  if (location.pathname.startsWith('/dashboard/timetable')) navigate('/student');
+                }}
               >
-                {(activeNavId) => <StudentDashboard activeNavId={activeNavId} />}
+                {(activeNavId) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'overview' : activeNavId} />}
               </LmsShell>
             </RoleGuard>
-          }
-        />
+          } />
+        ))}
 
         {/* Dashboard Phụ huynh - chỉ dành cho role parent */}
         <Route

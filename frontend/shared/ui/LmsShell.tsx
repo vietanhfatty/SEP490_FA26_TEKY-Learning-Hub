@@ -12,6 +12,7 @@ interface LmsShellProps {
   onToggleTheme: () => void;
   onLogout: () => Promise<void> | void;
   onRoleChange?: (role: UserRole) => void;
+  onSelectNav?: () => void;
   children: (activeNavId: string) => React.ReactNode;
 }
 
@@ -23,6 +24,7 @@ export const LmsShell: React.FC<LmsShellProps> = ({
   onToggleTheme,
   onLogout,
   onRoleChange,
+  onSelectNav,
   children,
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -33,6 +35,11 @@ export const LmsShell: React.FC<LmsShellProps> = ({
 
   const navItems = getNavItemsForRole(currentRole);
   const activeNavItem = navItems.find((item) => item.id === activeNavId) || navItems[0];
+
+  const handleSelectNav = (id: string) => {
+    setActiveNavId(id);
+    onSelectNav?.();
+  };
 
   const handleConfirmLogout = async () => {
     try {
@@ -58,7 +65,7 @@ export const LmsShell: React.FC<LmsShellProps> = ({
         <LmsSidebar
           currentRole={currentRole}
           activeNavId={activeNavId}
-          onSelectNav={setActiveNavId}
+          onSelectNav={handleSelectNav}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onLogoutClick={() => setIsLogoutModalOpen(true)}
@@ -82,7 +89,7 @@ export const LmsShell: React.FC<LmsShellProps> = ({
               currentRole={currentRole}
               activeNavId={activeNavId}
               onSelectNav={(id) => {
-                setActiveNavId(id);
+                handleSelectNav(id);
                 setIsMobileSidebarOpen(false);
               }}
               isCollapsed={false}

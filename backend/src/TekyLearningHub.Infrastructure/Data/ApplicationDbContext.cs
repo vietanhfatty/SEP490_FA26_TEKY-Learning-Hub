@@ -6,6 +6,7 @@ namespace TekyLearningHub.Infrastructure.Data;
 
 public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContext
 {
+    public DbSet<StudentProjectSubmission> StudentProjectSubmissions => Set<StudentProjectSubmission>();
     public DbSet<AccountEmail> AccountEmails => Set<AccountEmail>();
     private void ValidateAuditActors()
     {
@@ -27,6 +28,12 @@ public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContex
     }
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<StudentProjectSubmission>(entity =>
+        {
+            entity.ToTable("StudentProjectSubmissions");
+            entity.HasKey(submission => new { submission.AssignmentId, submission.StudentId });
+            entity.Property(submission => submission.FileName).HasMaxLength(180);
+        });
         modelBuilder.Entity<User>().Property(x => x.Bio).HasMaxLength(1000);
         modelBuilder.Entity<User>().Property(x => x.SecurityVersion).IsConcurrencyToken();
         modelBuilder.Entity<User>().Property(x => x.PasswordHash).IsConcurrencyToken();

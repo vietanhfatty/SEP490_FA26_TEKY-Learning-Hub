@@ -102,9 +102,9 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
   switch (role) {
     case 'student':
       return [
-        { id: 'overview', label: 'Tổng quan học tập', icon: IconHome },
-        { id: 'courses', label: 'Khóa học của tôi', icon: IconBookOpen, badge: '2 Đang học', badgeVariant: 'info' },
-        { id: 'live', label: 'Lớp học trực tuyến', icon: IconVideo, badge: 'Còn 45p', badgeVariant: 'accent' },
+        { id: 'overview', label: 'Lớp học của em', icon: IconHome },
+        { id: 'courses', label: 'Khóa học của tôi', icon: IconBookOpen },
+        { id: 'live', label: 'Lớp học trực tuyến', icon: IconVideo },
         { id: 'assignments', label: 'Dự án & Bài tập', icon: IconFileText, badge: '1 Cần nộp', badgeVariant: 'warning' },
         { id: 'achievements', label: 'Bảng vàng & Huy hiệu', icon: IconTrophy },
         { id: 'resources', label: 'Kho tài liệu STEAM', icon: IconSparkles },

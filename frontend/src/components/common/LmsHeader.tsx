@@ -106,15 +106,15 @@ export const LmsHeader: React.FC<LmsHeaderProps> = ({
 
         {/* Right: Actions, Live Status, Notifications & Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Live class indicator for Student / Teacher */}
-          {(currentRole === 'student' || currentRole === 'teacher') && (
+          {/* Live class indicator for Teacher */}
+          {(currentRole === 'teacher') && (
             <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200/80 dark:border-orange-800/40 text-xs">
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
               </span>
               <span className="font-bold text-orange-700 dark:text-orange-300 text-[11px]">
-                {currentRole === 'student' ? 'Lớp Scratch 3.0: 14:00' : 'Ca dạy Online: 14:00'}
+                Ca dạy Online: 14:00
               </span>
               <button
                 onClick={() => alert('Đang chuyển hướng vào phòng học trực tuyến TEKY...')}

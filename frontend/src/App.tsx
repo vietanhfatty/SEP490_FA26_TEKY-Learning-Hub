@@ -166,11 +166,18 @@ function AppRoutes() {
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onLogout={handleLogout}
         onRoleChange={handleRoleChange}
+        onSelectNav={() => {
+          if (location.pathname.startsWith('/dashboard/timetable')) navigate('/dashboard/student');
+        }}
       >
         {(activeNavId) => (
           <Routes>
             <Route path="/" element={<Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />} />
             <Route path="/dashboard/student" element={<StudentDashboard activeNavId={activeNavId} />} />
+            <Route path="/dashboard/timetable/*" element={currentRole === 'student'
+              ? <StudentDashboard activeNavId="overview" />
+              : <Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole]} replace />}
+            />
             <Route path="/dashboard/parent" element={<ParentDashboard activeNavId={activeNavId} />} />
             <Route path="/dashboard/teacher" element={<TeacherDashboard activeNavId={activeNavId} />} />
             <Route path="/dashboard/staff" element={<StaffDashboard activeNavId={activeNavId} />} />
