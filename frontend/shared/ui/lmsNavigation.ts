@@ -84,10 +84,10 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
   switch (role) {
     case 'student':
       return [
-        { id: 'overview', label: 'Home', icon: IconHome },
-        { id: 'courses', label: 'My Courses', icon: IconBookOpen },
+        { id: 'overview', label: 'Lớp học', icon: IconCalendar },
+        { id: 'courses', label: 'Khoá học', icon: IconBookOpen },
         { id: 'live', label: 'Today', icon: IconVideo },
-        { id: 'assignments', label: 'Assignments', icon: IconFileText },
+        { id: 'assignments', label: 'Ôn tập & Bài tập', icon: IconFileText },
         { id: 'achievements', label: 'Gamification', icon: IconTrophy },
       ];
     case 'teacher':

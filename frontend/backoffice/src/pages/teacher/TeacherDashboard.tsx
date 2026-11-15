@@ -1,3 +1,4 @@
+import { ProjectReviewsView } from '@teky/shared/ui/ProjectReviewsView';
 import React, { useState } from 'react';
 import { IconCalendar, IconCheckCircle, IconClock, IconBookOpen, IconDownload, IconPlus } from '../common/Icons';
 import { Badge } from '../common/Badge';
@@ -6,7 +7,7 @@ interface TeacherDashboardProps {
   activeNavId?: string;
 }
 
-export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId = 'overview' }) => {
+const LegacyTeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId = 'overview' }) => {
   const [selectedClass, setSelectedClass] = useState('SCRATCH-01');
   const [attendanceSaved, setAttendanceSaved] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -363,3 +364,5 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId 
     </div>
   );
 };
+
+export function TeacherDashboard(props:TeacherDashboardProps){return props.activeNavId==='grading'?<ProjectReviewsView/>:<LegacyTeacherDashboard {...props}/>;}

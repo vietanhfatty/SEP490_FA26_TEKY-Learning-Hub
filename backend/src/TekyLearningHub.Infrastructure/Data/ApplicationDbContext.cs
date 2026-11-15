@@ -9,6 +9,7 @@ public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContex
     public DbSet<UserRoleAssignment> UserRoles => Set<UserRoleAssignment>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<StudentProjectVersion> StudentProjectVersions => Set<StudentProjectVersion>();
     public DbSet<StudentProjectSubmission> StudentProjectSubmissions => Set<StudentProjectSubmission>();
     public DbSet<AccountEmail> AccountEmails => Set<AccountEmail>();
     public DbSet<AccountInvitation> AccountInvitations => Set<AccountInvitation>();
@@ -52,9 +53,18 @@ public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContex
             entity.HasOne(x => x.Role).WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Permission).WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Restrict);
         });
+        modelBuilder.Entity<StudentProjectVersion>(entity => {
+            entity.ToTable("StudentProjectVersions");
+            entity.HasKey(x => new { x.AssignmentId, x.StudentId, x.AttemptNo });
+            entity.Property(x => x.FileName).HasMaxLength(180);
+            entity.Property(x => x.ReviewStatus).HasMaxLength(20).IsUnicode(false);
+            entity.Property(x => x.Feedback).HasMaxLength(2000);
+        });
         modelBuilder.Entity<StudentProjectSubmission>(entity =>
         {
             entity.ToTable("StudentProjectSubmissions");
+            entity.Property(x => x.ReviewStatus).HasMaxLength(20).IsUnicode(false);
+            entity.Property(x => x.Feedback).HasMaxLength(2000);
             entity.HasKey(submission => new { submission.AssignmentId, submission.StudentId });
             entity.Property(submission => submission.FileName).HasMaxLength(180);
         });
