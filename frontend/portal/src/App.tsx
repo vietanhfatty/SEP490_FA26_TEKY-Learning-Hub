@@ -85,7 +85,29 @@ export function App() {
   const content = (
       <Routes>
         <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
-        <Route path="/account" element={<AccountPage />} />
+        <Route
+          path="/account"
+          element={
+            role ? (
+              <LmsShell
+                currentRole={role}
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((value) => !value)}
+                onLogout={logout}
+                onSelectNav={(navId) => {
+                  const target = resolveShellForRole(role);
+                  navigate(`${target.path}?tab=${navId}`);
+                }}
+              >
+                {() => <AccountPage />}
+              </LmsShell>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
         <Route path="/forgot-password" element={<RecoveryPage />} />
         <Route path="/" element={<HomePage isLoggedIn={isLoggedIn} onNavigate={handlePublicNavigate} />} />
         <Route path="/landing" element={<Navigate to="/" replace />} />
@@ -165,7 +187,6 @@ export function App() {
   );
   return <div className={isPublicRoute ? `public-site${isDarkMode ? ' public-dark' : ''}` : 'min-h-screen bg-slate-50 text-slate-900 font-sans'}>
     {isPublicRoute && <Navbar homePath="/" currentView={location.pathname} onNavigate={handlePublicNavigate} currentRole={role} userName={user?.fullName} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(previous => !previous)} isLoggedIn={isLoggedIn} onLogout={logout} />}
-    {!isPublicRoute && isLoggedIn && <a href="/account" className="fixed bottom-4 left-4 z-50 rounded-xl bg-blue-700 px-4 py-3 text-white shadow-md focus-visible:ring-2">Tài khoản</a>}
     {isPublicRoute ? <main id="public-content" className="public-main">{content}</main> : content}
     {isPublicRoute && <Footer homePath="/" />}
   </div>;

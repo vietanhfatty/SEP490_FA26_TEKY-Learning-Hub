@@ -119,6 +119,7 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
       return [
         { id: 'overview', label: 'Home', icon: IconHome },
         { id: 'users', label: 'Users', icon: IconUsers },
+        { id: 'directory', label: 'Phòng ban & chức danh', icon: IconLayers },
         { id: 'courses', label: 'Courses', icon: IconBookOpen },
         { id: 'groups', label: 'Groups', icon: IconUsers },
         { id: 'branches', label: 'Branches', icon: IconLayers },

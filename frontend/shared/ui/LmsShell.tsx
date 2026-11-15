@@ -8,6 +8,7 @@ import './lms.css';
 
 interface LmsShellProps {
   currentRole: UserRole;
+  activeNavId?: string;
   userName?: string;
   userEmail?: string;
   isDarkMode: boolean;
@@ -16,13 +17,12 @@ interface LmsShellProps {
   onSelectNav?: (id: string) => void;
   children: (activeNavId: string, onSelectNav: (id: string) => void) => React.ReactNode;
 }
-export const LmsShell: React.FC<LmsShellProps> = ({ currentRole, userName, userEmail, isDarkMode, onToggleTheme, onLogout, onSelectNav, children }) => {
+export const LmsShell: React.FC<LmsShellProps> = ({ currentRole, userName, userEmail, isDarkMode, onToggleTheme, onLogout, activeNavId: controlledNavId, onSelectNav, children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileViewport, setMobileViewport] = useState(() => window.matchMedia('(max-width: 760px)').matches);
-  const location = useLocation();
-  const [selectedNavId, setActiveNavId] = useState('overview');
-  const activeNavId = currentRole === 'student' && location.pathname.startsWith('/dashboard/courses') ? 'courses' : currentRole === 'student' && location.pathname.startsWith('/dashboard/timetable') ? 'overview' : selectedNavId;
+  const [localNavId, setActiveNavId] = useState('overview');
+  const activeNavId = controlledNavId ?? localNavId;
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const logoutDialog = useRef<HTMLDialogElement>(null);

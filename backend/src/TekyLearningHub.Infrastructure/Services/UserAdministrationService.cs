@@ -142,9 +142,22 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IPassword
         if(role==3)await db.Database.ExecuteSqlInterpolatedAsync($"IF NOT EXISTS(SELECT 1 FROM dbo.AdminProfiles WHERE UserId={id}) INSERT dbo.AdminProfiles(UserId,StaffCode) VALUES({id},{"AD-"+id});",ct);
         if(role==4)await db.Database.ExecuteSqlInterpolatedAsync($"IF NOT EXISTS(SELECT 1 FROM dbo.ParentProfiles WHERE UserId={id}) INSERT dbo.ParentProfiles(UserId) VALUES({id});",ct);
     }
+    private static bool IsPersonal(byte role) => role is 1 or 4;
+    private static bool IsStaff(byte role) => role is 2 or 3 or 5 or 6;
+    private static void ValidateAccountRoles(byte primary, IEnumerable<RoleGrantRequest> grants, int status)
+    {
+        var roles = grants.ToArray();
+        var valid = IsPersonal(primary)
+            ? roles.Length == 1 && roles[0].RoleId == primary && roles[0].ScopeType == "GLOBAL" && roles[0].DepartmentId == null
+            : IsStaff(primary) && roles.Length > 0 && roles.All(g => IsStaff(g.RoleId)) && roles.Any(g => g.RoleId == primary);
+        if (!valid) Fail(status, "Học viên và Phụ huynh phải dùng tài khoản riêng với một vai trò duy nhất. Tài khoản nhân sự chỉ được cấp vai trò nhân sự.");
+    }
+    private static RoleGrantRequest[] ActiveGrants(User user) => user.RoleAssignments
+        .Where(g => g.RevokedAt == null).Select(g => new RoleGrantRequest { RoleId=g.RoleId, ScopeType=g.ScopeType, DepartmentId=g.DepartmentId }).ToArray();
     private async Task AddGrant(int actor,User user,RoleGrantRequest g,CancellationToken ct)
     {
         await ValidateGrant(g,ct);
+        ValidateAccountRoles(IsStaff(user.PrimaryRoleId) ? g.RoleId : user.PrimaryRoleId, ActiveGrants(user).Append(g), 409);
         if(user.RoleAssignments.Any(x=>x.RoleId==g.RoleId&&x.ScopeType==g.ScopeType&&x.DepartmentId==g.DepartmentId&&x.RevokedAt==null))
             Fail(409,"Role trong phạm vi này đã được cấp.");
         user.RoleAssignments.Add(new UserRoleAssignment{RoleId=g.RoleId,ScopeType=g.ScopeType,DepartmentId=g.DepartmentId,AssignedBy=actor});
@@ -153,6 +166,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IPassword
     public Task<object> Create(int actor,CreateUserRequest r,CancellationToken ct=default) => Locked<object>(actor,async()=>
     {
         if(string.IsNullOrWhiteSpace(r.FullName)||r.Grants.Length==0||r.Grants.Length>20||!r.Grants.Any(x=>x.RoleId==r.PrimaryRoleId))Fail(400,"Tên, role hoặc role mặc định không hợp lệ.");
+        ValidateAccountRoles(r.PrimaryRoleId, r.Grants, 400);
         foreach(var g in r.Grants)await ValidateGrant(g,ct);
         var email=r.Email.Trim().ToLowerInvariant();
         if(await db.Users.AnyAsync(x=>x.Email.Trim().ToLower()==email,ct))Fail(409,"Email đã tồn tại.");
@@ -213,8 +227,11 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IPassword
             case "grant":
                 if(r.Grant==null)Fail(400,"Chưa chọn role.");await AddGrant(actor,user,r.Grant!,ct);break;
             case "primary":
+                if (IsPersonal(user.PrimaryRoleId) || !r.PrimaryRoleId.HasValue || !IsStaff(r.PrimaryRoleId.Value)) Fail(409,"Không thể thay đổi loại tài khoản bằng vai trò mặc định.");
                 if(!r.PrimaryRoleId.HasValue)Fail(400,"Chưa chọn role mặc định.");user.PrimaryRoleId=r.PrimaryRoleId!.Value;break;
             case "revoke":
+                if (IsPersonal(user.PrimaryRoleId)) Fail(409,"Không thể thu hồi vai trò duy nhất. Hãy khóa tài khoản để ngừng truy cập.");
+                if (r.PrimaryRoleId.HasValue && !IsStaff(r.PrimaryRoleId.Value)) Fail(409,"Không thể thay đổi loại tài khoản.");
                 var grant=user.RoleAssignments.SingleOrDefault(x=>x.UserRoleId==grantId&&x.RevokedAt==null);
                 if(grant==null)Fail(404,"Không tìm thấy quyền đang có hiệu lực.");
                 if(id==actor&&grant!.RoleId==3)Fail(409,"Không thể tự thu hồi System Admin.");
@@ -222,6 +239,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IPassword
             default: Fail(400,"Thao tác không hợp lệ.");break;
         }
         if(!user.RoleAssignments.Any(g=>g.RoleId==user.PrimaryRoleId&&g.RevokedAt==null))Fail(409,"Role mặc định phải có grant còn hiệu lực; hãy chọn role thay thế.");
+        if (operation != "status") ValidateAccountRoles(user.PrimaryRoleId, ActiveGrants(user), 409);
         user.AdministrationVersion++; user.UpdatedAt=DateTime.UtcNow;await Invalidate(user,ct);
         Audit(actor,id,"USER_"+operation.ToUpperInvariant(),before,new{user.Status,user.PrimaryRoleId,r.Grant,r.Reason,grantId});
         await db.SaveChangesAsync(ct);await PreserveAdmins(ct);return new{success=true,version=user.AdministrationVersion};
@@ -273,6 +291,7 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IPassword
         }
         else
         {
+            if (!IsStaff(user.PrimaryRoleId)) Fail(409,"Chỉ tài khoản nhân sự mới được bổ nhiệm phòng ban và chức danh.");
             if(r.EmploymentType is not ("FULL_TIME" or "PART_TIME" or "CONTRACTOR"))Fail(400,"Loại hình làm việc không hợp lệ.");
             if(!await db.Database.SqlQuery<int>($"SELECT DepartmentId AS Value FROM dbo.Departments WHERE DepartmentId={r.DepartmentId} AND IsActive=1").AnyAsync(ct)||
                !await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE PositionId={r.PositionId} AND IsActive=1").AnyAsync(ct))Fail(400,"Phòng ban hoặc chức danh không hợp lệ.");
@@ -284,14 +303,31 @@ public sealed class UserAdministrationService(ApplicationDbContext db, IPassword
     public Task<object> Directory(int actor,string kind,int? id,DirectoryRequest r,CancellationToken ct=default)=>Locked<object>(actor,async()=>
     {
         if(string.IsNullOrWhiteSpace(r.Name))Fail(400,"Tên không được để trống.");
+        if(kind is not ("departments" or "positions"))Fail(404,"Danh mục không tồn tại.");
+        var duplicateMessage=kind=="departments"
+            ? "Mã phòng ban đã tồn tại. Hãy dùng mã khác hoặc cập nhật phòng ban hiện có."
+            : "Mã chức danh đã tồn tại. Hãy dùng mã khác hoặc cập nhật chức danh hiện có.";
+        if(!id.HasValue)
+        {
+            // Include inactive entries: deactivation does not release a directory code.
+            var exists=kind=="departments"
+                ?await db.Database.SqlQuery<int>($"SELECT DepartmentId AS Value FROM dbo.Departments WHERE Code={r.Code}").AnyAsync(ct)
+                :await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE Code={r.Code}").AnyAsync(ct);
+            if(exists)Fail(409,duplicateMessage);
+        }
         int changed;
-        if(kind=="departments")changed=id.HasValue
-            ?await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Departments SET Name={r.Name.Trim()},IsActive={r.IsActive} WHERE DepartmentId={id.Value}",ct)
-            :await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Departments(Code,Name,IsActive) VALUES({r.Code},{r.Name.Trim()},{r.IsActive})",ct);
-        else if(kind=="positions")changed=id.HasValue
-            ?await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Positions SET Name={r.Name.Trim()},IsActive={r.IsActive} WHERE PositionId={id.Value}",ct)
-            :await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Positions(Code,Name,IsActive) VALUES({r.Code},{r.Name.Trim()},{r.IsActive})",ct);
-        else{Fail(404,"Danh mục không tồn tại.");return new{};}
+        try
+        {
+            if(kind=="departments")changed=id.HasValue
+                ?await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Departments SET Name={r.Name.Trim()},IsActive={r.IsActive} WHERE DepartmentId={id.Value}",ct)
+                :await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Departments(Code,Name,IsActive) VALUES({r.Code},{r.Name.Trim()},{r.IsActive})",ct);
+            else changed=id.HasValue
+                ?await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Positions SET Name={r.Name.Trim()},IsActive={r.IsActive} WHERE PositionId={id.Value}",ct)
+                :await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Positions(Code,Name,IsActive) VALUES({r.Code},{r.Name.Trim()},{r.IsActive})",ct);
+        }
+        // Raw SQL throws SqlException directly, unlike SaveChanges' DbUpdateException.
+        catch(SqlException ex) when(ex.Number is 2601 or 2627)
+        { throw new UserAdministrationException(409,duplicateMessage); }
         if(changed==0)Fail(404,"Không tìm thấy mục cần cập nhật.");
         db.AuditLogs.Add(new AuditLog{ActorUserId=actor,ActorType="User",Action="DIRECTORY_UPDATED",EntityType=kind,EntityId=id?.ToString(),NewValue=JsonSerializer.Serialize(r)});
         return new{success=true};
