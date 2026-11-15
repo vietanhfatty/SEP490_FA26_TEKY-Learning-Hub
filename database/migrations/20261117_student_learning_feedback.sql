@@ -3,6 +3,8 @@ ALTER TABLE dbo.StudentProjectSubmissions ADD
  AttemptNo int NOT NULL CONSTRAINT DF_Project_Attempt DEFAULT 1,
  ReviewStatus varchar(20) NOT NULL CONSTRAINT DF_Project_Review DEFAULT 'Pending',
  Feedback nvarchar(2000) NULL, ReviewedBy int NULL, ReviewedAt datetime2 NULL;
+GO
+-- Compile constraints in a new batch after the added columns exist.
 ALTER TABLE dbo.StudentProjectSubmissions ADD CONSTRAINT CK_Project_Review CHECK(ReviewStatus IN ('Pending','NeedsRevision','Passed')),
  CONSTRAINT FK_Project_Reviewer FOREIGN KEY(ReviewedBy) REFERENCES dbo.Users(UserId);
 CREATE TABLE dbo.StudentProjectVersions (
