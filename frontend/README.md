@@ -1,75 +1,27 @@
-# React + TypeScript + Vite
+﻿# TEKY frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Chạy từ thư mục gốc repository:
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```powershell
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Ba ứng dụng có cổng cố định. Vite sẽ báo lỗi nếu cổng đang bận, để tránh chuyển phiên sang nhầm ứng dụng.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- **5173 — Trang công khai:** trang chủ, danh sách khóa học, đăng nhập, khôi phục mật khẩu và nhận lời mời.
+- **3000 — Portal:** Học sinh (`/student`) và Phụ huynh (`/parent`).
+- **3001 — Backoffice:** Giáo viên (`/teacher`), Chuyên môn (`/staff`), Quản lý học thuật (`/academic-manager`) và Quản trị hệ thống (`/admin`). Trang Phòng ban & chức danh nằm ở `/admin/directory`.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Mở `http://localhost:5173` để bắt đầu. Sau khi đăng nhập, ứng dụng xác thực vai trò với API rồi tự chuyển đến Portal hoặc Backoffice. Cổng 5173 không hiển thị dashboard. Các URL cũ `/dashboard/*` tại cổng này chuyển tiếp sang ứng dụng theo vai trò; liên kết `/dashboard/admin/directory` được chuyển đến `/admin/directory` cho quản trị viên.
 
+Phiên đăng nhập được chuyển bằng mã dùng một lần và PKCE; access token và refresh token không xuất hiện trong URL. Lựa chọn **Ghi nhớ đăng nhập** được giữ khi đổi cổng. API của mỗi ứng dụng được proxy từ `/api` tới `http://localhost:5268`.
+
+Nếu dùng domain hoặc cổng khác, đặt cùng các giá trị `VITE_PUBLIC_ORIGIN`, `VITE_PORTAL_ORIGIN` và `VITE_BACKOFFICE_ORIGIN` trong môi trường chạy/build của cả ba ứng dụng. Khi dùng file `.env.local`, đặt file trong từng thư mục ứng dụng (`frontend/`, `frontend/portal/`, `frontend/backoffice/`). Backend cũng cần `Shells__PortalOrigin`, `Shells__BackofficeOrigin` và cấu hình CORS tương ứng.
+
+Kiểm tra từ thư mục gốc:
+
+```powershell
+pnpm --filter frontend --filter @teky/portal --filter @teky/backoffice build
+pnpm --filter frontend test:rbac
 ```

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { IconShieldCheck, IconSearch, IconPlus, IconUsers, IconBookOpen, IconClock, IconActivity, IconSettings, IconChevronRight, IconX, IconSparkles, IconLayers } from '../common/Icons';
 import { Badge } from '../common/Badge';
 import { AdminUsersView } from '@teky/shared/ui/AdminUsersView';
+import { AdminDirectoryView } from '@teky/shared/ui/AdminDirectoryView';
 import { AdminCoursesView } from '@teky/shared/ui/AdminCoursesView';
 
 interface AdminDashboardProps {
@@ -99,6 +100,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
       <dialog ref={widgetDialog} className="admin-dialog" aria-labelledby="widget-dialog-title"><div className="admin-dialog-title"><h2 id="widget-dialog-title">Add widgets</h2><button className="lms-icon-button" aria-label="Close" onClick={() => widgetDialog.current?.close()}><IconX size={20} /></button></div><p>Chọn nội dung bạn muốn hiển thị trên Home.</p><div className="admin-widget-options">{defaultWidgets.map((id) => <label key={id}><input type="checkbox" checked={widgets.includes(id)} onChange={(event) => setWidgets((current) => event.target.checked ? [...current, id] : current.filter((widget) => widget !== id))} />{widgetNames[id]}</label>)}</div><div className="admin-dialog-actions"><button className="admin-outline-button" onClick={() => setWidgets(defaultWidgets)}>Restore default</button><button className="admin-primary-button" onClick={() => widgetDialog.current?.close()}>Done</button></div></dialog>
     </div>
   );
+  if (activeTab === 'directory') return <AdminDirectoryView />;
   if (activeTab === 'users') return <AdminUsersView />;
   if (activeTab === 'courses') return <AdminCoursesView />;
   if (['groups','notifications','settings'].includes(activeTab)) return <div className="admin-home"><div className="admin-page-heading"><h1>{activeTab === 'groups' ? 'Groups' : activeTab === 'notifications' ? 'Notifications' : 'Account & Settings'}</h1></div><section className="admin-widget admin-no-stats">{activeTab === 'groups' ? <IconUsers size={42} /> : activeTab === 'notifications' ? <IconActivity size={42} /> : <IconSettings size={42} />}<h2>{activeTab === 'groups' ? 'No groups to show' : activeTab === 'notifications' ? 'No notifications to show' : 'TEKY Learning Hub'}</h2><p>{activeTab === 'settings' ? 'Không gian quản trị dành cho TEKY STEAM Academy.' : 'Dữ liệu sẽ xuất hiện khi dịch vụ quản trị được kết nối.'}</p><button className="admin-text-button" onClick={() => setActiveTab('overview')}>Back to Home</button></section></div>;

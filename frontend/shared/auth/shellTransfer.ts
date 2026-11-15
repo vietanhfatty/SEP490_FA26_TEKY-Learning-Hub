@@ -9,10 +9,10 @@ export interface SsoPayload {
   user?: unknown;
 }
 export function buildCrossAppUrl(origin: string, path: string, payload: SsoPayload): string {
-  void payload;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   if (normalizedPath.startsWith('//')) throw new Error('Invalid shell path');
-  const start = encodeURIComponent(JSON.stringify({ source: window.location.origin, path: normalizedPath }));
+  const rememberMe = localStorage.getItem('teky_access_token') === payload.accessToken;
+  const start = encodeURIComponent(JSON.stringify({ source: window.location.origin, path: normalizedPath, rememberMe }));
   return `${origin.replace(/\/$/, '')}/#shell-start=${start}`;
 }
 /** Legacy token-in-fragment sessions are intentionally rejected. */

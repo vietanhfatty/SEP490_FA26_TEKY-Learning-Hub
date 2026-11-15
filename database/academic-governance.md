@@ -13,7 +13,9 @@
 | 5 | AcademicStaff | academic_staff |
 | 6 | AcademicManager | academic_manager |
 
-Users.PrimaryRoleId chỉ là role mặc định để chọn giao diện; tài khoản phải có grant còn hiệu lực cho role đó để đăng nhập. UserRoles quản lý nhiều role và scope GLOBAL/DEPARTMENT. JWT phát đầy đủ role; mỗi request xác thực lại role và trạng thái tài khoản từ database. Permission và scope luôn được kiểm tra trực tiếp khi xử lý nghiệp vụ, không chỉ dựa vào role trên JWT.
+Users.PrimaryRoleId chọn giao diện mặc định và xác định nhóm tài khoản. Học viên (1) và Phụ huynh (4) dùng tài khoản riêng, email riêng, chỉ có một grant GLOBAL đúng role tương ứng. Nhân sự được có nhiều role trong nhóm Teacher/SystemAdmin/AcademicStaff/AcademicManager với scope GLOBAL/DEPARTMENT. Không chuyển nhóm bằng đổi role mặc định; chỉ nhân sự được bổ nhiệm chức danh/phòng ban. Tài khoản phải có grant còn hiệu lực cho role mặc định để đăng nhập. JWT phát đầy đủ role; mỗi request xác thực lại role và trạng thái tài khoản từ database. Permission và scope luôn được kiểm tra trực tiếp khi xử lý nghiệp vụ, không chỉ dựa vào role trên JWT.
+
+Script `database/tools/repair_account_roles.sql` mặc định chỉ xem trước và rollback. Sau khi xem danh sách, đặt `@Apply=1` để thu hồi role sai nhóm theo PrimaryRoleId, chuẩn hóa grant cá nhân, ghi audit và vô hiệu hóa phiên. Không xóa profile hoặc liên kết nghiệp vụ; các liên kết nhân sự bất thường được báo riêng để rà soát. Script không thay đổi dữ liệu đã hợp lệ khi chạy lại.
 
 StaffAppointments lưu chức danh và thành viên phòng theo thời gian. Không dùng position để tự động cấp quyền. Phân công EDITOR/COMMENTER đặt trong ContentAssignments; danh sách APPROVER nằm trong ApprovalParticipants của từng vòng.
 

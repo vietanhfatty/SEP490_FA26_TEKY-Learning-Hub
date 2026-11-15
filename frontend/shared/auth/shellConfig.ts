@@ -44,6 +44,9 @@ function readEnv(key: string): string | undefined {
   return env?.[key];
 }
 
+/** Public home and login app; may initiate a handoff but cannot receive one. */
+export const PUBLIC_ORIGIN = readEnv('VITE_PUBLIC_ORIGIN') ?? 'http://localhost:5173';
+
 /** Origin của Portal (Học sinh & Phụ huynh). */
 export const PORTAL_ORIGIN = readEnv('VITE_PORTAL_ORIGIN') ?? 'http://localhost:3000';
 
