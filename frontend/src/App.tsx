@@ -88,7 +88,8 @@ function AppRoutes() {
   // Reject unauthorized URLs before mounting any dashboard or its data requests.
   if (isDashboardRoute && (!isLoggedIn || !currentRole)) return <Navigate to="/login" replace />;
   const dashboardRole = (Object.keys(DASHBOARD_PATH_BY_ROLE) as UserRole[])
-    .find(candidate => DASHBOARD_PATH_BY_ROLE[candidate] === location.pathname);
+    .find(candidate => DASHBOARD_PATH_BY_ROLE[candidate] === location.pathname)
+    ?? ((location.pathname.startsWith('/dashboard/courses') || location.pathname.startsWith('/dashboard/timetable')) ? 'student' : undefined);
   if (isDashboardRoute && currentRole && (!dashboardRole || !currentUser?.roles.includes(dashboardRole))) {
     return <Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole]} replace />;
   }
@@ -101,11 +102,13 @@ function AppRoutes() {
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onLogout={handleLogout}
+        onSelectNav={(id) => { if (dashboardRole === 'student') navigate(id === 'courses' || id === 'assignments' ? '/dashboard/courses' : '/dashboard/student'); }}
       >
         {(activeNavId, onSelectNav) => (
           <Routes>
         <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
             <Route path="/" element={<Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />} />
+            {['/dashboard/courses','/dashboard/courses/:courseId','/dashboard/courses/:courseId/lessons/:lessonId','/dashboard/timetable','/dashboard/timetable/:sessionId'].map(path => <Route key={path} path={path} element={<StudentDashboard activeNavId={activeNavId} onSelectNav={onSelectNav} />} />)}
             <Route path="/dashboard/student" element={<StudentDashboard key={activeNavId} activeNavId={activeNavId} onSelectNav={onSelectNav} />} />
             <Route path="/dashboard/parent" element={<ParentDashboard activeNavId={activeNavId} />} />
             <Route path="/dashboard/teacher" element={<TeacherDashboard activeNavId={activeNavId} />} />

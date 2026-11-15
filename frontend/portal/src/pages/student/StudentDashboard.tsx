@@ -1,3 +1,6 @@
+import { useLocation, useNavigate } from 'react-router-dom';
+import { StudentCoursesView } from '@teky/shared/ui/StudentCoursesView';
+import { StudentClassesView } from '@teky/shared/ui/StudentClassesView';
 import React, { useEffect, useRef, useState } from 'react';
 import { IconArrowRight, IconBookOpen, IconCalendar, IconCheckCircle, IconClock, IconCode, IconGrid, IconMenu, IconSearch, IconTrophy, IconVideo, IconX } from '../common/Icons';
 import { Badge } from '../common/Badge';
@@ -91,7 +94,7 @@ interface StudentDashboardProps {
   onSelectNav?: (id: string) => void;
 }
 
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId = 'overview', onSelectNav }) => {
+const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId = 'overview', onSelectNav }) => {
   // Backend dynamic classes & timetable state
   const [data, setData] = useState<StudentClasses | null>(null);
   const [path, setPath] = useState(window.location.pathname);
@@ -436,3 +439,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
     </div>
   );
 };
+
+export function StudentDashboard(props: StudentDashboardProps) {
+ const location=useLocation();const navigate=useNavigate();
+ if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses'||props.activeNavId==='assignments')return <StudentCoursesView />;
+ if(location.pathname.startsWith('/dashboard/timetable')||!props.activeNavId||props.activeNavId==='overview'||props.activeNavId==='live')return <StudentClassesView sessionParam={location.pathname.match(/^\/dashboard\/timetable\/([^/]+)$/)?.[1]} onNavigate={navigate} />;
+ return <LegacyStudentDashboard {...props}/>;
+}

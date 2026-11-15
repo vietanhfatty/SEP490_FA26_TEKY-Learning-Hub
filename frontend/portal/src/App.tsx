@@ -104,7 +104,7 @@ export function App() {
         />
 
         {/* Dashboard Học sinh - chỉ dành cho role student */}
-        {['/student', '/dashboard/timetable/*'].map(path => (
+        {['/student', '/dashboard/timetable/*', '/dashboard/courses', '/dashboard/courses/:courseId', '/dashboard/courses/:courseId/lessons/:lessonId'].map(path => (
           <Route key={path} path={path} element={
             <RoleGuard
               allowedRoles={['student']}
@@ -123,9 +123,7 @@ export function App() {
                 isDarkMode={isDarkMode}
                 onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
-                onSelectNav={() => {
-                  if (location.pathname.startsWith('/dashboard/timetable')) navigate('/student');
-                }}
+                onSelectNav={(id) => navigate(id === 'courses' || id === 'assignments' ? '/dashboard/courses' : '/student')}
               >
                 {(activeNavId, onSelectNav) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'overview' : activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>

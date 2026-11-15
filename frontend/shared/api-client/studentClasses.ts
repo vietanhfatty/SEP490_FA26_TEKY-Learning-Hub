@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './auth';
 
 export interface StudentProject {
+  attemptNo: number; reviewStatus: string; feedback: string | null; reviewedAt: string | null;
   fileName: string;
   submittedAt: string;
 }
@@ -31,7 +32,7 @@ export interface StudentClasses {
   studentId: number; studentCode: string; fullName: string; classes: StudentClass[];
 }
 
-async function requestStudent(path: string, init: RequestInit = {}): Promise<Response> {
+export async function requestStudent(path: string, init: RequestInit = {}): Promise<Response> {
   const token = sessionStorage.getItem('teky_access_token') || localStorage.getItem('teky_access_token') || localStorage.getItem('teky_token') || sessionStorage.getItem('teky_token');
   const response = await fetch(`${API_BASE_URL}/student/${path}`, {
     ...init,

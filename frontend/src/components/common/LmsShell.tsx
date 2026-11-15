@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import type { UserRole } from '../../types';
 import { LmsSidebar } from './LmsSidebar';
@@ -12,19 +13,22 @@ interface LmsShellProps {
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onLogout: () => Promise<void> | void;
+  onSelectNav?: (id: string) => void;
   children: (activeNavId: string, onSelectNav: (id: string) => void) => React.ReactNode;
 }
-export const LmsShell: React.FC<LmsShellProps> = ({ currentRole, userName, userEmail, isDarkMode, onToggleTheme, onLogout, children }) => {
+export const LmsShell: React.FC<LmsShellProps> = ({ currentRole, userName, userEmail, isDarkMode, onToggleTheme, onLogout, onSelectNav, children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileViewport, setMobileViewport] = useState(() => window.matchMedia('(max-width: 760px)').matches);
-  const [activeNavId, setActiveNavId] = useState('overview');
+  const location = useLocation();
+  const [selectedNavId, setActiveNavId] = useState('overview');
+  const activeNavId = currentRole === 'student' && location.pathname.startsWith('/dashboard/courses') ? 'courses' : currentRole === 'student' && location.pathname.startsWith('/dashboard/timetable') ? 'overview' : selectedNavId;
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const logoutDialog = useRef<HTMLDialogElement>(null);
   const items = getNavItemsForRole(currentRole);
   const activeItem = items.find((item) => item.id === activeNavId) || items[0];
-  const select = (id: string) => { setActiveNavId(id); setMobileOpen(false); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  const select = (id: string) => { setActiveNavId(id); setMobileOpen(false); onSelectNav?.(id); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const toggle = () => { if (window.matchMedia('(max-width: 760px)').matches) setMobileOpen((open) => !open); else setCollapsed((value) => !value); };
   useEffect(() => {
     const media = window.matchMedia('(max-width: 760px)');

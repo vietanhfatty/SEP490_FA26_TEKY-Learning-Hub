@@ -10,13 +10,13 @@ const localDateTime = new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
 });
 
-function ProjectForm({ sessionId, assignment }: { sessionId: number; assignment: StudentAssignment }) {
+export function ProjectForm({ sessionId, assignment, onSubmitted }: { sessionId: number; assignment: StudentAssignment; onSubmitted?: () => void }) {
   const inputId = useId();
   const [file, setFile] = useState<File>();
   const [submission, setSubmission] = useState(assignment.submission);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const canSubmit = assignment.canSubmit && !submission;
+  const canSubmit = assignment.canSubmit && (!submission || submission.reviewStatus === 'NeedsRevision');
 
   function chooseFile(value?: File) {
     setError('');
@@ -38,6 +38,7 @@ function ProjectForm({ sessionId, assignment }: { sessionId: number; assignment:
     try {
       setSubmission(await submitStudentProject(sessionId, assignment.assignmentId, file));
       setFile(undefined);
+      onSubmitted?.();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Chưa nộp được sản phẩm.');
     } finally {
@@ -62,10 +63,12 @@ function ProjectForm({ sessionId, assignment }: { sessionId: number; assignment:
     <div className="sc-work-line">
       <h3>{assignment.title}</h3>
       <span role="status" className="sc-status" data-status={submission ? 'done' : canSubmit ? 'upcoming' : 'ended'}>
-        {submission ? 'Đã nộp' : canSubmit ? 'Chưa nộp' : 'Đã đóng nộp'}
+        {submission ? submission.reviewStatus === 'Passed' ? 'Đạt yêu cầu' : submission.reviewStatus === 'NeedsRevision' ? 'Cần luyện thêm' : 'Chờ phản hồi' : canSubmit ? 'Chưa nộp' : 'Đã đóng nộp'}
       </span>
     </div>
     {assignment.dueAt && <p className="sc-muted">Hạn nộp: {localDateTime.format(Date.parse(assignment.dueAt))}</p>}
+    {submission?.feedback && <blockquote className="sc-feedback"><strong>Phản hồi của giáo viên · Lần {submission.attemptNo}</strong><p>{submission.feedback}</p></blockquote>}
+    {submission?.reviewStatus === 'NeedsRevision' && <p>Ôn lại học liệu và sửa sản phẩm theo góp ý trước khi nộp lại.{!canSubmit && ' Bài tập đã đóng hoặc hết hạn; cần giáo viên mở lại hạn nộp.'}</p>}
     {submission && <>
       <p className="sc-meta"><IconFileText size={17} aria-hidden="true" /> {submission.fileName}</p>
       <p className="sc-muted">Đã nộp lúc {localDateTime.format(Date.parse(submission.submittedAt))}</p>
@@ -93,7 +96,7 @@ function ProjectForm({ sessionId, assignment }: { sessionId: number; assignment:
         <p id={inputId + '-formats'} className="sc-muted">Scratch, Python, STL, Roblox Studio, PDF, ảnh hoặc ZIP · Tối đa 10 MB</p>
         {file && <p className="sc-meta"><IconFileText size={17} aria-hidden="true" /> {file.name}</p>}
       </div>
-      <button type="submit" className="sc-button sc-primary" disabled={!file || busy}>{busy ? 'Đang nộp…' : 'Nộp sản phẩm'}</button>
+      <button type="submit" className="sc-button sc-primary" disabled={!file || busy}>{busy ? 'Đang nộp…' : submission ? 'Nộp lại sản phẩm' : 'Nộp sản phẩm'}</button>
     </form>}
     {error && <p className="sc-work-error" role="alert">{error}</p>}
   </article>;

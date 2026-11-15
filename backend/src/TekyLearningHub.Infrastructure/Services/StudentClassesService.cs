@@ -85,13 +85,17 @@ public class StudentClassesService(ApplicationDbContext db) : IStudentClassesSer
             {
                 assignment.AssignmentId, assignment.Title, assignment.Instructions, assignment.DueAt, assignment.Status,
                 FileName = submission == null ? null : submission.FileName,
-                SubmittedAt = submission == null ? (DateTime?)null : submission.SubmittedAt
+                SubmittedAt = submission == null ? (DateTime?)null : submission.SubmittedAt,
+                AttemptNo = submission == null ? 0 : submission.AttemptNo,
+                ReviewStatus = submission == null ? null : submission.ReviewStatus,
+                Feedback = submission == null ? null : submission.Feedback,
+                ReviewedAt = submission == null ? (DateTime?)null : submission.ReviewedAt
             }).ToListAsync(cancellationToken);
 
         return assignments.Select(a => new StudentAssignmentDto(a.AssignmentId, a.Title, a.Instructions,
             a.DueAt is { } dueAt ? Utc(dueAt) : null,
-            active && a.Status == "Published" && (a.DueAt is null || a.DueAt > now) && a.SubmittedAt is null,
-            a.SubmittedAt is { } submittedAt ? new StudentProjectDto(a.FileName!, Utc(submittedAt)) : null)).ToList();
+            active && a.Status == "Published" && (a.DueAt is null || a.DueAt > now) && (a.SubmittedAt is null || a.ReviewStatus == "NeedsRevision"),
+            a.SubmittedAt is { } submittedAt ? new StudentProjectDto(a.FileName!, Utc(submittedAt), a.AttemptNo, a.ReviewStatus!, a.Feedback, a.ReviewedAt is {} reviewed ? Utc(reviewed) : null) : null)).ToList();
     }
 
     public async Task<StudentProjectOutcome> SubmitProjectAsync(int userId, int sessionId, int assignmentId,
@@ -109,6 +113,24 @@ public class StudentClassesService(ApplicationDbContext db) : IStudentClassesSer
             if (assignment.Status != "Published" || assignment.DueAt <= now)
                 return new StudentProjectOutcome(StudentProjectResult.Closed);
 
+            var previous = await db.StudentProjectSubmissions.SingleOrDefaultAsync(
+                s => s.AssignmentId == assignmentId && s.StudentId == userId, cancellation);
+            if (previous != null && previous.ReviewStatus != "NeedsRevision")
+                return new StudentProjectOutcome(StudentProjectResult.AlreadySubmitted);
+            if (previous != null) {
+                db.StudentProjectVersions.Add(new StudentProjectVersion {
+                    AssignmentId = assignmentId, StudentId = userId, AttemptNo = previous.AttemptNo,
+                    FileName = previous.FileName, Content = previous.Content, SubmittedAt = previous.SubmittedAt,
+                    ReviewStatus = previous.ReviewStatus, Feedback = previous.Feedback,
+                    ReviewedBy = previous.ReviewedBy, ReviewedAt = previous.ReviewedAt
+                });
+                previous.AttemptNo++;
+                previous.FileName = fileName; previous.Content = content; previous.SubmittedAt = now;
+                previous.ReviewStatus = "Pending"; previous.Feedback = null; previous.ReviewedBy = null; previous.ReviewedAt = null;
+                await db.SaveChangesAsync(cancellation);
+                await transaction.CommitAsync(cancellation);
+                return new StudentProjectOutcome(StudentProjectResult.Submitted, new StudentProjectDto(fileName, Utc(now), previous.AttemptNo));
+            }
             var submission = new StudentProjectSubmission
             {
                 AssignmentId = assignmentId,

@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import type { UserRole } from '../types';
 import { LmsSidebar } from './LmsSidebar';
@@ -19,7 +20,9 @@ export const LmsShell: React.FC<LmsShellProps> = ({ currentRole, userName, userE
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileViewport, setMobileViewport] = useState(() => window.matchMedia('(max-width: 760px)').matches);
-  const [activeNavId, setActiveNavId] = useState('overview');
+  const location = useLocation();
+  const [selectedNavId, setActiveNavId] = useState('overview');
+  const activeNavId = currentRole === 'student' && location.pathname.startsWith('/dashboard/courses') ? 'courses' : currentRole === 'student' && location.pathname.startsWith('/dashboard/timetable') ? 'overview' : selectedNavId;
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const logoutDialog = useRef<HTMLDialogElement>(null);
