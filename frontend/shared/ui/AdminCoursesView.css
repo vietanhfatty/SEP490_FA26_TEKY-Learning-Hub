@@ -1,0 +1,41 @@
+/* Quản lý khóa học dành cho role admin (Backoffice + app gốc). */
+
+.admin-error { padding: 12px 16px; margin-bottom: 16px !important; background: #fff1f2; color: #9f1239; border: 1px solid #fecdd3; border-radius: 5px; }
+.admin-loading { color: var(--talent-muted); margin: 8px 0 16px; }
+.admin-muted { color: var(--talent-muted); font-size: 13px; }
+
+.ac-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0; }
+.ac-toolbar .admin-catalog-search { margin: 0; }
+.ac-filter select { min-height: 44px; padding: 10px 12px; border: 1px solid var(--talent-border); border-radius: 5px; background: var(--talent-surface); color: var(--talent-text); }
+
+.ac-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 1100px) { .ac-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .ac-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.ac-card { display: flex; flex-direction: column; }
+.ac-card .ac-card-cover { background: var(--talent-soft); color: var(--talent-blue); min-height: 110px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; }
+.ac-card h2 { padding: 16px 16px 4px; font-size: 16px; }
+.ac-card p { padding: 0 16px 12px; font-size: 12px; color: var(--talent-muted); }
+.ac-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 16px 12px; font-size: 12px; color: var(--talent-muted); }
+.ac-card-actions { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border-top: 1px solid var(--talent-border); padding: 10px 12px; }
+.ac-card-actions select { min-height: 36px; padding: 4px 8px; border: 1px solid var(--talent-border); border-radius: 5px; background: var(--talent-surface); color: var(--talent-text); font-size: 12px; }
+.ac-danger { color: #be123c; }
+.ac-danger:hover { background: #fff1f2; color: #9f1239; }
+
+.admin-dialog.ac-dialog-wide { width: min(760px, calc(100% - 32px)); }
+.admin-dialog textarea { min-height: 80px; border: 1px solid var(--talent-border); border-radius: 5px; background: var(--talent-canvas); padding: 10px 12px; color: var(--talent-text); width: 100%; font-family: inherit; }
+
+.ac-lesson-list { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 12px; }
+.ac-lesson-list > li { border: 1px solid var(--talent-border); border-radius: 5px; padding: 12px 14px; background: var(--talent-canvas); }
+.ac-lesson-list > li > div:first-child { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.ac-lesson-list small { color: var(--talent-muted); font-size: 12px; }
+.ac-lesson-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+.ac-material-list { list-style: none; margin: 10px 0 0; padding: 0 0 0 14px; display: grid; gap: 4px; border-left: 2px solid var(--talent-border); }
+.ac-material-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--talent-muted); }
+
+.ac-subheading { margin: 24px 0 8px; font-size: 14px; font-weight: 700; }
+.ac-material-editor { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
+.ac-material-editor li { display: grid; grid-template-columns: 140px 1fr 1.4fr auto; gap: 8px; align-items: center; }
+.ac-material-editor select, .ac-material-editor input { min-height: 44px; border: 1px solid var(--talent-border); border-radius: 5px; background: var(--talent-canvas); padding: 10px 12px; color: var(--talent-text); width: 100%; }
+@media (max-width: 720px) { .ac-material-editor li { grid-template-columns: minmax(0, 1fr); } }

@@ -22,6 +22,10 @@ public class DatabaseMigrationTests
         var catalog = SqlMigrationCatalog.Load();
         Assert.Equal(SqlMigrationCatalog.BaselineName, catalog[0].Name);
         Assert.Contains(catalog, x => x.Name == "20261113_account_security.sql");
+        Assert.Contains(catalog, x => x.Name == "20261114_course_lifecycle_status.sql");
+        Assert.Contains(catalog, x => x.Name == "20261114_student_project_submissions.sql");
+        Assert.Contains(catalog, x => x.Name == "20261115_academic_governance.sql");
+        Assert.Contains(catalog, x => x.Name == "20261116_account_administration.sql");
         Assert.Equal(44, SqlMigrationCatalog.BaselineTables(catalog[0].Script).Count);
         Assert.DoesNotContain("MERGE INTO", catalog[0].Script);
         Assert.DoesNotContain("CREATE DATABASE", catalog[0].Script);
@@ -40,10 +44,10 @@ public class DatabaseMigrationTests
         await using var db = new TestDatabase();
         await db.Migrate();
         var history = await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations");
-        Assert.Equal(2, history);
+        Assert.Equal(SqlMigrationCatalog.Load().Count, history);
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM sys.views WHERE name='vw_ClassGradebook'"));
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM sys.triggers WHERE name='trg_AuditLogs_NoChange'"));
-        await db.Execute("INSERT dbo.Roles VALUES(1,'Student'); INSERT dbo.Users(Email,PasswordHash,RoleId,FullName) VALUES('keep@example.com','original-hash',1,N'Giữ nguyên');");
+        await db.Execute("INSERT dbo.Users(Email,PasswordHash,PrimaryRoleId,FullName) VALUES('keep@example.com','original-hash',1,N'Giữ nguyên');");
         await db.Migrate();
         Assert.Equal(history, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.Users WHERE Email='keep@example.com' AND PasswordHash='original-hash' AND FullName=N'Giữ nguyên'"));
@@ -58,7 +62,7 @@ public class DatabaseMigrationTests
         await db.Execute("INSERT dbo.Roles VALUES(1,'Student'); INSERT dbo.Users(Email,PasswordHash,RoleId,FullName,Status,FailedLoginCount) VALUES('keep@example.com','keep-hash',1,N'Tên cũ','Locked',4); INSERT dbo.UserSessions(UserId,TokenHash) SELECT UserId,'keep-session' FROM dbo.Users; INSERT dbo.PasswordResetOtps(UserId,OtpHash,ExpiresAt) SELECT UserId,'keep-otp',DATEADD(minute,5,SYSUTCDATETIME()) FROM dbo.Users; INSERT dbo.AuditLogs(ActorType,Action) VALUES('System','KEEP');");
         await db.Migrate();
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations WHERE AppliedAs='Baselined'"));
-        Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.Users WHERE Email='keep@example.com' AND PasswordHash='keep-hash' AND FullName=N'Tên cũ' AND Status='Locked' AND FailedLoginCount=4 AND SecurityVersion=0 AND LockoutEndAt IS NULL AND Bio IS NULL"));
+        Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.Users WHERE Email='keep@example.com' AND PasswordHash='keep-hash' AND FullName=N'Tên cũ' AND Status='Locked' AND FailedLoginCount=4 AND SecurityVersion=1 AND LockoutEndAt IS NULL AND Bio IS NULL"));
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.UserSessions WHERE TokenHash='keep-session'"));
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.PasswordResetOtps WHERE OtpHash='keep-otp'"));
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.AuditLogs WHERE Action='KEEP'"));
@@ -68,12 +72,12 @@ public class DatabaseMigrationTests
     public async Task ManuallyAppliedAccountScriptCanBeAdopted()
     {
         await using var db = new TestDatabase(); await db.Create();
-        foreach (var script in SqlMigrationCatalog.Load())
+        foreach (var script in SqlMigrationCatalog.Load().Where(x => x.Name == SqlMigrationCatalog.BaselineName || x.Name == "20261113_account_security.sql"))
             foreach (var batch in SqlMigrationCatalog.Batches(script.Script)) await db.Execute(batch);
         await db.Execute("INSERT dbo.Roles VALUES(1,'Student'); INSERT dbo.Users(Email,PasswordHash,RoleId,FullName,Bio,SecurityVersion) VALUES('keep@example.com','hash',1,'Existing','Keep bio',7);");
         await db.Migrate();
-        Assert.Equal(2, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
-        Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.Users WHERE Bio='Keep bio' AND SecurityVersion=7"));
+        Assert.Equal(SqlMigrationCatalog.Load().Count, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
+        Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.Users WHERE Bio='Keep bio' AND SecurityVersion=8"));
     }
 
     [SqlServerFact]
@@ -81,7 +85,7 @@ public class DatabaseMigrationTests
     {
         await using var db = new TestDatabase();
         await Task.WhenAll(db.Migrate(), db.Migrate());
-        Assert.Equal(2, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
+        Assert.Equal(SqlMigrationCatalog.Load().Count, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
     }
 
     [SqlServerFact]
@@ -92,7 +96,7 @@ public class DatabaseMigrationTests
             "CREATE TABLE dbo.RollbackProbe(Id int); THROW 51000, 'Expected migration test failure', 1;")).ToList();
         await Assert.ThrowsAsync<SqlException>(() => DevelopmentDatabaseMigrator.ApplyAsync(db.ConnectionString, scripts, NullLogger.Instance));
         Assert.Equal(0, await db.Scalar("SELECT COUNT(*) FROM sys.tables WHERE name='RollbackProbe'"));
-        Assert.Equal(2, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
+        Assert.Equal(SqlMigrationCatalog.Load().Count, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
     }
 
     [SqlServerFact]
@@ -101,7 +105,7 @@ public class DatabaseMigrationTests
         await using var db = new TestDatabase(); await db.Migrate();
         var scripts = SqlMigrationCatalog.Load().Select(x => x.Name==SqlMigrationCatalog.BaselineName ? x with { Script=x.Script+"\n-- changed" } : x).ToList();
         await Assert.ThrowsAsync<InvalidOperationException>(() => DevelopmentDatabaseMigrator.ApplyAsync(db.ConnectionString, scripts, NullLogger.Instance));
-        Assert.Equal(2, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
+        Assert.Equal(SqlMigrationCatalog.Load().Count, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
         await using var partial = new TestDatabase(); await partial.Create();
         await partial.Execute("CREATE TABLE dbo.Users(Id int); INSERT dbo.Users VALUES(123);");
         await Assert.ThrowsAsync<InvalidOperationException>(() => partial.Migrate());
@@ -120,10 +124,10 @@ public class DatabaseMigrationTests
         var service = new TekyLearningHub.Infrastructure.Services.AuthService(db,
             new TekyLearningHub.Infrastructure.Security.PasswordHasher(),
             new TekyLearningHub.Infrastructure.Security.JwtTokenGenerator(config));
-        string[] roles = ["Student", "Teacher", "Admin", "Parent", "Staff", "AcademicManager"];
+        string[] roles = ["Student", "Teacher", "SystemAdmin", "Parent", "AcademicStaff", "AcademicManager"];
         for (byte id=1; id<=6; id++) {
-            var role = new TekyLearningHub.Domain.Entities.Role {RoleId=id,RoleName=roles[id-1]};
-            var user = new TekyLearningHub.Domain.Entities.User {Email=$"role{id}@example.com",FullName="Test",PasswordHash="hash",RoleId=id,Role=role,Status="Active",ThemeMode="Light"};
+            var role = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleAsync(db.Roles, r => r.RoleId == id);
+            var user = new TekyLearningHub.Domain.Entities.User {Email=$"role{id}@example.com",FullName="Test",PasswordHash="hash",PrimaryRoleId=id,PrimaryRole=role,RoleAssignments=[new(){RoleId=id}],Status="Active",ThemeMode="Light"};
             db.Users.Add(user); await db.SaveChangesAsync();
             Assert.True((await service.LogoutAsync(null,user.UserId,"127.0.0.1",true)).Success);
         }
@@ -133,7 +137,7 @@ public class DatabaseMigrationTests
         Assert.Equal(1, await database.Scalar("SELECT COUNT(*) FROM dbo.AuditLogs WHERE ActorType='System'"));
     }
 
-    private sealed class TestDatabase : IAsyncDisposable
+    internal sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string name = "Teky_MigrationTests_" + Guid.NewGuid().ToString("N");
         private readonly SqlConnectionStringBuilder settings = new(Environment.GetEnvironmentVariable("TEKY_MIGRATION_TEST_CONNECTION")!);

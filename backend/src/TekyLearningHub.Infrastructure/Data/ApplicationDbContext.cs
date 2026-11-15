@@ -6,8 +6,12 @@ namespace TekyLearningHub.Infrastructure.Data;
 
 public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContext
 {
+    public DbSet<UserRoleAssignment> UserRoles => Set<UserRoleAssignment>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<StudentProjectSubmission> StudentProjectSubmissions => Set<StudentProjectSubmission>();
     public DbSet<AccountEmail> AccountEmails => Set<AccountEmail>();
+    public DbSet<AccountInvitation> AccountInvitations => Set<AccountInvitation>();
     private void ValidateAuditActors()
     {
         foreach (var entry in ChangeTracker.Entries<AuditLog>()
@@ -28,6 +32,26 @@ public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContex
     }
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<UserRoleAssignment>(entity =>
+        {
+            entity.ToTable("UserRoles");
+            entity.HasKey(x => x.UserRoleId);
+            entity.Property(x => x.ScopeType).HasMaxLength(20).IsUnicode(false);
+            entity.HasOne(x => x.User).WithMany(x => x.RoleAssignments).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Role).WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.HasKey(x => x.PermissionId);
+            entity.Property(x => x.Code).HasMaxLength(80).IsUnicode(false);
+            entity.Property(x => x.Description).HasMaxLength(250);
+        });
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.HasKey(x => new { x.RoleId, x.PermissionId });
+            entity.HasOne(x => x.Role).WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Permission).WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<StudentProjectSubmission>(entity =>
         {
             entity.ToTable("StudentProjectSubmissions");
@@ -36,12 +60,19 @@ public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContex
         });
         modelBuilder.Entity<User>().Property(x => x.Bio).HasMaxLength(1000);
         modelBuilder.Entity<User>().Property(x => x.SecurityVersion).IsConcurrencyToken();
+        modelBuilder.Entity<User>().Property(x => x.AdministrationVersion).IsConcurrencyToken();
         modelBuilder.Entity<User>().Property(x => x.PasswordHash).IsConcurrencyToken();
         modelBuilder.Entity<User>().Property(x => x.Phone).IsConcurrencyToken();
         modelBuilder.Entity<User>().Property(x => x.FailedLoginCount).IsConcurrencyToken();
         modelBuilder.Entity<PasswordResetOtp>().Property(x => x.UsedAt).IsConcurrencyToken();
         modelBuilder.Entity<PasswordResetOtp>().Property(x => x.Attempts).IsConcurrencyToken();
         modelBuilder.Entity<AccountEmail>().HasKey(x => x.Id);
+        modelBuilder.Entity<AccountInvitation>(entity =>
+        {
+            entity.ToTable("AccountInvitations"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.TokenHash).HasMaxLength(255).IsRequired();
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)

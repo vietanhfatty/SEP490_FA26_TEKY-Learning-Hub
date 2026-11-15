@@ -19,15 +19,16 @@ public class AccountSecurityTests {
  [Theory]
  [InlineData(1,"Student","student")]
  [InlineData(2,"Teacher","teacher")]
- [InlineData(3,"Admin","admin")]
+ [InlineData(3,"SystemAdmin","system_admin")]
  [InlineData(4,"Parent","parent")]
- [InlineData(5,"Staff","staff")]
+ [InlineData(5,"AcademicStaff","academic_staff")]
  [InlineData(6,"AcademicManager","academic_manager")]
  public async Task LoginReturnsExpectedRoleForEachRealRole(byte id, string roleName, string expected) {
   using var db=CreateDb();
   var user=db.Users.Single();
-  if(id==1) user.Role.RoleName=roleName;
-  else {user.RoleId=id;user.Role=new Role {RoleId=id,RoleName=roleName};}
+  if(id==1) user.PrimaryRole.RoleName=roleName;
+  else {user.PrimaryRoleId=id;user.PrimaryRole=new Role {RoleId=id,RoleName=roleName};}
+  user.RoleAssignments.Single().RoleId=id;user.RoleAssignments.Single().Role=user.PrimaryRole;
   await db.SaveChangesAsync();
   var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Jwt:Secret",new string('x',64)}}).Build();
   var result=await new AuthService(db,hasher,new JwtTokenGenerator(config),protection).LoginAsync(new LoginRequestDto{EmailOrUsername=user.Email,Password="OriginalPassword123"},null,null);
@@ -37,7 +38,7 @@ public class AccountSecurityTests {
  }
  ApplicationDbContext CreateDb() {
   var db=new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
-  db.Users.Add(new User {UserId=1,Email="user@example.com",FullName="Student",Status="Active",ThemeMode="Light",PasswordHash=hasher.HashPassword("OriginalPassword123"),RoleId=1,Role=new Role{RoleId=1,RoleName="Student"}});
+  db.Users.Add(new User {UserId=1,Email="user@example.com",FullName="Student",Status="Active",ThemeMode="Light",PasswordHash=hasher.HashPassword("OriginalPassword123"),PrimaryRoleId=1,PrimaryRole=new Role{RoleId=1,RoleName="Student"},RoleAssignments=[new(){RoleId=1}]});
   db.SaveChanges();return db;
  }
  AccountController Controller(ApplicationDbContext db) => new(db,hasher,protection) {ControllerContext=new ControllerContext {HttpContext=new DefaultHttpContext {User=new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier,"1")],"test"))}}};

@@ -57,7 +57,7 @@ builder.Services.AddAuthentication(options =>
         var version=context.Principal?.FindFirst("security_version")?.Value;
         var db=context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
         if(!int.TryParse(id,out var userId) || !int.TryParse(version,out var tokenVersion)) {context.Fail("Invalid session");return;}
-        var user=await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(db.Users, x=>x.UserId==userId);
+        var user=await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.Include(db.Users, x=>x.RoleAssignments), x=>x.UserId==userId);
         if (!TekyLearningHub.Infrastructure.Security.SessionAuthorization.MatchesCurrentUser(context.Principal, user)) context.Fail("Session revoked or role changed");
     }};
     options.TokenValidationParameters = new TokenValidationParameters
@@ -95,6 +95,7 @@ using (var scope = app.Services.CreateScope())
         var connectionString = app.Configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
         await DevelopmentDatabaseMigrator.ApplyAsync(connectionString, app.Logger);
+        if (app.Configuration.GetValue<bool>("migrate-only")) return;
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         await DbInitializer.SeedAsync(context, passwordHasher);

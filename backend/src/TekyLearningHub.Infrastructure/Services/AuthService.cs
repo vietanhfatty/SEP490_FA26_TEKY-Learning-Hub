@@ -42,14 +42,15 @@ public class AuthService : IAuthService
 
         // Search user by email or by username prefix/phone
         var user = await _context.Users
-            .Include(u => u.Role)
+            .Include(u => u.PrimaryRole)
+            .Include(u => u.RoleAssignments)
             .FirstOrDefaultAsync(u =>
                 (isEmail && u.Email.ToLower() == identifier.ToLower()) ||
                 (!isEmail && (u.Email.ToLower().StartsWith(identifier.ToLower() + "@") ||
                               u.Email.ToLower() == identifier.ToLower() ||
                               u.Phone == identifier)));
 
-        if (user == null)
+        if (user == null || !UserAuthorization.HasValidPrimaryRole(user))
         {
             return ApiResponse<AuthResponseDto>.FailureResult("Tài khoản hoặc mật khẩu không chính xác.");
         }
@@ -128,7 +129,8 @@ public class AuthService : IAuthService
         var tokenHash = HashToken(refreshToken);
         var session = await _context.UserSessions
             .Include(s => s.User)
-            .ThenInclude(u => u.Role)
+            .ThenInclude(u => u.PrimaryRole)
+            .Include(s => s.User.RoleAssignments)
             .FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.IsActive);
 
         if (session == null)
@@ -137,7 +139,7 @@ public class AuthService : IAuthService
         }
 
         var user = session.User;
-        if (user == null || !user.Status.Equals("Active", StringComparison.OrdinalIgnoreCase))
+        if (user == null || !UserAuthorization.HasValidPrimaryRole(user) || !user.Status.Equals("Active", StringComparison.OrdinalIgnoreCase))
         {
             return ApiResponse<AuthResponseDto>.FailureResult("Tài khoản không hoạt động hoặc không tồn tại.");
         }
@@ -205,7 +207,8 @@ public class AuthService : IAuthService
             var tokenHash = HashToken(refreshToken);
             var session = await _context.UserSessions
                 .Include(s => s.User)
-                .ThenInclude(u => u.Role)
+                .ThenInclude(u => u.PrimaryRole)
+            .Include(s => s.User.RoleAssignments)
                 .FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.IsActive);
 
             if (session != null)
@@ -213,7 +216,7 @@ public class AuthService : IAuthService
                 session.IsActive = false;
                 session.LogoutAt = DateTime.UtcNow;
                 effectiveUserId ??= session.UserId;
-                roleName ??= session.User?.Role?.RoleName;
+                roleName ??= session.User?.PrimaryRole?.RoleName;
             }
         }
 
@@ -237,9 +240,10 @@ public class AuthService : IAuthService
             if (string.IsNullOrEmpty(roleName))
             {
                 var user = await _context.Users
-                    .Include(u => u.Role)
+                    .Include(u => u.PrimaryRole)
+            .Include(u => u.RoleAssignments)
                     .FirstOrDefaultAsync(u => u.UserId == effectiveUserId.Value);
-                roleName = user?.Role?.RoleName;
+                roleName = user?.PrimaryRole?.RoleName;
             }
 
             var auditLog = new AuditLog
@@ -263,10 +267,11 @@ public class AuthService : IAuthService
     public async Task<ApiResponse<UserDto>> GetCurrentUserAsync(int userId)
     {
         var user = await _context.Users
-            .Include(u => u.Role)
+            .Include(u => u.PrimaryRole)
+            .Include(u => u.RoleAssignments)
             .FirstOrDefaultAsync(u => u.UserId == userId);
 
-        if (user == null)
+        if (user == null || !UserAuthorization.HasValidPrimaryRole(user))
         {
             return ApiResponse<UserDto>.FailureResult("Không tìm thấy thông tin người dùng.");
         }
@@ -276,7 +281,7 @@ public class AuthService : IAuthService
 
     private static UserDto MapToUserDto(User user)
     {
-        var roleName = RoleNameNormalizer.Normalize(user.Role?.RoleName) ?? RoleNameNormalizer.FromRoleId(user.RoleId);
+        var roleName = RoleNameNormalizer.Normalize(user.PrimaryRole?.RoleName) ?? RoleNameNormalizer.FromRoleId(user.PrimaryRoleId);
 
         return new UserDto
         {
@@ -284,7 +289,8 @@ public class AuthService : IAuthService
             Email = user.Email,
             FullName = user.FullName,
             Role = roleName,
-            RoleId = user.RoleId,
+            RoleId = user.PrimaryRoleId,
+            Roles = UserAuthorization.Roles(user),
             AvatarUrl = user.AvatarUrl,
             Phone = user.Phone,
             Bio = user.Bio,

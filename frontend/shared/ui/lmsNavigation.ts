@@ -57,7 +57,7 @@ export const ROLE_DISPLAY_CONFIG: Record<
     avatarEmoji: '👨‍🏫',
     campus: 'Khoa Lập trình & Robotics',
   },
-  staff: {
+  academic_staff: {
     label: 'Giáo vụ',
     badge: 'info',
     defaultName: 'Nguyễn Thu Nga',
@@ -71,7 +71,7 @@ export const ROLE_DISPLAY_CONFIG: Record<
     avatarEmoji: '👩‍💻',
     campus: 'Hội đồng chuyên môn CSTA',
   },
-  admin: {
+  system_admin: {
     label: 'Quản trị hệ thống',
     badge: 'neutral',
     defaultName: 'Admin Kỹ Thuật',
@@ -115,7 +115,7 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
         { id: 'teachers', label: 'Điều phối Giảng viên', icon: IconUsers },
         { id: 'surveys', label: 'Khảo sát chất lượng', icon: IconSparkles },
       ];
-    case 'admin':
+    case 'system_admin':
       return [
         { id: 'overview', label: 'Home', icon: IconHome },
         { id: 'users', label: 'Users', icon: IconUsers },
@@ -126,7 +126,7 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
         { id: 'audit', label: 'Reports', icon: IconActivity },
         { id: 'settings', label: 'Account & Settings', icon: IconSettings },
       ];
-    case 'staff':
+    case 'academic_staff':
       return [
         { id: 'overview', label: 'Home', icon: IconHome },
         { id: 'users', label: 'Users', icon: IconUsers },

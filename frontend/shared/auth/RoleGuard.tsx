@@ -27,7 +27,8 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
 }) => {
   const { role, isLoggedIn, isInitializing, accessToken, refreshToken, user } = useAuth();
   const target = resolveShellForRole(role);
-  const shouldTransfer = isLoggedIn && !!role && !allowedRoles.includes(role) && detectCurrentShell() !== target.app;
+  const hasAllowedRole = allowedRoles.some(allowed => user?.roles.includes(allowed));
+  const shouldTransfer = isLoggedIn && !!role && !hasAllowedRole && detectCurrentShell() !== target.app;
   useEffect(() => {
     if (!shouldTransfer || !accessToken) return;
     window.location.assign(buildCrossAppUrl(shellOrigin(target.app), target.path, {
@@ -41,7 +42,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  if (!allowedRoles.includes(role)) {
+  if (!hasAllowedRole) {
     if (shouldTransfer) return <div role="status">Đang chuyển đến giao diện của bạn…</div>;
 
     return <>{fallback}</>;

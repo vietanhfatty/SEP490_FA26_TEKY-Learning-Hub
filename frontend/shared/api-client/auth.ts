@@ -8,6 +8,7 @@ export interface AuthUserData {
   fullName: string;
   role: string;
   roleId: number;
+  roles: string[];
   avatarUrl?: string;
   phone?: string;
   status: string;
@@ -67,7 +68,12 @@ export async function verifySession(accessToken: string, refreshToken: string | 
   if (!response.ok) throw new Error('Không thể xác thực phiên đăng nhập. Vui lòng đăng nhập lại.');
   const result = await response.json();
   const user = result?.data as AuthUserData | undefined;
+  const tokenRoles = claims.roles?.map(normalizeRole).sort();
+  const serverRoles = Array.isArray(user?.roles) ? user.roles.map(normalizeRole).sort() : [];
   if (!result?.success || !user || user.status !== 'Active' || String(user.userId) !== claims.userId ||
+      !tokenRoles?.length || tokenRoles.includes(null) || serverRoles.includes(null) ||
+      new Set(tokenRoles).size !== tokenRoles.length || new Set(serverRoles).size !== serverRoles.length ||
+      JSON.stringify(tokenRoles) !== JSON.stringify(serverRoles) || !serverRoles.includes(role) ||
       roleFromClaims({ roleId: user.roleId }) !== role || normalizeRole(user.role) !== role || isTokenExpired(accessToken)) {
     throw new Error('Quyền tài khoản đã thay đổi hoặc không hợp lệ. Vui lòng đăng nhập lại.');
   }

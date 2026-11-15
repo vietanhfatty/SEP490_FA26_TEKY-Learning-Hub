@@ -34,13 +34,26 @@ globalThis.sessionStorage = storage();
 afterEach(() => { mock.restoreAll(); localStorage.clear(); sessionStorage.clear(); });
 const token = (claims = {}) => ['header', Buffer.from(JSON.stringify({ nameid: '42', role_id: 1, role: 'student',
   exp: Math.floor(Date.now() / 1000) + 3600, ...claims })).toString('base64url'), 'signature'].join('.');
-const user = (roleId = 1, role = 'student') => ({ userId: 42, roleId, role, status: 'Active', fullName: 'Student' });
+const user = (roleId = 1, role = 'student') => ({ userId: 42, roleId, role, roles: [role], status: 'Active', fullName: 'Student' });
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
-for (const [roleId, role] of [[1, 'student'], [2, 'teacher'], [3, 'admin'], [4, 'parent'], [5, 'staff'], [6, 'academic_manager']]) {
+test('verifies all role memberships while retaining the primary dashboard role', async () => {
+  const accessToken = token({ role_id: 2, role_name: 'teacher', role: ['teacher', 'academic_staff'] });
+  mock.method(globalThis, 'fetch', async () => reply({ success: true, data: { ...user(2, 'teacher'), roles: ['academic_staff', 'teacher'] } }));
+  const verified = await verifySession(accessToken, null);
+  assert.equal(verified.role, 'teacher');
+  assert.deepEqual(verified.user.roles, ['academic_staff', 'teacher']);
+});
+
+test('rejects stale secondary role grants even if the primary role still matches', async () => {
+  mock.method(globalThis, 'fetch', async () => reply({ success: true, data: user(2, 'teacher') }));
+  await assert.rejects(verifySession(token({ role_id: 2, role: ['teacher', 'academic_staff'] }), null));
+});
+
+for (const [roleId, role] of [[1, 'student'], [2, 'teacher'], [3, 'system_admin'], [4, 'parent'], [5, 'academic_staff'], [6, 'academic_manager']]) {
   test(`uses server-verified identity for ${role}, ignoring cached role and profile`, async () => {
-    localStorage.setItem('teky_role', 'admin');
-    localStorage.setItem('teky_user', JSON.stringify(user(3, 'admin')));
+    localStorage.setItem('teky_role', 'system_admin');
+    localStorage.setItem('teky_user', JSON.stringify(user(3, 'system_admin')));
     const accessToken = token({ role_id: roleId, role });
     const fetch = mock.method(globalThis, 'fetch', async (url, options) => {
       assert.equal(url, '/api/auth/me');
@@ -57,11 +70,11 @@ for (const [roleId, role] of [[1, 'student'], [2, 'teacher'], [3, 'admin'], [4, 
 for (const status of [401, 403, 500]) {
   test(`rejects a token when server verification returns ${status}`, async () => {
     mock.method(globalThis, 'fetch', async () => reply({}, status));
-    await assert.rejects(verifySession(token({ role_id: 3, role: 'admin' }), null));
+    await assert.rejects(verifySession(token({ role_id: 3, role: 'system_admin' }), null));
   });
 }
 
-for (const invalid of ['jwt-demo-token-bcrypt-verified', 'header.payload', token({ exp: 1 }), token({ role_id: 99, role: 'admin' }), token({ exp: 'Infinity' })]) {
+for (const invalid of ['jwt-demo-token-bcrypt-verified', 'header.payload', token({ exp: 1 }), token({ role_id: 99, role: 'system_admin' }), token({ exp: 'Infinity' })]) {
   test('rejects invalid, expired, or unknown-role tokens before opening a session', async () => {
     const fetch = mock.method(globalThis, 'fetch', async () => { throw new Error('must not fetch'); });
     await assert.rejects(verifySession(invalid, null));
@@ -70,7 +83,7 @@ for (const invalid of ['jwt-demo-token-bcrypt-verified', 'header.payload', token
 }
 
 test('rejects a changed role, wrong identity, or disabled account from /auth/me', async () => {
-  for (const data of [user(3, 'admin'), { ...user(), userId: 99 }, { ...user(), status: 'Inactive' }, { ...user(), role: 'admin' }]) {
+  for (const data of [user(3, 'system_admin'), { ...user(), userId: 99 }, { ...user(), status: 'Inactive' }, { ...user(), role: 'system_admin' }]) {
     mock.method(globalThis, 'fetch', async () => reply({ success: true, data }));
     await assert.rejects(verifySession(token(), null));
     mock.restoreAll();
@@ -110,7 +123,7 @@ test('concurrent refreshes rotate once and cannot restore a logged-out session',
 test('JWT decoding fails closed for malformed payloads and invalid role IDs', () => {
   assert.equal(decodeJwtClaims('a.bnVsbA.c'), null);
   assert.equal(decodeJwtClaims('a.W10.c'), null);
-  assert.equal(roleFromClaims({ roleId: 99, role: 'admin' }), null);
+  assert.equal(roleFromClaims({ roleId: 99, role: 'system_admin' }), null);
   assert.equal(isTokenExpired(token({ exp: 'Infinity' })), true);
 });
 

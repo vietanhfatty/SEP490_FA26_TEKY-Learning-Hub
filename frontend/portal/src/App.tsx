@@ -1,3 +1,4 @@
+import { AcceptInvitationPage } from '@teky/shared/account/AcceptInvitationPage';
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
@@ -83,6 +84,7 @@ export function App() {
   };
   const content = (
       <Routes>
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/forgot-password" element={<RecoveryPage />} />
         <Route path="/" element={<HomePage isLoggedIn={isLoggedIn} onNavigate={handlePublicNavigate} />} />

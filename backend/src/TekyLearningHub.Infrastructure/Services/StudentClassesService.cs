@@ -11,7 +11,7 @@ namespace TekyLearningHub.Infrastructure.Services;
 public class StudentClassesService(ApplicationDbContext db) : IStudentClassesService
 {
     private IQueryable<StudentProfile> Students(int userId) => db.StudentProfiles.AsNoTracking()
-        .Where(s => s.UserId == userId && s.User.Status == "Active" && s.User.Role.RoleName == "Student");
+        .Where(s => s.UserId == userId && s.User.Status == "Active" && s.User.RoleAssignments.Any(r => r.RoleId == 1 && r.RevokedAt == null));
 
     private IQueryable<Enrollment> Enrollments(int userId) => db.Enrollments.AsNoTracking()
         .Where(e => e.StudentId == userId && (e.Status == "Active" || e.Status == "Completed"));

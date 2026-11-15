@@ -9,6 +9,7 @@ export interface JwtClaims {
   email?: string;
   fullName?: string;
   role?: string;
+  roles?: string[];
   roleId?: number;
   roleName?: string;
   expiresAt?: number;
@@ -31,9 +32,9 @@ const UNIQUE_NAME_CLAIM_URI = 'http://schemas.xmlsoap.org/ws/2005/05/identity/cl
 const ROLE_ID_MAP: Record<number, UserRole> = {
   1: 'student',
   2: 'teacher',
-  3: 'admin',
+  3: 'system_admin',
   4: 'parent',
-  5: 'staff',
+  5: 'academic_staff',
   6: 'academic_manager',
 };
 
@@ -92,12 +93,15 @@ export function decodeJwtClaims(token: string | null | undefined): JwtClaims | n
 
     const expRaw = readClaim(payload, 'exp');
     const parsedExp = expRaw !== undefined ? Number(expRaw) : typeof payload.exp === 'number' ? payload.exp : Number.NaN;
+    const rawRoles = payload.role ?? payload[ROLE_CLAIM_URI];
+    const roles = typeof rawRoles === 'string' ? [rawRoles] : Array.isArray(rawRoles) && rawRoles.every(x => typeof x === 'string') ? rawRoles as string[] : [];
 
     return {
       userId: readClaim(payload, 'nameid', 'user_id', NAME_ID_CLAIM_URI),
       email: readClaim(payload, 'email', EMAIL_CLAIM_URI),
       fullName: readClaim(payload, 'unique_name', 'name', UNIQUE_NAME_CLAIM_URI),
       role: readClaim(payload, 'role', ROLE_CLAIM_URI),
+      roles,
       roleId: Number.isFinite(parsedRoleId) ? parsedRoleId : undefined,
       roleName: readClaim(payload, 'role_name'),
       expiresAt: Number.isFinite(parsedExp) ? parsedExp : undefined,
@@ -169,21 +173,22 @@ export function normalizeRoleString(raw: string | null | undefined): UserRole | 
     case 'giangvien':
     case 'giảng_viên':
       return 'teacher';
-    case 'admin':
+    case 'system_admin':
     case 'administrator':
     case 'systemadmin':
     case 'quantri':
     case 'quản_trị':
-      return 'admin';
+      return 'system_admin';
     case 'parent':
     case 'guardian':
     case 'phuhuynh':
     case 'phụ_huynh':
       return 'parent';
-    case 'staff':
+    case 'academicstaff':
+    case 'academic_staff':
     case 'giao_vu':
     case 'operations':
-      return 'staff';
+      return 'academic_staff';
     case 'academicmanager':
     case 'academic_manager':
     case 'manager':
