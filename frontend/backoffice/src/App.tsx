@@ -1,3 +1,4 @@
+import { AcceptInvitationPage } from '@teky/shared/account/AcceptInvitationPage';
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
@@ -22,7 +23,7 @@ import type { UserRole } from '@teky/shared/types';
 function RoleRedirect() {
   const { role } = useAuth();
   const target = resolveShellForRole(role);
-  return <RoleGuard allowedRoles={['teacher', 'staff', 'academic_manager', 'admin']}><Navigate to={target.path} replace /></RoleGuard>;
+  return <RoleGuard allowedRoles={['teacher', 'academic_staff', 'academic_manager', 'system_admin']}><Navigate to={target.path} replace /></RoleGuard>;
 }
 
 export function App() {
@@ -75,6 +76,7 @@ export function App() {
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans">
       {isAccountVisible && <a href="/account" className="fixed bottom-4 left-4 z-50 rounded-xl bg-blue-700 px-4 py-3 text-white shadow-md focus-visible:ring-2">Tài khoản</a>}
       <Routes>
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/forgot-password" element={<RecoveryPage />} />
         {/* Cổng đăng nhập Backoffice */}
@@ -114,9 +116,9 @@ export function App() {
         <Route
           path="/staff"
           element={
-            <RoleGuard allowedRoles={['staff']} fallback={forbidden('Giáo vụ')}>
+            <RoleGuard allowedRoles={['academic_staff']} fallback={forbidden('Giáo vụ')}>
               <LmsShell
-                currentRole="staff"
+                currentRole="academic_staff"
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}
@@ -152,9 +154,9 @@ export function App() {
         <Route
           path="/admin"
           element={
-            <RoleGuard allowedRoles={['admin']} fallback={forbidden('Quản trị hệ thống')}>
+            <RoleGuard allowedRoles={['system_admin']} fallback={forbidden('Quản trị hệ thống')}>
               <LmsShell
-                currentRole="admin"
+                currentRole="system_admin"
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}

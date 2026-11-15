@@ -23,9 +23,9 @@ public static class RoleNameNormalizer
         {
             "student" => "student",
             "teacher" or "tutor" or "gv" => "teacher",
-            "admin" or "administrator" or "systemadmin" => "admin",
+            "admin" or "administrator" or "systemadmin" or "system_admin" => "system_admin",
             "parent" or "guardian" => "parent",
-            "staff" or "giao_vu" or "operations" => "staff",
+            "staff" or "giao_vu" or "operations" or "academicstaff" or "academic_staff" => "academic_staff",
             "academicmanager" or "academic_manager" or "manager" or "academic" => "academic_manager",
             _ => normalized
         };
@@ -40,11 +40,11 @@ public static class RoleNameNormalizer
         {
             (byte)Domain.Enums.UserRole.Student => "student",
             (byte)Domain.Enums.UserRole.Teacher => "teacher",
-            (byte)Domain.Enums.UserRole.Admin => "admin",
+            (byte)Domain.Enums.UserRole.SystemAdmin => "system_admin",
             (byte)Domain.Enums.UserRole.Parent => "parent",
-            (byte)Domain.Enums.UserRole.Staff => "staff",
+            (byte)Domain.Enums.UserRole.AcademicStaff => "academic_staff",
             (byte)Domain.Enums.UserRole.AcademicManager => "academic_manager",
-            _ => "student"
+            _ => throw new ArgumentOutOfRangeException(nameof(roleId), "Unknown role")
         };
     }
 }

@@ -11,7 +11,7 @@ public partial class User
 
     public string PasswordHash { get; set; } = null!;
 
-    public byte RoleId { get; set; }
+    public byte PrimaryRoleId { get; set; }
 
     public string FullName { get; set; } = null!;
 
@@ -30,6 +30,8 @@ public partial class User
     public int FailedLoginCount { get; set; }
     public DateTime? LockoutEndAt { get; set; }
     public int SecurityVersion { get; set; }
+    public bool ActivationPending { get; set; }
+    public int AdministrationVersion { get; set; }
     public string? Bio { get; set; }
 
     public DateTime? LastLoginAt { get; set; }
@@ -68,7 +70,9 @@ public partial class User
 
     public virtual ICollection<PasswordResetOtp> PasswordResetOtps { get; set; } = new List<PasswordResetOtp>();
 
-    public virtual Role Role { get; set; } = null!;
+    public virtual Role PrimaryRole { get; set; } = null!;
+
+    public ICollection<UserRoleAssignment> RoleAssignments { get; set; } = new List<UserRoleAssignment>();
 
     public virtual StudentProfile? StudentProfile { get; set; }
 

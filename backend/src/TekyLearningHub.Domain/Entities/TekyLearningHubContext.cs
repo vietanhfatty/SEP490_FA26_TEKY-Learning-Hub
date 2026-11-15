@@ -943,8 +943,8 @@ public partial class TekyLearningHubContext : DbContext
                 .HasMaxLength(5)
                 .HasDefaultValue("Light");
 
-            entity.HasOne(d => d.Role).WithMany(p => p.Users)
-                .HasForeignKey(d => d.RoleId)
+            entity.HasOne(d => d.PrimaryRole).WithMany(p => p.Users)
+                .HasForeignKey(d => d.PrimaryRoleId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Users__RoleId__3B75D760");
         });

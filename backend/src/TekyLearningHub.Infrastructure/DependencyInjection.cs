@@ -36,7 +36,10 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<AcademicPermissionService>();
+        services.AddScoped<UserAdministrationService>();
         services.AddScoped<IStudentClassesService, StudentClassesService>();
+        services.AddScoped<ICourseService, CourseService>();
         services.AddDataProtection();
         services.AddHostedService<AccountEmailWorker>();
 

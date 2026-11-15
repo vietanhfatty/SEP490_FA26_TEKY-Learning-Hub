@@ -1,3 +1,4 @@
+import { AcceptInvitationPage } from '@teky/shared/account/AcceptInvitationPage';
 import { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { UserRole } from './types';
@@ -21,9 +22,9 @@ const DASHBOARD_PATH_BY_ROLE: Record<UserRole, string> = {
   student: '/dashboard/student',
   parent: '/dashboard/parent',
   teacher: '/dashboard/teacher',
-  staff: '/dashboard/staff',
+  academic_staff: '/dashboard/staff',
   academic_manager: '/dashboard/academic-manager',
-  admin: '/dashboard/admin',
+  system_admin: '/dashboard/admin',
 };
 
 function AppRoutes() {
@@ -86,13 +87,15 @@ function AppRoutes() {
 
   // Reject unauthorized URLs before mounting any dashboard or its data requests.
   if (isDashboardRoute && (!isLoggedIn || !currentRole)) return <Navigate to="/login" replace />;
-  if (isDashboardRoute && currentRole && location.pathname !== '/' && location.pathname !== DASHBOARD_PATH_BY_ROLE[currentRole]) {
+  const dashboardRole = (Object.keys(DASHBOARD_PATH_BY_ROLE) as UserRole[])
+    .find(candidate => DASHBOARD_PATH_BY_ROLE[candidate] === location.pathname);
+  if (isDashboardRoute && currentRole && (!dashboardRole || !currentUser?.roles.includes(dashboardRole))) {
     return <Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole]} replace />;
   }
   if (isLoggedIn && currentRole && isDashboardRoute) {
     return (
       <LmsShell
-        currentRole={currentRole}
+        currentRole={dashboardRole ?? currentRole}
         userName={currentUser?.fullName}
         userEmail={currentUser?.email}
         isDarkMode={isDarkMode}
@@ -101,6 +104,7 @@ function AppRoutes() {
       >
         {(activeNavId, onSelectNav) => (
           <Routes>
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
             <Route path="/" element={<Navigate to={DASHBOARD_PATH_BY_ROLE[currentRole] ?? '/dashboard/student'} replace />} />
             <Route path="/dashboard/student" element={<StudentDashboard key={activeNavId} activeNavId={activeNavId} onSelectNav={onSelectNav} />} />
             <Route path="/dashboard/parent" element={<ParentDashboard activeNavId={activeNavId} />} />
@@ -139,6 +143,7 @@ function AppRoutes() {
       {/* Main Content Area */}
       <main id="public-content" className="public-main">
         <Routes>
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
           {/* Trang chủ giới thiệu */}
           <Route path="/" element={<Navigate to="/landing" replace />} />
           <Route path="/landing" element={<HomePage onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />} />

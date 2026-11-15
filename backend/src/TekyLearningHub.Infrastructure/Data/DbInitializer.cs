@@ -14,9 +14,9 @@ public static class DbInitializer
         {
             new() { RoleId = 1, RoleName = "Student" },
             new() { RoleId = 2, RoleName = "Teacher" },
-            new() { RoleId = 3, RoleName = "Admin" },
+            new() { RoleId = 3, RoleName = "SystemAdmin" },
             new() { RoleId = 4, RoleName = "Parent" },
-            new() { RoleId = 5, RoleName = "Staff" },
+            new() { RoleId = 5, RoleName = "AcademicStaff" },
             new() { RoleId = 6, RoleName = "AcademicManager" }
         };
 
@@ -38,7 +38,7 @@ public static class DbInitializer
             {
                 Email = "student@teky.edu.vn",
                 PasswordHash = defaultPasswordHash,
-                RoleId = 1,
+                PrimaryRoleId = 1,
                 FullName = "Nguyễn Minh Quân",
                 Phone = "0901234501",
                 Status = "Active",
@@ -49,7 +49,7 @@ public static class DbInitializer
             {
                 Email = "teacher@teky.edu.vn",
                 PasswordHash = defaultPasswordHash,
-                RoleId = 2,
+                PrimaryRoleId = 2,
                 FullName = "Thầy Hoàng Văn Nam",
                 Phone = "0901234503",
                 Status = "Active",
@@ -60,7 +60,7 @@ public static class DbInitializer
             {
                 Email = "admin@teky.edu.vn",
                 PasswordHash = defaultPasswordHash,
-                RoleId = 3,
+                PrimaryRoleId = 3,
                 FullName = "Admin Kỹ Thuật",
                 Phone = "0901234505",
                 Status = "Active",
@@ -71,7 +71,7 @@ public static class DbInitializer
             {
                 Email = "parent@teky.edu.vn",
                 PasswordHash = defaultPasswordHash,
-                RoleId = 4,
+                PrimaryRoleId = 4,
                 FullName = "Trần Thu Trang",
                 Phone = "0901234502",
                 Status = "Active",
@@ -82,7 +82,7 @@ public static class DbInitializer
             {
                 Email = "staff@teky.edu.vn",
                 PasswordHash = defaultPasswordHash,
-                RoleId = 5,
+                PrimaryRoleId = 5,
                 FullName = "Nguyễn Thu Nga (Giáo vụ)",
                 Phone = "0901234514",
                 Status = "Active",
@@ -93,7 +93,7 @@ public static class DbInitializer
             {
                 Email = "manager@teky.edu.vn",
                 PasswordHash = defaultPasswordHash,
-                RoleId = 6,
+                PrimaryRoleId = 6,
                 FullName = "Đỗ Thị Hồng (QL Đào tạo)",
                 Phone = "0901234504",
                 Status = "Active",
@@ -108,6 +108,15 @@ public static class DbInitializer
         {
             if (!existingUsers.Contains(user.Email.ToLower()))
             {
+                var academicDepartmentId = user.PrimaryRoleId is 5 or 6
+                    ? await ((ApplicationDbContext)context).Database.SqlQuery<int>(
+                        $"SELECT DepartmentId AS Value FROM dbo.Departments WHERE Code='ACADEMIC'").SingleAsync()
+                    : (int?)null;
+                user.RoleAssignments.Add(new UserRoleAssignment {
+                    RoleId=user.PrimaryRoleId,
+                    ScopeType=academicDepartmentId.HasValue ? "DEPARTMENT" : "GLOBAL",
+                    DepartmentId=academicDepartmentId
+                });
                 context.Users.Add(user);
             }
         }

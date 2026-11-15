@@ -33,9 +33,9 @@ public class AuthTests
     [Theory]
     [InlineData(1, "student")]
     [InlineData(2, "teacher")]
-    [InlineData(3, "admin")]
+    [InlineData(3, "system_admin")]
     [InlineData(4, "parent")]
-    [InlineData(5, "staff")]
+    [InlineData(5, "academic_staff")]
     [InlineData(6, "academic_manager")]
     public void JwtTokenGenerator_ShouldGenerateValidTokenWithCorrectRole(byte roleId, string expectedRole)
     {
@@ -57,8 +57,9 @@ public class AuthTests
             UserId = 100 + roleId,
             Email = $"{expectedRole}@teky.edu.vn",
             FullName = $"Test {expectedRole}",
-            RoleId = roleId,
-            Role = new Role { RoleId = roleId, RoleName = expectedRole }
+            PrimaryRoleId = roleId,
+            PrimaryRole = new Role { RoleId = roleId, RoleName = expectedRole },
+            RoleAssignments = [new() { RoleId=roleId }]
         };
 
         // Act
