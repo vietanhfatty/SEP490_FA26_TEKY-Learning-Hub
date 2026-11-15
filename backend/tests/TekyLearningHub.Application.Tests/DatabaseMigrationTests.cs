@@ -26,6 +26,7 @@ public class DatabaseMigrationTests
         Assert.Contains(catalog, x => x.Name == "20261114_student_project_submissions.sql");
         Assert.Contains(catalog, x => x.Name == "20261115_academic_governance.sql");
         Assert.Contains(catalog, x => x.Name == "20261116_account_administration.sql");
+        Assert.Contains(catalog, x => x.Name == "20261117_student_learning_feedback.sql");
         Assert.Equal(44, SqlMigrationCatalog.BaselineTables(catalog[0].Script).Count);
         Assert.DoesNotContain("MERGE INTO", catalog[0].Script);
         Assert.DoesNotContain("CREATE DATABASE", catalog[0].Script);
@@ -78,6 +79,47 @@ public class DatabaseMigrationTests
         await db.Migrate();
         Assert.Equal(SqlMigrationCatalog.Load().Count, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
         Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.Users WHERE Bio='Keep bio' AND SecurityVersion=8"));
+    }
+
+    [SqlServerFact]
+    public async Task LearningFeedbackUpgradePreservesExistingSubmissionsAndValidatesReviewStatus()
+    {
+        await using var db = new TestDatabase();
+        var previous = SqlMigrationCatalog.Load()
+            .TakeWhile(x => x.Name != "20261117_student_learning_feedback.sql").ToList();
+        await DevelopmentDatabaseMigrator.ApplyAsync(db.ConnectionString, previous, NullLogger.Instance);
+        await db.Execute("""
+            INSERT dbo.Users(Email,PasswordHash,PrimaryRoleId,FullName)
+                VALUES('upgrade@example.com','keep-hash',1,N'Existing student');
+            INSERT dbo.StudentProfiles(UserId,StudentCode)
+                SELECT UserId,'UPGRADE-STUDENT' FROM dbo.Users;
+            INSERT dbo.Courses(CourseCode,Name) VALUES('UPGRADE',N'Existing course');
+            INSERT dbo.Classes(ClassCode,CourseId,Name)
+                SELECT 'UPGRADE-CLASS',CourseId,N'Existing class' FROM dbo.Courses;
+            INSERT dbo.Assignments(ClassId,Title,CreatedBy)
+                SELECT c.ClassId,N'Existing assignment',u.UserId FROM dbo.Classes c CROSS JOIN dbo.Users u;
+            INSERT dbo.StudentProjectSubmissions(AssignmentId,StudentId,FileName,Content,SubmittedAt)
+                SELECT a.AssignmentId,s.UserId,N'keep.py',0x010203,'20261114'
+                FROM dbo.Assignments a CROSS JOIN dbo.StudentProfiles s;
+            """);
+
+        await db.Migrate();
+
+        Assert.Equal(1, await db.Scalar("""
+            SELECT COUNT(*) FROM dbo.StudentProjectSubmissions
+            WHERE FileName=N'keep.py' AND Content=0x010203 AND SubmittedAt='20261114'
+                AND AttemptNo=1 AND ReviewStatus='Pending'
+                AND Feedback IS NULL AND ReviewedBy IS NULL AND ReviewedAt IS NULL;
+            """));
+        Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM sys.tables WHERE name='StudentProjectVersions'"));
+        var invalidStatus = await Assert.ThrowsAsync<SqlException>(() =>
+            db.Execute("UPDATE dbo.StudentProjectSubmissions SET ReviewStatus='Invalid';"));
+        Assert.Equal(547, invalidStatus.Number);
+
+        await db.Execute("UPDATE dbo.StudentProjectSubmissions SET ReviewStatus='NeedsRevision',Feedback=N'Keep feedback';");
+        await db.Migrate();
+        Assert.Equal(SqlMigrationCatalog.Load().Count, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
+        Assert.Equal(1, await db.Scalar("SELECT COUNT(*) FROM dbo.StudentProjectSubmissions WHERE ReviewStatus='NeedsRevision' AND Feedback=N'Keep feedback'"));
     }
 
     [SqlServerFact]

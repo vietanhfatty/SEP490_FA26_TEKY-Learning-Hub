@@ -11,7 +11,7 @@ public class DatabaseLearningFlowTests {
   await fixture.Execute("""
     INSERT dbo.Users(Email,PasswordHash,PrimaryRoleId,FullName) VALUES
       ('student@flow.test','unused',1,'Student'),('teacher@flow.test','unused',2,'Teacher'),('other@flow.test','unused',2,'Other');
-    INSERT dbo.UserRoles(UserId,RoleId) SELECT UserId,PrimaryRoleId FROM dbo.Users WHERE Email LIKE '%@flow.test';
+    INSERT dbo.UserRoles(UserId,RoleId,ScopeType) SELECT UserId,PrimaryRoleId,'GLOBAL' FROM dbo.Users WHERE Email LIKE '%@flow.test';
     INSERT dbo.StudentProfiles(UserId,StudentCode) SELECT UserId,'FLOW-STUDENT' FROM dbo.Users WHERE Email='student@flow.test';
     INSERT dbo.TeacherProfiles(UserId,TeacherCode) SELECT UserId,'FLOW-TEACHER' FROM dbo.Users WHERE Email='teacher@flow.test';
     INSERT dbo.TeacherProfiles(UserId,TeacherCode) SELECT UserId,'FLOW-OTHER' FROM dbo.Users WHERE Email='other@flow.test';
