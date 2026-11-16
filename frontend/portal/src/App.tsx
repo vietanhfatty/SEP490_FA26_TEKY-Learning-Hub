@@ -125,10 +125,12 @@ export function App() {
           }
         />
 
+        <Route path="/dashboard/projects" element={<Navigate to="/student" replace />} />
+
         {/* Dashboard Học sinh - chỉ dành cho role student */}
-        {['/student', '/dashboard/projects', '/dashboard/assessments', '/dashboard/assessments/:assessmentId', '/dashboard/assignments', '/dashboard/assignments/:assignmentId', '/dashboard/timetable/*', '/dashboard/courses', '/dashboard/courses/:courseId', '/dashboard/courses/:courseId/lessons/:lessonId'].map(path => (
+        {['/student', '/dashboard/assessments', '/dashboard/assessments/:assessmentId', '/dashboard/assignments', '/dashboard/assignments/:assignmentId', '/dashboard/timetable/*', '/dashboard/courses', '/dashboard/courses/:courseId', '/dashboard/courses/:courseId/lessons/:lessonId'].map(path => (
           <Route key={path} path={path} element={
-            path === '/student' && new URLSearchParams(location.search).get('tab') === 'achievements'
+            path === '/student' && ['achievements', 'projects'].includes(new URLSearchParams(location.search).get('tab') ?? '')
               ? <Navigate to="/student" replace />
               : (
             <RoleGuard
@@ -143,13 +145,13 @@ export function App() {
             >
               <LmsShell
                 currentRole="student"
-                activeNavId={location.pathname === '/dashboard/projects' ? 'projects' : location.pathname.startsWith('/dashboard/assessments') ? 'assessments' : location.pathname.startsWith('/dashboard/assignments') ? 'assignments' : location.pathname.startsWith('/dashboard/courses') ? 'courses' : location.pathname.startsWith('/dashboard/timetable') ? 'classes' : location.pathname === '/student' ? new URLSearchParams(location.search).get('tab') || 'overview' : undefined}
+                activeNavId={location.pathname.startsWith('/dashboard/assessments') ? 'assessments' : location.pathname.startsWith('/dashboard/assignments') ? 'assignments' : location.pathname.startsWith('/dashboard/courses') ? 'courses' : location.pathname.startsWith('/dashboard/timetable') ? 'classes' : location.pathname === '/student' ? new URLSearchParams(location.search).get('tab') || 'overview' : undefined}
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}
                 onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
-                onSelectNav={(id) => navigate(id === 'projects' ? '/dashboard/projects' : id === 'assessments' ? '/dashboard/assessments' : id === 'assignments' ? '/dashboard/assignments' : id === 'courses' ? '/dashboard/courses' : id === 'classes' || id === 'live' ? '/dashboard/timetable' : id === 'overview' ? '/student' : `/student?tab=${encodeURIComponent(id)}`)}
+                onSelectNav={(id) => navigate(id === 'assessments' ? '/dashboard/assessments' : id === 'assignments' ? '/dashboard/assignments' : id === 'courses' ? '/dashboard/courses' : id === 'classes' || id === 'live' ? '/dashboard/timetable' : id === 'overview' ? '/student' : `/student?tab=${encodeURIComponent(id)}`)}
               >
                 {(activeNavId, onSelectNav) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'classes' : activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>
