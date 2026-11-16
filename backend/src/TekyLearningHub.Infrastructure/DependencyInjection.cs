@@ -27,7 +27,7 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? "Server=localhost\\SQLEXPRESS02;Database=Teky_Learning_Hub;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
+            ?? "Server=.\\SQLEXPRESS;Database=Teky_Learning_Hub;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {
