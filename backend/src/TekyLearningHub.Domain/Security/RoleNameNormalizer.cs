@@ -1,4 +1,4 @@
-namespace TekyLearningHub.Infrastructure.Security;
+namespace TekyLearningHub.Domain.Security;
 
 /// <summary>
 /// Chuẩn hoá tên vai trò giữa bảng Roles (PascalCase) và các giá trị snake_case

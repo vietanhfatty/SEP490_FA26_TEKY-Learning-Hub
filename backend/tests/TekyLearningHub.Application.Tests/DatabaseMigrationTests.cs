@@ -1,7 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
 using TekyLearningHub.Infrastructure.Data.Migrations;
-using TekyLearningHub.Infrastructure.Services.Auth;
 using Xunit;
 
 namespace TekyLearningHub.Application.Tests;
@@ -146,7 +145,7 @@ public class DatabaseMigrationTests
     public async Task ModifiedMigrationAndPartialSchemaAreRejected()
     {
         await using var db = new TestDatabase(); await db.Migrate();
-        var scripts = SqlMigrationCatalog.Load().Select(x => x.Name==SqlMigrationCatalog.BaselineName ? x with { Script=x.Script+"\n-- changed" } : x).ToList();
+        var scripts = SqlMigrationCatalog.Load().Select(x => x.Name == SqlMigrationCatalog.BaselineName ? x with { Script = x.Script + "\n-- changed" } : x).ToList();
         await Assert.ThrowsAsync<InvalidOperationException>(() => DevelopmentDatabaseMigrator.ApplyAsync(db.ConnectionString, scripts, NullLogger.Instance));
         Assert.Equal(SqlMigrationCatalog.Load().Count, await db.Scalar("SELECT COUNT(*) FROM dbo.__TekySchemaMigrations"));
         await using var partial = new TestDatabase(); await partial.Create();
@@ -164,18 +163,19 @@ public class DatabaseMigrationTests
             Microsoft.EntityFrameworkCore.SqlServerDbContextOptionsExtensions.UseSqlServer(
                 new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<TekyLearningHub.Infrastructure.Data.ApplicationDbContext>(), database.ConnectionString).Options);
         var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
-        var service = new TekyLearningHub.Infrastructure.Services.Auth.AuthService(db,
+        var service = TestServices.Auth(db,
             new TekyLearningHub.Infrastructure.Security.PasswordHasher(),
             new TekyLearningHub.Infrastructure.Security.JwtTokenGenerator(config));
         string[] roles = ["Student", "Teacher", "SystemAdmin", "Parent", "AcademicStaff", "AcademicManager"];
-        for (byte id=1; id<=6; id++) {
+        for (byte id = 1; id <= 6; id++)
+        {
             var role = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleAsync(db.Roles, r => r.RoleId == id);
-            var user = new TekyLearningHub.Domain.Entities.User {Email=$"role{id}@example.com",FullName="Test",PasswordHash="hash",PrimaryRoleId=id,PrimaryRole=role,RoleAssignments=[new(){RoleId=id}],Status="Active",ThemeMode="Light"};
+            var user = new TekyLearningHub.Domain.Entities.User { Email = $"role{id}@example.com", FullName = "Test", PasswordHash = "hash", PrimaryRoleId = id, PrimaryRole = role, RoleAssignments = [new() { RoleId = id }], Status = "Active", ThemeMode = "Light" };
             db.Users.Add(user); await db.SaveChangesAsync();
-            Assert.True((await service.LogoutAsync(null,user.UserId,"127.0.0.1",true)).Success);
+            Assert.True((await service.LogoutAsync(null, user.UserId, "127.0.0.1", true)).Success);
         }
         Assert.Equal(6, await database.Scalar("SELECT COUNT(*) FROM dbo.AuditLogs WHERE ActorType='User' AND Action='USER_LOGOUT_ALL_DEVICES'"));
-        db.AuditLogs.Add(new TekyLearningHub.Domain.Entities.AuditLog {ActorType="System",Action="SYSTEM_TEST"});
+        db.AuditLogs.Add(new TekyLearningHub.Domain.Entities.AuditLog { ActorType = "System", Action = "SYSTEM_TEST" });
         await db.SaveChangesAsync();
         Assert.Equal(1, await database.Scalar("SELECT COUNT(*) FROM dbo.AuditLogs WHERE ActorType='System'"));
     }
@@ -184,18 +184,18 @@ public class DatabaseMigrationTests
     {
         private readonly string name = "Teky_MigrationTests_" + Guid.NewGuid().ToString("N");
         private readonly SqlConnectionStringBuilder settings = new(Environment.GetEnvironmentVariable("TEKY_MIGRATION_TEST_CONNECTION")!);
-        public string ConnectionString { get { var copy=new SqlConnectionStringBuilder(settings.ConnectionString) { InitialCatalog=name, Pooling=false }; return copy.ConnectionString; } }
+        public string ConnectionString { get { var copy = new SqlConnectionStringBuilder(settings.ConnectionString) { InitialCatalog = name, Pooling = false }; return copy.ConnectionString; } }
         public Task Migrate() => DevelopmentDatabaseMigrator.ApplyAsync(ConnectionString, NullLogger.Instance);
-        public async Task Create() { await using var master = Master(); await master.OpenAsync(); await using var command=master.CreateCommand();command.CommandText=$"CREATE DATABASE [{name}]";await command.ExecuteNonQueryAsync(); }
-        private SqlConnection Master() => new(new SqlConnectionStringBuilder(settings.ConnectionString) { InitialCatalog="master", Pooling=false }.ConnectionString);
-        public async Task Execute(string sql) { await using var connection=new SqlConnection(ConnectionString);await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText=sql;await command.ExecuteNonQueryAsync(); }
-        public async Task<int> Scalar(string sql) { await using var connection=new SqlConnection(ConnectionString);await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText=sql;return Convert.ToInt32(await command.ExecuteScalarAsync()); }
+        public async Task Create() { await using var master = Master(); await master.OpenAsync(); await using var command = master.CreateCommand(); command.CommandText = $"CREATE DATABASE [{name}]"; await command.ExecuteNonQueryAsync(); }
+        private SqlConnection Master() => new(new SqlConnectionStringBuilder(settings.ConnectionString) { InitialCatalog = "master", Pooling = false }.ConnectionString);
+        public async Task Execute(string sql) { await using var connection = new SqlConnection(ConnectionString); await connection.OpenAsync(); await using var command = connection.CreateCommand(); command.CommandText = sql; await command.ExecuteNonQueryAsync(); }
+        public async Task<int> Scalar(string sql) { await using var connection = new SqlConnection(ConnectionString); await connection.OpenAsync(); await using var command = connection.CreateCommand(); command.CommandText = sql; return Convert.ToInt32(await command.ExecuteScalarAsync()); }
         public async ValueTask DisposeAsync()
         {
             // Only drop the uniquely generated database belonging to this test, never a configured app DB.
-            if (!System.Text.RegularExpressions.Regex.IsMatch(name,@"^Teky_MigrationTests_[a-f0-9]{32}$")) throw new InvalidOperationException();
-            await using var master=Master();await master.OpenAsync();await using var command=master.CreateCommand();
-            command.CommandText=$"IF DB_ID(N'{name}') IS NOT NULL BEGIN ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{name}]; END";
+            if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^Teky_MigrationTests_[a-f0-9]{32}$")) throw new InvalidOperationException();
+            await using var master = Master(); await master.OpenAsync(); await using var command = master.CreateCommand();
+            command.CommandText = $"IF DB_ID(N'{name}') IS NOT NULL BEGIN ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{name}]; END";
             await command.ExecuteNonQueryAsync();
         }
     }

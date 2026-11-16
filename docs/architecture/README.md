@@ -1,103 +1,75 @@
 # Kiến trúc TEKY Learning Hub
 
-Cập nhật: 2026-11-16. Tài liệu này mô tả source đang triển khai; khi đổi vị trí file hoặc ranh giới nghiệp vụ, cập nhật cùng thay đổi code.
+Cập nhật: 2026-11-16. Backend dùng .NET 9 và được tách theo trách nhiệm của bốn tầng. Nhóm nghiệp vụ trong mỗi tầng là `Auth`, `Admin`, `Portal`, `Backoffice`.
 
-## Backend
+## Trách nhiệm và dependency
 
-Backend dùng .NET 9, ASP.NET Core, EF Core và SQL Server, gồm bốn project:
+- **Domain:** entity, enum, constant và chính sách role/grant thuần. Không tham chiếu Application, Infrastructure, EF Core, SQL Server hoặc ASP.NET Core.
+- **Application:** thực thi use case; chứa `Services`, DTO, validator và interface repository/dịch vụ kỹ thuật. Chỉ tham chiếu project Domain; không phụ thuộc EF, SQL, SMTP, filesystem hoặc HTTP framework.
+- **Infrastructure:** triển khai các interface Application bằng EF Core, SQL Server, JWT, BCrypt, Data Protection, SMTP, file storage và bộ nhớ. Tham chiếu Application và Domain.
+- **Api:** controller tiếp nhận HTTP, lấy danh tính, gọi interface Application và ánh xạ response. Tham chiếu Application; sử dụng Infrastructure tại composition root để đăng ký adapter và khởi tạo host.
 
-- `TekyLearningHub.Domain`: entity, enum, constant và context được scaffold từ database.
-- `TekyLearningHub.Application`: DTO, hợp đồng service, hợp đồng truy cập dữ liệu/bảo mật và validator.
-- `TekyLearningHub.Infrastructure`: triển khai service, persistence, security, email và SQL migration.
-- `TekyLearningHub.Api`: HTTP controller, xác thực/phân quyền, ánh xạ response và cấu hình ứng dụng.
+Luồng thực thi: controller nhận interface service Application qua DI; service kiểm tra nghiệp vụ và gọi repository/adapter interface; implementation Infrastructure truy cập tài nguyên bên ngoài. Service không phải lớp chuyển tiếp toàn bộ nghiệp vụ sang Infrastructure.
 
-Tham chiếu project hiện tại: Application tham chiếu Domain; Infrastructure tham chiếu Application và Domain; Api tham chiếu Application và Infrastructure. DI được đăng ký qua `AddApplication()` và `AddInfrastructure()` trong `Program.cs`.
-
-Đây là kiến trúc phân lớp hiện tại. `Domain/Entities/TekyLearningHubContext.cs` còn là EF context được scaffold; `Infrastructure/Data/ApplicationDbContext.cs` mở rộng mapping của context này. `AccountController` và `ShellTransferController` hiện còn dùng DbContext trực tiếp cho hồ sơ, khôi phục mật khẩu và chuyển phiên. Các điểm này chưa tách hoàn toàn theo Clean Architecture; việc nhóm lại thư mục không thay đổi ranh giới phụ thuộc đó.
-
-### Các nhóm nghiệp vụ
-
-- `Auth`: đăng nhập, đăng xuất, refresh token, hồ sơ/bảo mật tài khoản dùng chung cho mọi role, kích hoạt lời mời và chuyển phiên giữa các ứng dụng.
-- `Admin`: quản lý tài khoản, role/scope, phòng ban, chức danh, bổ nhiệm, khóa học và học liệu.
-- `Portal`: lớp học, bài học và nộp dự án của học sinh. Chỉ thêm phần phụ huynh khi có nghiệp vụ thực tế.
-- `Backoffice`: nghiệp vụ giáo viên/nhân sự ngoài quản trị hệ thống; hiện có duyệt dự án của giáo viên.
-
-Tên thư mục thể hiện nơi sở hữu nghiệp vụ. Quyền truy cập vẫn do `[Authorize]`, permission, scope và kiểm tra dữ liệu ở backend quyết định. Ví dụ `Auth/AccountController` phục vụ hồ sơ mọi role, còn `Backoffice/ProjectReviewsController` chỉ cho giáo viên được phân công.
-
-### Vị trí source
+## Vị trí code
 
 ```text
-backend/
-  src/
-    TekyLearningHub.Api/
-      Controllers/
-        Admin/       AdminCoursesController, AdminUsersController
-        Auth/        AuthController, AccountController,
-                     InvitationController, ShellTransferController
-        Portal/      StudentClassesController, StudentLearningController,
-                     StudentProjectsController
-        Backoffice/  ProjectReviewsController
-      Program.cs
-    TekyLearningHub.Application/
-      DTOs/
-        Admin/       CourseDtos, UserAdministrationRequests
-        Auth/        Login, refresh, logout, account, invitation và user DTO
-        Portal/      StudentClassesDto, StudentProjectDto
-        Common/      ApiResponse
-      Interfaces/
-        Admin/       ICourseService
-        Auth/        IAuthService
-        Portal/      IStudentClassesService
-        IApplicationDbContext.cs
-        IJwtTokenGenerator.cs
-        IPasswordHasher.cs
-      Validators/Auth/LoginRequestValidator.cs
-      DependencyInjection.cs
-    TekyLearningHub.Infrastructure/
-      Services/
-        Admin/       CourseService, UserAdministrationService
-        Auth/        AuthService, AccountEmailWorker
-        Portal/      StudentClassesService, StudentLearningService
-        Backoffice/  ProjectReviewService
-      Data/          ApplicationDbContext, DbInitializer, Migrations/
-      Security/      JWT, password hashing, role/permission/session checks
-      DependencyInjection.cs
-    TekyLearningHub.Domain/
-      Entities/
-      Enums/
-      Constants/
-  tests/TekyLearningHub.Application.Tests/
-database/
-  migrations/
+backend/src/
+  TekyLearningHub.Domain/
+    Entities/                   Entity thuần, không có DbContext
+    Enums/                      ID role và enum nghiệp vụ
+    Constants/                  Trạng thái, loại audit actor
+    Security/                   UserAuthorization, RoleNameNormalizer
+  TekyLearningHub.Application/
+    Services/
+      Auth/                     Auth, account, shell transfer, session validation
+      Admin/                    UserAdministrationService, CourseService
+      Portal/                   StudentClassesService, StudentLearningService
+      Backoffice/               ProjectReviewService
+    Interfaces/
+      Auth/                     Service/repository tài khoản, avatar, chuyển phiên
+      Admin/                    Service/repository quản trị và khóa học
+      Portal/                   Service/repository học tập và bài nộp
+      Backoffice/               Service/repository duyệt bài
+      Persistence.cs            Unit of work, transaction, lỗi persistence, email outbox
+      IAcademicPermissionReader.cs
+      IPasswordHasher.cs
+      IJwtTokenGenerator.cs
+    DTOs/                       Auth, Admin, Portal, Backoffice, Common
+    Validators/Auth/
+    Common/                     Lỗi use case dùng chung
+    DependencyInjection.cs      AddApplication đăng ký service nghiệp vụ
+  TekyLearningHub.Infrastructure/
+    Data/                       Hai DbContext, mapping, seed, migration, UnitOfWork
+    Repositories/               Auth, Admin, Portal, Backoffice
+    Security/                   JWT, BCrypt, claim adapter, permission reader, ticket store
+    Storage/                    AvatarStorage
+    Services/Auth/              Email outbox và SMTP background worker
+    ApplicationStartup.cs       Khởi tạo database Development
+    DependencyInjection.cs      AddInfrastructure đăng ký adapter
+  TekyLearningHub.Api/
+    Controllers/                Auth, Admin, Portal, Backoffice
+    Program.cs                  Composition root, xác thực và HTTP pipeline
 ```
 
-`InvitationController` có file riêng trong Auth và dùng luồng kích hoạt của `UserAdministrationService`. `AcceptInvitationRequest` ở `DTOs/Auth`; các request quản trị nằm ở `DTOs/Admin`. Service quản trị tái sử dụng `Auth/AccountEmailWorker` để enqueue email.
+`TekyLearningHubContext` được scaffold và `ApplicationDbContext` cùng nằm trong Infrastructure/Data. Giữ nguyên EF mapping hiện có; entity Domain không bị scaffold lại. Không còn `IApplicationDbContext` trả DbSet ở Application.
 
-`StudentLearningService` chỉ xử lý việc học của học sinh. `ProjectReviewService` sở hữu truy vấn và đánh giá bài nộp của giáo viên; được đăng ký scoped riêng. Các HTTP route và điều kiện phân quyền được giữ nguyên khi chuyển thư mục.
+## Ranh giới nghiệp vụ và dữ liệu
 
-Các interface dùng chung cho persistence và security được giữ ở gốc `Application/Interfaces`. Không tạo thư mục nghiệp vụ trống để dự đoán tính năng chưa có.
+Application quản lý điều kiện đăng nhập, lockout, role/scope, cấp quyền, lời mời, trạng thái khóa học, điều kiện nộp lại bài và đánh giá. Repository trả entity hoặc DTO đã truy vấn xong; không đưa DbContext, DbSet, IQueryable, SQL exception hay EF transaction ra ngoài Infrastructure.
 
-`Application/Services` trước đây chỉ có `.gitkeep` và đã được bỏ. Implementation hiện tại dùng EF/SQL nên nằm trong `Infrastructure/Services`; Application giữ hợp đồng, DTO và validator. Các placeholder không dùng cho repository, middleware và Domain/Common cũng đã được bỏ khỏi Git.
+`IUnitOfWork` giữ transaction trên cùng DbContext scoped với repository. Infrastructure thực hiện retry, isolation và SQL application lock. Transaction quản trị giữ khóa `Teky.UserAdministration`, kiểm tra quyền và admin cuối cùng trong cùng transaction; transaction nộp bài dùng Serializable. Duyệt bài dùng cập nhật có điều kiện để không chấm nhầm phiên bản. Xung đột EF/SQL được chuyển thành lỗi persistence trung lập và ánh xạ ra kết quả nghiệp vụ/HTTP như trước.
 
-`Application/Services` trước đây chỉ có `.gitkeep` và đã được bỏ. Implementation hiện tại dùng EF/SQL nên nằm trong `Infrastructure/Services`; Application giữ hợp đồng, DTO và validator. Các placeholder không dùng cho repository, middleware và Domain/Common cũng đã được bỏ khỏi Git.
+Application yêu cầu enqueue email qua outbox; Infrastructure mã hóa và ghi cùng dữ liệu nghiệp vụ, worker gửi SMTP riêng. Avatar được kiểm tra trong Application, đọc/ghi file qua `IAvatarStorage`. Ticket chuyển phiên có kho bộ nhớ singleton, giới hạn dung lượng và thao tác lấy/xóa nguyên tử; thời hạn, origin và PKCE được kiểm tra trong Application.
 
-## Frontend và phiên đăng nhập
+Controller không còn truy cập database, filesystem hoặc worker. `AccountController` và `ShellTransferController` gọi use case tương ứng. Xác thực JWT trích claim tại API rồi gọi `ISessionValidationService` với dữ liệu danh tính thuần; Application kiểm tra với tài khoản hiện tại. `SessionAuthorization` trong Infrastructure chỉ là adapter claim phục vụ kiểm tra tương thích.
 
-Frontend dùng pnpm workspace, React, TypeScript và Vite:
+HTTP route, JSON response, mã lỗi, rate limit và điều kiện phân quyền được giữ nguyên. Không thay schema hoặc thêm SQL migration cho lần tách tầng này.
 
-- `frontend/`: ứng dụng công khai tại `5173`, gồm trang chủ, khóa học, đăng nhập và khôi phục mật khẩu.
-- `frontend/portal/`: ứng dụng tại `3000`, gồm Student (`/student`) và Parent (`/parent`).
-- `frontend/backoffice/`: ứng dụng tại `3001`, gồm Teacher (`/teacher`), AcademicStaff (`/staff`), AcademicManager (`/academic-manager`) và SystemAdmin (`/admin`).
-- `frontend/shared/`: xác thực, API client, UI và nghiệp vụ dùng lại giữa các ứng dụng.
+## Frontend và database
 
-`shared/auth/shellConfig.ts` định nghĩa origin và ánh xạ role sang ứng dụng. ID role lấy theo `Domain/Enums/UserRole.cs`; frontend dùng tên chuẩn `student`, `teacher`, `system_admin`, `parent`, `academic_staff`, `academic_manager`. Quyền được xác minh qua `/api/auth/me`, không tin role lưu trong browser.
+Frontend giữ ba ứng dụng: công khai `5173`, Portal `3000` cho Student/Parent, Backoffice `3001` cho bốn role nhân sự. `frontend/shared/auth` quản lý xác thực, PKCE và đăng xuất về `${PUBLIC_ORIGIN}/login`. Xem [hướng dẫn frontend](../../frontend/README.md).
 
-Đăng nhập từ cổng công khai chuyển phiên bằng mã một lần và PKCE. Khi đăng xuất, tất cả role gọi `AuthProvider.logout()`; `shared/auth/logout.ts` thu hồi/xóa phiên ở cổng hiện tại và chuyển về `${PUBLIC_ORIGIN}/login?loggedOut=1`. Trước khi AuthProvider khôi phục phiên, trang công khai xóa session cũ của chính origin đó và gỡ dấu đăng xuất khỏi URL. HTTP lỗi hoặc mất kết nối không ngăn việc kết thúc phiên cục bộ; response đăng xuất chậm không được ngắt một phiên đăng nhập mới.
+Migration nằm trong `database/migrations`, được nhúng trong Infrastructure. Development khởi tạo qua `ApplicationStartup`; Production/Staging không tự migrate/seed. Xem [quy ước migration](../../database/migrations/README.txt).
 
-## Database và kiểm thử
-
-SQL migration nằm trong `database/migrations`, được nhúng trong Infrastructure. Development chạy migration còn thiếu trước khi phục vụ HTTP; Production/Staging không tự migrate hoặc seed. Xem [quy ước migration](../../database/migrations/README.txt).
-
-Kiểm thử backend nằm trong `backend/tests/TekyLearningHub.Application.Tests`. Các test SQL Server dùng database tạm và yêu cầu `TEKY_MIGRATION_TEST_CONNECTION`; khi thiếu biến này, test integration được đánh dấu skip. Chạy trực tiếp file `.csproj` của test vì solution hiện chỉ chứa bốn project source.
-
-Lệnh kiểm tra và nguyên tắc thay đổi code: [quy ước phát triển](conventions.md). Hướng dẫn cổng và cấu hình môi trường: [frontend](../../frontend/README.md).
+Kiểm thử backend gồm test use case bằng repository giả, test dependency/DI và test integration SQL Server. Xem [quy ước phát triển](conventions.md).

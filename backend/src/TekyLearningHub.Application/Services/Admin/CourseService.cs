@@ -1,66 +1,29 @@
-using System.Data;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.DTOs.Admin;
-using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Application.Interfaces.Admin;
+using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Constants;
 using TekyLearningHub.Domain.Entities;
 
-namespace TekyLearningHub.Infrastructure.Services.Admin;
+namespace TekyLearningHub.Application.Services.Admin;
 
 /// <summary>
 /// Quản lý khóa học, bài học và học liệu dành cho role admin.
 /// Mọi thao tác xoá đều là soft delete để giữ lịch sử lớp học, bài tập và điểm số.
 /// </summary>
-public class CourseService(IApplicationDbContext db) : ICourseService
+public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseService
 {
     private static readonly string[] MaterialTypes = ["Slide", "Document", "AssemblyGuide", "Video"];
 
     public async Task<CoursePageDto> ListAsync(string? status, string? keyword, int skip, int take,
         CancellationToken cancellationToken)
     {
-        var query = db.Courses.AsNoTracking();
-
-        var normalizedStatus = CourseStatuses.Normalize(status);
-        if (normalizedStatus is not null) query = query.Where(c => c.Status == normalizedStatus);
-
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            var term = keyword.Trim();
-            query = query.Where(c => c.Name.Contains(term) || c.CourseCode.Contains(term));
-        }
-
-        var total = await query.CountAsync(cancellationToken);
-        var items = await query
-            .OrderBy(c => c.CourseCode)
-            .Skip(Math.Max(0, skip))
-            .Take(Math.Clamp(take <= 0 ? 50 : take, 1, 200))
-            .Select(c => new CourseSummaryDto(
-                c.CourseId, c.CourseCode, c.Name, c.LevelCode, c.Status,
-                c.Lessons.Count(l => !l.IsDeleted),
-                c.Classes.Count,
-                c.CreatedAt))
-            .ToListAsync(cancellationToken);
-
-        return new CoursePageDto(total, items);
+        return await db.List(CourseStatuses.Normalize(status), keyword, skip, take, cancellationToken);
     }
 
     public async Task<CourseDetailDto?> GetAsync(int courseId, CancellationToken cancellationToken)
     {
-        var course = await db.Courses.AsNoTracking()
-            .Include(c => c.Lessons.Where(l => !l.IsDeleted).OrderBy(l => l.OrderNo))
-                .ThenInclude(l => l.LessonMaterials.OrderBy(m => m.SortOrder))
-            .AsSplitQuery()
-            .SingleOrDefaultAsync(c => c.CourseId == courseId, cancellationToken);
-        if (course is null) return null;
-
-        var classCount = await db.Courses.AsNoTracking()
-            .Where(c => c.CourseId == courseId)
-            .Select(c => c.Classes.Count)
-            .SingleAsync(cancellationToken);
-
-        return MapDetail(course, classCount);
+        var course = await db.FindCourse(courseId, cancellationToken);
+        return course is null ? null : MapDetail(course, course.Classes.Count);
     }
 
     public async Task<CourseOperationResult<CourseDetailDto>> CreateAsync(CourseUpsertRequest request, int actorUserId,
@@ -86,7 +49,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
             CreatedAt = DateTime.UtcNow
         };
 
-        db.Courses.Add(course);
+        db.AddCourse(course);
 
         var saved = await SaveAsync(cancellationToken);
         if (!saved.Succeeded) return CourseOperationResult<CourseDetailDto>.Fail(saved.Error ?? "Không lưu được thay đổi.", saved.StatusCode);
@@ -104,7 +67,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
     public async Task<CourseOperationResult<CourseDetailDto>> UpdateAsync(int courseId, CourseUpsertRequest request,
         int actorUserId, string? ipAddress, CancellationToken cancellationToken)
     {
-        var course = await db.Courses.SingleOrDefaultAsync(c => c.CourseId == courseId, cancellationToken);
+        var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404);
 
         var code = request.CourseCode.Trim();
@@ -128,7 +91,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
         {
             if (requestedStatus == CourseStatuses.Published)
             {
-                var hasLessons = await db.Lessons.AnyAsync(l => l.CourseId == courseId && !l.IsDeleted, cancellationToken);
+                var hasLessons = await db.HasLessons(courseId, cancellationToken);
                 if (!hasLessons)
                     return CourseOperationResult<CourseDetailDto>.Fail("Khóa học cần ít nhất một bài học trước khi xuất bản.", 409);
             }
@@ -156,12 +119,12 @@ public class CourseService(IApplicationDbContext db) : ICourseService
         if (normalized is null)
             return CourseOperationResult<CourseDetailDto>.Fail("Trạng thái khóa học không hợp lệ.");
 
-        var course = await db.Courses.SingleOrDefaultAsync(c => c.CourseId == courseId, cancellationToken);
+        var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404);
 
         if (normalized == CourseStatuses.Published)
         {
-            var hasLessons = await db.Lessons.AnyAsync(l => l.CourseId == courseId && !l.IsDeleted, cancellationToken);
+            var hasLessons = await db.HasLessons(courseId, cancellationToken);
             if (!hasLessons)
                 return CourseOperationResult<CourseDetailDto>.Fail("Khóa học cần ít nhất một bài học trước khi xuất bản.", 409);
         }
@@ -190,13 +153,13 @@ public class CourseService(IApplicationDbContext db) : ICourseService
     public async Task<CourseOperationResult<CourseDetailDto>> ArchiveAsync(int courseId, int actorUserId,
         string? ipAddress, CancellationToken cancellationToken)
     {
-        var course = await db.Courses.SingleOrDefaultAsync(c => c.CourseId == courseId, cancellationToken);
+        var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404);
 
         var oldStatus = course.Status;
         course.Status = CourseStatuses.Archived;
 
-        var lessons = await db.Lessons.Where(l => l.CourseId == courseId && !l.IsDeleted).ToListAsync(cancellationToken);
+        var lessons = await db.Lessons(courseId, cancellationToken);
         foreach (var lesson in lessons) lesson.IsDeleted = true;
 
         AddAudit(actorUserId, "COURSE_ARCHIVED", "Course", courseId.ToString(), oldStatus, CourseStatuses.Archived, ipAddress);
@@ -213,7 +176,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
     public async Task<CourseOperationResult<LessonDto>> UpsertLessonAsync(int courseId, int? lessonId,
         LessonUpsertRequest request, int actorUserId, string? ipAddress, CancellationToken cancellationToken)
     {
-        var course = await db.Courses.SingleOrDefaultAsync(c => c.CourseId == courseId, cancellationToken);
+        var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<LessonDto>.Fail("Không tìm thấy khóa học.", 404);
 
         var title = request.Title.Trim();
@@ -243,13 +206,12 @@ public class CourseService(IApplicationDbContext db) : ICourseService
                 OrderNo = request.OrderNo,
                 IsDeleted = false
             };
-            db.Lessons.Add(lesson);
+            db.AddLesson(lesson);
             action = "LESSON_CREATED";
         }
         else
         {
-            var existing = await db.Lessons.SingleOrDefaultAsync(l => l.LessonId == lessonId && l.CourseId == courseId,
-                cancellationToken);
+            var existing = await db.FindLesson(courseId, lessonId.Value, cancellationToken);
             if (existing is null) return CourseOperationResult<LessonDto>.Fail("Không tìm thấy bài học.", 404);
             lesson = existing;
 
@@ -271,17 +233,14 @@ public class CourseService(IApplicationDbContext db) : ICourseService
         AddAudit(actorUserId, action, "Lesson", lesson.LessonId.ToString(), null, title, ipAddress);
         await CommitAuditAsync(cancellationToken);
 
-        var stored = await db.Lessons.AsNoTracking()
-            .Include(l => l.LessonMaterials.OrderBy(m => m.SortOrder))
-            .SingleAsync(l => l.LessonId == lesson.LessonId, cancellationToken);
+        var stored = await db.LoadLesson(lesson.LessonId, cancellationToken);
         return CourseOperationResult<LessonDto>.Success(MapLesson(stored));
     }
 
     public async Task<CourseOperationResult<bool>> DeleteLessonAsync(int courseId, int lessonId, int actorUserId,
         string? ipAddress, CancellationToken cancellationToken)
     {
-        var lesson = await db.Lessons.SingleOrDefaultAsync(l => l.LessonId == lessonId && l.CourseId == courseId,
-            cancellationToken);
+        var lesson = await db.FindLesson(courseId, lessonId, cancellationToken);
         if (lesson is null) return CourseOperationResult<bool>.Fail("Không tìm thấy bài học.", 404);
         if (lesson.IsDeleted) return CourseOperationResult<bool>.Success(true);
 
@@ -297,12 +256,10 @@ public class CourseService(IApplicationDbContext db) : ICourseService
     public async Task<CourseOperationResult<bool>> DeleteMaterialAsync(int courseId, int lessonId, int materialId,
         int actorUserId, string? ipAddress, CancellationToken cancellationToken)
     {
-        var material = await db.LessonMaterials
-            .SingleOrDefaultAsync(m => m.MaterialId == materialId && m.Lesson.LessonId == lessonId && m.Lesson.CourseId == courseId,
-                cancellationToken);
+        var material = await db.FindMaterial(courseId, lessonId, materialId, cancellationToken);
         if (material is null) return CourseOperationResult<bool>.Fail("Không tìm thấy học liệu.", 404);
 
-        db.LessonMaterials.Remove(material);
+        db.RemoveMaterial(material);
         AddAudit(actorUserId, "MATERIAL_DELETED", "LessonMaterial", materialId.ToString(), material.Title, null, ipAddress);
 
         var saved = await SaveAsync(cancellationToken);
@@ -318,9 +275,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
     private async Task<string?> SyncMaterialsAsync(Lesson lesson, IReadOnlyList<LessonMaterialUpsertRequest> materials,
         CancellationToken cancellationToken)
     {
-        var existing = await db.LessonMaterials
-            .Where(m => m.LessonId == lesson.LessonId)
-            .ToListAsync(cancellationToken);
+        var existing = await db.Materials(lesson.LessonId, cancellationToken);
 
         var keep = new HashSet<int>();
         foreach (var item in materials)
@@ -337,7 +292,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
             {
                 // Gán navigation property để EF sinh INSERT Lessons trước INSERT LessonMaterials.
                 target = new LessonMaterial { Lesson = lesson };
-                db.LessonMaterials.Add(target);
+                db.AddMaterial(target);
             }
 
             target.MaterialType = item.MaterialType;
@@ -349,7 +304,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
         }
 
         foreach (var stale in existing.Where(m => !keep.Contains(m.MaterialId)))
-            db.LessonMaterials.Remove(stale);
+            db.RemoveMaterial(stale);
 
         return null;
     }
@@ -361,21 +316,22 @@ public class CourseService(IApplicationDbContext db) : ICourseService
     {
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await unit.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+        catch (PersistenceConflictException ex) when (ex.Duplicate)
         {
             // Audit log không được làm thất bại thao tác nghiệp vụ đã thành công.
         }
     }
 
-    private async Task<CourseOperationResult<bool>> SaveAsync(CancellationToken cancellationToken)    {
+    private async Task<CourseOperationResult<bool>> SaveAsync(CancellationToken cancellationToken)
+    {
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await unit.SaveChangesAsync(cancellationToken);
             return CourseOperationResult<bool>.Success(true);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+        catch (PersistenceConflictException ex) when (ex.Duplicate)
         {
             return CourseOperationResult<bool>.Fail("Mã khóa học đã tồn tại.", 409);
         }
@@ -384,7 +340,7 @@ public class CourseService(IApplicationDbContext db) : ICourseService
     private void AddAudit(int actorUserId, string action, string entityType, string? entityId, string? oldValue,
         string? newValue, string? ipAddress)
     {
-        db.AuditLogs.Add(new AuditLog
+        db.AddAudit(new AuditLog
         {
             ActorUserId = actorUserId,
             ActorType = AuditActorTypes.User,

@@ -1,8 +1,9 @@
-using System;
 using System.Collections.Generic;
+using System;
 using Microsoft.EntityFrameworkCore;
+using TekyLearningHub.Domain.Entities;
 
-namespace TekyLearningHub.Domain.Entities;
+namespace TekyLearningHub.Infrastructure.Data;
 
 public partial class TekyLearningHubContext : DbContext
 {
@@ -106,14 +107,6 @@ public partial class TekyLearningHubContext : DbContext
     public virtual DbSet<WorkspaceDraft> WorkspaceDrafts { get; set; }
 
     public virtual DbSet<XpTransaction> XpTransactions { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (!optionsBuilder.IsConfigured)
-        {
-            optionsBuilder.UseSqlServer("Server=VIETANHFATTY\\SQLEXPRESS;uid=sa;password=123456;database=Teky_Learning_Hub;Encrypt=True;TrustServerCertificate=True;");
-        }
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,21 +1,22 @@
 ---
-description: Backend layers, feature folders, namespaces, dependency injection and verification
+description: Clean backend layer boundaries, use cases, persistence adapters and verification
 globs: "backend/**/*.cs,backend/**/*.csproj,backend/**/*.sln,database/migrations/*.sql"
 alwaysApply: false
 ---
 
 # Backend architecture
 
-- Read `docs/architecture/README.md` and `docs/architecture/conventions.md` before changing backend structure.
-- Preserve the four projects: Domain (entities/enums/constants), Application (contracts/DTOs/validators), Infrastructure (EF/SQL/security/email/service implementations), Api (HTTP/host).
-- Group feature code by Auth, Admin, Portal or Backoffice within its layer; create only groups with actual code. Shared persistence/security interfaces remain in `Application/Interfaces`.
-- Match namespaces to folders. Example: `Controllers/Admin/AdminUsersController.cs` uses `TekyLearningHub.Api.Controllers.Admin`.
-- Give each controller a file named after the class. Invitation activation belongs to Auth; teacher project reviews belong to Backoffice.
-- Move related DTOs/interfaces/validators with a feature and update imports, fully qualified types, DI and tests. DbContext services are scoped in `Infrastructure/DependencyInjection.cs`.
-- Keep explicit HTTP routes, authorization, permission/scope checks, ownership, rate limits, audit and concurrency behavior when moving code.
-- Add new persistence/business operations to services; do not expand the existing direct DbContext use in Account/ShellTransfer controllers. Document remaining architecture exceptions honestly.
-- Do not add reverse project references from Application/Domain to Infrastructure/Api. Do not overwrite scaffolded entities or alter applied migrations to reorganize folders.
-- Verify backend with `dotnet test backend/tests/TekyLearningHub.Application.Tests/TekyLearningHub.Application.Tests.csproj`; the solution currently contains only source projects.
-- If a running API locks DLLs, use `--no-restore -p:BaseOutputPath=bin/Verification/` for a separate test output.
-- Report skipped SQL Server tests; enable them only with a configured `TEKY_MIGRATION_TEST_CONNECTION` for disposable test databases.
-- Update architecture docs and these conventions in the same change as structural changes.
+- Read `docs/architecture/README.md` and `docs/architecture/conventions.md` before structural changes.
+- Domain owns pure entities/enums/constants/policies. Application owns business services, DTOs, validators and ports. Infrastructure owns EF/SQL/security/email/storage adapters. Api owns HTTP and host composition.
+- Domain cannot reference other project layers or EF/SQL/ASP.NET. Application references only Domain and framework-neutral libraries; never Infrastructure, EF/SQL, SMTP or ASP.NET.
+- Business services belong in `Application/Services/{Auth,Admin,Portal,Backoffice}`. Infrastructure/Services contains only technical services. Do not replace business logic with pass-through Application wrappers.
+- Define specific repository methods in Application and implement them in Infrastructure/Repositories. Return materialized data, never DbContext, DbSet, IQueryable or provider exceptions.
+- Controllers inject Application service interfaces, never concrete Infrastructure services/repositories/DbContext/workers. Host composition may call Infrastructure DI/startup entrypoints.
+- Match namespaces to folders; use one file per controller. Keep DTO contracts explicit and typed while preserving existing HTTP JSON, routes and status codes.
+- AddApplication registers use cases; AddInfrastructure registers adapters. Repositories, outbox and unit of work share a scoped DbContext.
+- Preserve identity administration locks, permission/version checks, last-admin protection, serializable submissions and atomic conditional reviews. Translate EF/SQL errors at the adapter boundary.
+- Queue email in the same unit of work; send SMTP outside retries. Keep avatar IO and atomic transfer-ticket storage behind Application ports.
+- Do not change schema or overwrite scaffolded entities for a layer refactor. DbContext and mappings belong in Infrastructure/Data.
+- Run the test csproj directly; the solution contains source projects only. LayerBoundaryTests must pass. SQL integration tests require TEKY_MIGRATION_TEST_CONNECTION and disposable databases.
+- Use `-p:BaseOutputPath=bin/LayerVerification/` if a running API locks default DLLs. Report skipped tests and transient timeout reruns.
+- Update architecture docs and role-mapping references with ownership/dependency changes.

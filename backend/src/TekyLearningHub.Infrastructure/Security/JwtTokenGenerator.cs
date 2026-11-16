@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
+using TekyLearningHub.Domain.Security;
 
 namespace TekyLearningHub.Infrastructure.Security;
 

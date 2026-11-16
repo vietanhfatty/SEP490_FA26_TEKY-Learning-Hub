@@ -1,38 +1,39 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.DTOs.Auth;
 using TekyLearningHub.Application.DTOs.Common;
-using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Application.Interfaces.Auth;
+using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
-using TekyLearningHub.Infrastructure.Security;
+using TekyLearningHub.Domain.Security;
 
-namespace TekyLearningHub.Infrastructure.Services.Auth;
+namespace TekyLearningHub.Application.Services.Auth;
 
 public class AuthService : IAuthService
 {
-    private readonly IApplicationDbContext _context;
-    private readonly Microsoft.AspNetCore.DataProtection.IDataProtectionProvider? _protection;
+    private readonly IAuthRepository _context;
+    private readonly IUnitOfWork _unit;
+    private readonly IAccountEmailOutbox _email;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
 
     public AuthService(
-        IApplicationDbContext context,
+        IAuthRepository context,
         IPasswordHasher passwordHasher,
-        IJwtTokenGenerator jwtTokenGenerator, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider? protection = null)
+        IJwtTokenGenerator jwtTokenGenerator, IUnitOfWork unit, IAccountEmailOutbox email)
     {
         _context = context;
-        _protection = protection;
+        _unit = unit; _email = email;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
     }
 
     public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginRequestDto request, string? ipAddress, string? userAgent)
     {
-        for (var attempt=0; ; attempt++) {
-            try { return await LoginCoreAsync(request,ipAddress,userAgent); }
-            catch (DbUpdateConcurrencyException) when (attempt<7 && _context is TekyLearningHub.Infrastructure.Data.ApplicationDbContext db) { db.ChangeTracker.Clear(); }
+        for (var attempt = 0; ; attempt++)
+        {
+            try { return await LoginCoreAsync(request, ipAddress, userAgent); }
+            catch (PersistenceConflictException e) when (!e.Duplicate && attempt < 7) { _unit.Reset(); }
         }
     }
 
@@ -42,14 +43,7 @@ public class AuthService : IAuthService
         var isEmail = identifier.Contains('@');
 
         // Search user by email or by username prefix/phone
-        var user = await _context.Users
-            .Include(u => u.PrimaryRole)
-            .Include(u => u.RoleAssignments)
-            .FirstOrDefaultAsync(u =>
-                (isEmail && u.Email.ToLower() == identifier.ToLower()) ||
-                (!isEmail && (u.Email.ToLower().StartsWith(identifier.ToLower() + "@") ||
-                              u.Email.ToLower() == identifier.ToLower() ||
-                              u.Phone == identifier)));
+        var user = await _context.FindByIdentifier(identifier);
 
         if (user == null || !UserAuthorization.HasValidPrimaryRole(user))
         {
@@ -68,7 +62,7 @@ public class AuthService : IAuthService
 
         if (user.LockoutEndAt > DateTime.UtcNow)
             return ApiResponse<AuthResponseDto>.FailureResult("Tài khoản hoặc mật khẩu không chính xác, hoặc tài khoản đang tạm khóa.");
-        if (user.LockoutEndAt != null) {user.LockoutEndAt=null;user.FailedLoginCount=0;}
+        if (user.LockoutEndAt != null) { user.LockoutEndAt = null; user.FailedLoginCount = 0; }
         var isPasswordValid = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
         if (!isPasswordValid)
         {
@@ -76,13 +70,9 @@ public class AuthService : IAuthService
             if (user.FailedLoginCount > 5)
             {
                 user.LockoutEndAt = DateTime.UtcNow.AddMinutes(15);
-                if (_context is TekyLearningHub.Infrastructure.Data.ApplicationDbContext db) {
-                    // Queue delivery independently of SMTP availability.
-                    var provider = _protection ?? throw new InvalidOperationException("Data protection is required for email.");
-                    AccountEmailWorker.Enqueue(db, provider, user.Email, "TEKY - Cảnh báo đăng nhập", "Tài khoản tạm khóa trong 15 phút do nhập sai mật khẩu quá 5 lần.");
-                }
+                _email.Enqueue(user.Email, "TEKY - Cảnh báo đăng nhập", "Tài khoản tạm khóa trong 15 phút do nhập sai mật khẩu quá 5 lần.");
             }
-            await _context.SaveChangesAsync();
+            await _unit.SaveChangesAsync();
 
             return ApiResponse<AuthResponseDto>.FailureResult("Tài khoản hoặc mật khẩu không chính xác.");
         }
@@ -105,8 +95,8 @@ public class AuthService : IAuthService
             IsActive = true
         };
 
-        _context.UserSessions.Add(session);
-        await _context.SaveChangesAsync();
+        _context.AddSession(session);
+        await _unit.SaveChangesAsync();
 
         var authResponse = new AuthResponseDto
         {
@@ -128,11 +118,7 @@ public class AuthService : IAuthService
         }
 
         var tokenHash = HashToken(refreshToken);
-        var session = await _context.UserSessions
-            .Include(s => s.User)
-            .ThenInclude(u => u.PrimaryRole)
-            .Include(s => s.User.RoleAssignments)
-            .FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.IsActive);
+        var session = await _context.FindSession(tokenHash);
 
         if (session == null)
         {
@@ -150,7 +136,7 @@ public class AuthService : IAuthService
         {
             session.IsActive = false;
             session.LogoutAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _unit.SaveChangesAsync();
             return ApiResponse<AuthResponseDto>.FailureResult("Refresh token đã hết hạn. Vui lòng đăng nhập lại.");
         }
 
@@ -172,8 +158,8 @@ public class AuthService : IAuthService
             IsActive = true
         };
 
-        _context.UserSessions.Add(newSession);
-        await _context.SaveChangesAsync();
+        _context.AddSession(newSession);
+        await _unit.SaveChangesAsync();
 
         var response = new AuthResponseDto
         {
@@ -206,11 +192,7 @@ public class AuthService : IAuthService
         if (!string.IsNullOrWhiteSpace(refreshToken))
         {
             var tokenHash = HashToken(refreshToken);
-            var session = await _context.UserSessions
-                .Include(s => s.User)
-                .ThenInclude(u => u.PrimaryRole)
-            .Include(s => s.User.RoleAssignments)
-                .FirstOrDefaultAsync(s => s.TokenHash == tokenHash && s.IsActive);
+            var session = await _context.FindSession(tokenHash);
 
             if (session != null)
             {
@@ -224,9 +206,7 @@ public class AuthService : IAuthService
         // 2. Thu hồi toàn bộ phiên hoạt động nếu allDevices == true
         if (allDevices && effectiveUserId.HasValue)
         {
-            var activeSessions = await _context.UserSessions
-                .Where(s => s.UserId == effectiveUserId.Value && s.IsActive)
-                .ToListAsync();
+            var activeSessions = await _context.ActiveSessions(effectiveUserId.Value);
 
             foreach (var s in activeSessions)
             {
@@ -240,10 +220,7 @@ public class AuthService : IAuthService
         {
             if (string.IsNullOrEmpty(roleName))
             {
-                var user = await _context.Users
-                    .Include(u => u.PrimaryRole)
-            .Include(u => u.RoleAssignments)
-                    .FirstOrDefaultAsync(u => u.UserId == effectiveUserId.Value);
+                var user = await _context.FindUser(effectiveUserId.Value);
                 roleName = user?.PrimaryRole?.RoleName;
             }
 
@@ -257,20 +234,17 @@ public class AuthService : IAuthService
                 CreatedAt = DateTime.UtcNow
             };
 
-            _context.AuditLogs.Add(auditLog);
+            _context.AddAudit(auditLog);
         }
 
-        await _context.SaveChangesAsync();
+        await _unit.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResult(true, "Thu hồi token và đăng xuất thành công.");
     }
 
     public async Task<ApiResponse<UserDto>> GetCurrentUserAsync(int userId)
     {
-        var user = await _context.Users
-            .Include(u => u.PrimaryRole)
-            .Include(u => u.RoleAssignments)
-            .FirstOrDefaultAsync(u => u.UserId == userId);
+        var user = await _context.FindUser(userId);
 
         if (user == null || !UserAuthorization.HasValidPrimaryRole(user))
         {

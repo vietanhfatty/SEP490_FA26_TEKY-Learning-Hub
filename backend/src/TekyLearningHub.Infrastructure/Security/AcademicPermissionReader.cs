@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Infrastructure.Data;
 
 namespace TekyLearningHub.Infrastructure.Security;
 
 /// <summary>Checks live scoped grants. JWT role membership alone never grants content access.</summary>
-public sealed class AcademicPermissionService(ApplicationDbContext db)
+public sealed class AcademicPermissionReader(ApplicationDbContext db) : IAcademicPermissionReader
 {
     public Task<bool> HasPermissionAsync(int userId, string permission, int? departmentId, CancellationToken ct = default) =>
         (from grant in db.UserRoles

@@ -19,11 +19,13 @@ The source of role IDs is `backend/src/TekyLearningHub.Domain/Enums/UserRole.cs`
 
 ## Backend ownership
 
-- `Infrastructure/Security/RoleNameNormalizer.cs` normalizes aliases and maps IDs to canonical strings.
+- `Domain/Security/RoleNameNormalizer.cs` normalizes aliases and maps IDs to canonical strings.
 - `Infrastructure/Security/JwtTokenGenerator.cs` takes `role_id` and `role_name` from `PrimaryRoleId`. The `role` claim contains all active role memberships and can be an array. It also emits `security_version`.
-- `Infrastructure/Security/UserAuthorization.cs` validates active grants and primary-role membership. `SessionAuthorization.cs` compares JWT authorization with the current account.
-- `Infrastructure/Services/Auth/AuthService.cs` maps `PrimaryRole`/`PrimaryRoleId` and active role memberships into `UserDto`.
+- `Domain/Security/UserAuthorization.cs` validates active grants and primary-role membership. `Application/Services/Auth/SessionValidationService.cs` compares plain JWT identity data with the current account; the Infrastructure claim adapter delegates to that policy.
+- `Application/Services/Auth/AuthService.cs` maps `PrimaryRole`/`PrimaryRoleId` and active role memberships into `UserDto`.
 - Auth controllers are in `Api/Controllers/Auth`; administrative controllers are in `Api/Controllers/Admin`; student controllers are in `Api/Controllers/Portal`; teacher reviews are in `Api/Controllers/Backoffice`.
+
+Application use cases depend on repository/security ports; Infrastructure implements queries and JWT/hash/email/storage adapters. Controllers call Application service interfaces. See the architecture docs for transaction and DI ownership.
 
 ## Frontend ownership
 

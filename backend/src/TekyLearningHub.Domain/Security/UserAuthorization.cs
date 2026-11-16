@@ -1,6 +1,6 @@
 using TekyLearningHub.Domain.Entities;
 
-namespace TekyLearningHub.Infrastructure.Security;
+namespace TekyLearningHub.Domain.Security;
 
 public static class UserAuthorization
 {
