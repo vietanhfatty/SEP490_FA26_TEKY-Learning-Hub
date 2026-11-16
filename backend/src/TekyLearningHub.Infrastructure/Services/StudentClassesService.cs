@@ -140,6 +140,41 @@ public class StudentClassesService(ApplicationDbContext db) : IStudentClassesSer
             session?.SessionId ?? a.SessionId)).ToList();
     }
 
+    public async Task<IReadOnlyList<StudentProjectItemDto>?> GetProjectsAsync(int userId, CancellationToken cancellationToken)
+    {
+        if (!await Students(userId).AnyAsync(cancellationToken)) return null;
+        var assignments = AccessibleAssignments(userId, null);
+        var files = await (
+            from file in db.StudentProjectSubmissions.AsNoTracking()
+            join a in assignments on file.AssignmentId equals a.AssignmentId
+            where file.StudentId == userId
+            select new
+            {
+                a.AssignmentId, a.Title, a.Class.ClassCode, CourseName = a.Class.Course.Name,
+                file.SubmittedAt, file.AttemptNo, file.ReviewStatus, file.FileName, file.Feedback
+            }).ToListAsync(cancellationToken);
+        var portfolio = await (
+            from item in db.PortfolioItems.AsNoTracking()
+            join a in assignments on item.Submission.AssignmentId equals a.AssignmentId
+            where item.StudentId == userId && item.Submission.StudentId == userId && item.Submission.IsCurrent
+            let grade = item.Submission.Grade
+            select new
+            {
+                a.AssignmentId, item.Title, a.Class.ClassCode, CourseName = a.Class.Course.Name,
+                item.Submission.SubmittedAt, item.Submission.AttemptNo, item.Summary, a.MaxScore,
+                Finalized = grade != null && grade.IsFinalized,
+                Score = grade != null && grade.IsFinalized ? grade.FinalScore : null,
+                Feedback = grade != null && grade.IsFinalized ? grade.RemarkText : null
+            }).ToListAsync(cancellationToken);
+
+        return files.Select(file => new StudentProjectItemDto(file.AssignmentId, file.Title, file.ClassCode, file.CourseName,
+                Utc(file.SubmittedAt), file.AttemptNo, file.ReviewStatus, file.FileName, file.Feedback))
+            .Concat(portfolio.Select(item => new StudentProjectItemDto(item.AssignmentId, item.Title, item.ClassCode, item.CourseName,
+                Utc(item.SubmittedAt), item.AttemptNo, item.Finalized ? "Graded" : "Pending", null,
+                item.Feedback, item.Summary, item.Score, item.MaxScore)))
+            .OrderByDescending(project => project.SubmittedAt).ThenBy(project => project.AssignmentId).ToList();
+    }
+
     public async Task<StudentProjectOutcome> SubmitProjectAsync(int userId, int? sessionId, int assignmentId,
         string fileName, byte[] content, CancellationToken cancellationToken)
     {
