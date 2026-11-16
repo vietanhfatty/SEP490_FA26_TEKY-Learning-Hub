@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Xml.Linq;
-using TekyLearningHub.Application.Interfaces;
+using TekyLearningHub.Application.Interfaces.Backoffice;
 
-namespace TekyLearningHub.Application.Services;
+namespace TekyLearningHub.Application.Services.Backoffice;
 
 public class AstAnalysisService : IAstAnalysisService
 {

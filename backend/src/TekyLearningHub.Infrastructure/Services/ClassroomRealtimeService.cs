@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
-using TekyLearningHub.Application.Interfaces;
+using TekyLearningHub.Application.Interfaces.Backoffice;
 using TekyLearningHub.Infrastructure.Hubs;
 
 namespace TekyLearningHub.Infrastructure.Services;

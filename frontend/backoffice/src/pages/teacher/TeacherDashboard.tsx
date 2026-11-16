@@ -86,6 +86,36 @@ const FALLBACK_WORKSPACE: TeacherWorkspaceDto = {
   ],
 };
 
+const FALLBACK_ROSTER: StudentAttendanceItemDto[] = [
+  {
+    attendanceId: 6,
+    studentId: 2,
+    studentCode: 'TEKY-STU-001',
+    studentName: 'Lê Bảo An',
+    status: 'Present',
+    absenceReason: 'Đồng bộ tự động từ máy trạm LAB-WS-01 (IP: 192.168.1.105)',
+    markedAt: '2026-11-13T13:55:00Z',
+  },
+  {
+    attendanceId: 7,
+    studentId: 3,
+    studentCode: 'TEKY-STU-002',
+    studentName: 'Trần Thị Mai',
+    status: 'Present',
+    absenceReason: 'Có mặt đúng giờ quy định',
+    markedAt: '2026-11-13T13:57:00Z',
+  },
+  {
+    attendanceId: 8,
+    studentId: 4,
+    studentCode: 'TEKY-STU-003',
+    studentName: 'Nguyễn Minh Trí',
+    status: 'Late',
+    absenceReason: 'Đến lớp muộn 10 phút do phương tiện di chuyển',
+    markedAt: '2026-11-13T14:10:00Z',
+  },
+];
+
 interface TeacherDashboardProps {
   activeNavId?: string;
 }
@@ -137,7 +167,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId 
 
   // SCR-TEA-02: Điểm danh 1-Chạm, Đồng bộ Máy trạm & Xét duyệt Học bù
   const [attendanceSession, setAttendanceSession] = useState<ClassAttendanceSessionDto | null>(null);
-  const [roster, setRoster] = useState<StudentAttendanceItemDto[]>([]);
+  const [roster, setRoster] = useState<StudentAttendanceItemDto[]>(FALLBACK_ROSTER);
   const [savingAttendance, setSavingAttendance] = useState<boolean>(false);
   const [makeupList, setMakeupList] = useState<MakeupRequestItemDto[]>([]);
   const [makeupTeacherNote, setMakeupTeacherNote] = useState<Record<number, string>>({});
@@ -248,70 +278,61 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId 
     setErrorMsg(null);
     try {
       const [ws, clsList, subList, mkList] = await Promise.all([
-        teacherApi.getWorkspace(1),
-        teacherApi.getClasses(1),
-        teacherApi.getSubmissions(1),
-        teacherApi.getMakeupRequests(1),
+        teacherApi.getWorkspace(1).catch(() => null),
+        teacherApi.getClasses(1).catch(() => null),
+        teacherApi.getSubmissions(1).catch(() => null),
+        teacherApi.getMakeupRequests(1).catch(() => null),
       ]);
 
-      setWorkspace(ws);
-      if (clsList.length > 0) {
+      if (ws) {
+        if (ws.weeklySchedule && ws.weeklySchedule.length > 0) {
+          setWorkspace(ws);
+          const firstSessionId = ws.weeklySchedule[0].sessionId;
+          setSelectedSessionId(firstSessionId);
+          try {
+            const att = await teacherApi.getSessionAttendance(firstSessionId);
+            setAttendanceSession(att);
+            if (att?.students?.length) {
+              setRoster(att.students);
+            }
+          } catch {
+            // Keep fallback roster
+          }
+        } else {
+          // If no weekly schedule in DB yet, use demo workspace with teacher name
+          setWorkspace((prev) => ({
+            ...FALLBACK_WORKSPACE,
+            teacherName: ws.teacherName || prev.teacherName,
+          }));
+          setRoster(FALLBACK_ROSTER);
+        }
+      }
+
+      if (clsList && clsList.length > 0) {
         setClasses(clsList);
         setSelectedClassId(clsList[0].classId);
+        try {
+          const ana = await teacherApi.getAnalytics(clsList[0].classId);
+          setAnalytics(ana);
+        } catch {
+          // Keep default analytics
+        }
       }
-      setSubmissions(subList);
-      if (subList.length > 0) {
+
+      if (subList && subList.length > 0) {
+        setSubmissions(subList);
         const firstSub = subList[0];
         setSelectedSubmissionId(firstSub.submissionId);
         if (firstSub.remarkText) setRemarkText(firstSub.remarkText);
       }
-      setMakeupList(mkList);
 
-      const firstSessionId = ws.weeklySchedule[0]?.sessionId ?? 6;
-      setSelectedSessionId(firstSessionId);
-
-      const [att, ana] = await Promise.all([
-        teacherApi.getSessionAttendance(firstSessionId),
-        teacherApi.getAnalytics(clsList[0]?.classId ?? 3),
-      ]);
-      setAttendanceSession(att);
-      setRoster(att.students);
-      setAnalytics(ana);
+      if (mkList) {
+        setMakeupList(mkList);
+      }
     } catch (err) {
-      setErrorMsg(
-        err instanceof Error
-          ? `Không thể đồng bộ trực tiếp với máy chủ dữ liệu (${err.message}). Hệ thống đang kích hoạt chế độ dữ liệu dự phòng tiêu chuẩn.`
-          : 'Không thể kết nối máy chủ Backend .NET.'
-      );
-      setRoster([
-        {
-          attendanceId: 6,
-          studentId: 2,
-          studentCode: 'TEKY-STU-001',
-          studentName: 'Lê Bảo An',
-          status: 'Present',
-          absenceReason: 'Đồng bộ tự động từ máy trạm LAB-WS-01 (IP: 192.168.1.105)',
-          markedAt: '2026-11-13T13:55:00Z',
-        },
-        {
-          attendanceId: 7,
-          studentId: 3,
-          studentCode: 'TEKY-STU-002',
-          studentName: 'Trần Thị Mai',
-          status: 'Present',
-          absenceReason: 'Có mặt đúng giờ quy định',
-          markedAt: '2026-11-13T13:57:00Z',
-        },
-        {
-          attendanceId: 8,
-          studentId: 4,
-          studentCode: 'TEKY-STU-003',
-          studentName: 'Nguyễn Minh Trí',
-          status: 'Late',
-          absenceReason: 'Đến lớp muộn 10 phút do phương tiện di chuyển',
-          markedAt: '2026-11-13T14:10:00Z',
-        },
-      ]);
+      console.warn('Teacher data load error:', err);
+      setWorkspace(FALLBACK_WORKSPACE);
+      setRoster(FALLBACK_ROSTER);
     } finally {
       setLoading(false);
     }

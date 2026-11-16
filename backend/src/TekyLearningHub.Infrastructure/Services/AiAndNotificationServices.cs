@@ -1,25 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.Interfaces;
+using TekyLearningHub.Application.Interfaces.Backoffice;
+using TekyLearningHub.Application.Interfaces.Portal;
 using TekyLearningHub.Domain.Entities;
 using TekyLearningHub.Infrastructure.Hubs;
 
 namespace TekyLearningHub.Infrastructure.Services;
 
-public class AiAssistantService : IAiAssistantService
+/// <summary>Trợ lý sinh sa bàn và bản tin âm thanh. Đọc dữ liệu qua cổng repository.</summary>
+public class AiAssistantService(IParentRepository parentRepository) : IAiAssistantService
 {
-    private readonly IApplicationDbContext _context;
-
-    public AiAssistantService(IApplicationDbContext context)
-    {
-        _context = context;
-    }
-
     public Task<GeneratedMapResultDto> GenerateStemMapAndQuestAsync(string teacherPrompt, CancellationToken cancellationToken = default)
     {
         var cleanPrompt = string.IsNullOrWhiteSpace(teacherPrompt) ? "Thử thách lập trình xe robot vượt mê cung cơ bản" : teacherPrompt;
@@ -45,25 +39,11 @@ public class AiAssistantService : IAiAssistantService
 
     public async Task<string> GenerateParentAudioDigestTextAsync(int sessionId, int studentId, CancellationToken cancellationToken = default)
     {
-        var session = await _context.ClassSessions
-            .AsNoTracking()
-            .Include(s => s.Class)
-            .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        var data = await parentRepository.DigestData(sessionId, studentId, cancellationToken);
 
-        var student = await _context.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.UserId == studentId, cancellationToken);
-
-        var grade = await _context.Grades
-            .AsNoTracking()
-            .Include(g => g.Submission)
-            .Where(g => g.Submission.StudentId == studentId && g.Submission.Assignment.ClassId == (session != null ? session.ClassId : 0))
-            .OrderByDescending(g => g.FinalizedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var studentName = student?.FullName ?? "con";
-        var className = session?.Class.Name ?? "lớp STEM";
-        var score = grade?.FinalScore ?? 9.0m;
+        var studentName = data?.StudentName ?? "con";
+        var className = data?.ClassName ?? "lớp STEM";
+        var score = data?.FinalScore ?? 9.0m;
 
         return $"Chào phụ huynh của {studentName}! Hôm nay tại {className}, {studentName} đã học tập rất tích cực. " +
                $"Con đã hoàn thành thử thách lập trình sa bàn thực hành với số điểm ấn tượng {score:F1}/10. " +
@@ -71,17 +51,12 @@ public class AiAssistantService : IAiAssistantService
     }
 }
 
-public class NotificationService : INotificationService
+/// <summary>Lưu thông báo rồi phát tín hiệu realtime tới người nhận.</summary>
+public class NotificationService(
+    INotificationRepository repository,
+    IUnitOfWork unit,
+    IHubContext<NotificationHub> notificationHub) : INotificationService
 {
-    private readonly IApplicationDbContext _context;
-    private readonly IHubContext<NotificationHub> _notificationHub;
-
-    public NotificationService(IApplicationDbContext context, IHubContext<NotificationHub> notificationHub)
-    {
-        _context = context;
-        _notificationHub = notificationHub;
-    }
-
     public async Task SendNotificationAsync(int recipientUserId, string type, string title, string body, string? refType = null, long? refId = null, CancellationToken cancellationToken = default)
     {
         var notification = new Notification
@@ -96,10 +71,10 @@ public class NotificationService : INotificationService
             CreatedAt = DateTime.UtcNow
         };
 
-        await _context.Notifications.AddAsync(notification, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        repository.AddNotification(notification);
+        await unit.SaveChangesAsync(cancellationToken);
 
-        await _notificationHub.Clients.Group($"user_{recipientUserId}").SendAsync("OnNotificationReceived", new
+        await notificationHub.Clients.Group($"user_{recipientUserId}").SendAsync("OnNotificationReceived", new
         {
             notification.NotificationId,
             notification.Type,

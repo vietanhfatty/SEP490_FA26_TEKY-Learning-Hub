@@ -3,91 +3,40 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.DTOs;
 using TekyLearningHub.Application.Interfaces;
+using TekyLearningHub.Application.Interfaces.Backoffice;
+using TekyLearningHub.Application.Interfaces.Portal;
 using TekyLearningHub.Domain.Entities;
 
-namespace TekyLearningHub.Application.Services;
+namespace TekyLearningHub.Application.Services.Backoffice;
 
-public interface ITeacherService
+public class TeacherService(
+    ITeacherRepository repository,
+    IUnitOfWork unit,
+    IAstAnalysisService astService,
+    IClassroomRealtimeService realtimeService,
+    INotificationService notificationService) : ITeacherService
 {
-    // SCR-TEA-01: Bàn làm việc & Lớp phụ trách
-    Task<TeacherWorkspaceDto> GetTeacherWorkspaceAsync(int teacherId, DateOnly? weekStart = null, CancellationToken ct = default);
-    Task<List<TeacherClassSummaryDto>> GetTeacherClassesAsync(int teacherId, CancellationToken ct = default);
-
-    // SCR-TEA-02: Điểm danh 1-Chạm, Đồng bộ Máy trạm & Xét duyệt Học bù
-    Task<ClassAttendanceSessionDto> GetSessionAttendanceAsync(int sessionId, CancellationToken ct = default);
-    Task<bool> UpdateSessionAttendanceAsync(UpdateClassAttendanceRequest request, int teacherId, CancellationToken ct = default);
-    Task<bool> SyncWorkstationCheckInAsync(int sessionId, int studentId, string workstationIp, CancellationToken ct = default);
-    Task<List<MakeupRequestItemDto>> GetMakeupRequestsAsync(int teacherId, CancellationToken ct = default);
-    Task<bool> ReviewMakeupRequestAsync(ReviewMakeupRequestDto request, int teacherId, CancellationToken ct = default);
-
-    // SCR-TEA-04: Thiết kế Sa bàn STEM 2D
-    Task<int> CreateStemMapAsync(CreateStemMapRequest request, int teacherId, CancellationToken ct = default);
-
-    // SCR-TEA-05: Chấm bài Hybrid 60/40
-    Task<List<GradingQueueItemDto>> GetGradingQueueAsync(int teacherId, int? classId, CancellationToken ct = default);
-    Task<SubmissionGradingResultDto> GradeSubmissionAsync(GradeSubmissionRequest request, int teacherId, CancellationToken ct = default);
-
-    // SCR-TEA-06: Phân tích hiệu suất & phổ điểm lớp học
-    Task<ClassPerformanceAnalyticsDto> GetClassPerformanceAnalyticsAsync(int classId, CancellationToken ct = default);
-}
-
-public class TeacherService : ITeacherService
-{
-    private readonly IApplicationDbContext _context;
-    private readonly IAstAnalysisService _astService;
-    private readonly IClassroomRealtimeService _realtimeService;
-    private readonly INotificationService _notificationService;
-
-    public TeacherService(
-        IApplicationDbContext context,
-        IAstAnalysisService astService,
-        IClassroomRealtimeService realtimeService,
-        INotificationService notificationService)
-    {
-        _context = context;
-        _astService = astService;
-        _realtimeService = realtimeService;
-        _notificationService = notificationService;
-    }
-
     // ==================== SCR-TEA-01: BÀN LÀM VIỆC & LỚP PHỤ TRÁCH ====================
 
     public async Task<TeacherWorkspaceDto> GetTeacherWorkspaceAsync(int teacherId, DateOnly? weekStart = null, CancellationToken ct = default)
     {
-        var teacher = await _context.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.UserId == teacherId, ct);
+        var teacher = await repository.FindUser(teacherId, ct);
 
-        var classes = await _context.Classes
-            .AsNoTracking()
-            .Where(c => c.TeacherId == teacherId && c.Status == "Open")
-            .Include(c => c.ClassSessions)
-            .Include(c => c.Enrollments)
-            .ToListAsync(ct);
-
+        var classes = await repository.TeacherClasses(teacherId, ct);
         var activeClassIds = classes.Select(c => c.ClassId).ToList();
 
-        var pendingSubmissionsCount = await _context.Submissions
-            .CountAsync(s => s.Status != "Finalized" && activeClassIds.Contains(s.Assignment.ClassId), ct);
+        var pendingSubmissionsCount = activeClassIds.Count == 0
+            ? 0
+            : await repository.PendingSubmissionCount(activeClassIds, ct);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var anchor = weekStart ?? today;
         var startOfWeek = anchor.AddDays(-(((int)anchor.DayOfWeek + 6) % 7));
         var endOfWeek = startOfWeek.AddDays(7);
 
-        var weeklySessions = await _context.ClassSessions
-            .AsNoTracking()
-            .Where(s => activeClassIds.Contains(s.ClassId) && s.SessionDate >= startOfWeek && s.SessionDate < endOfWeek)
-            .Include(s => s.Class)
-                .ThenInclude(c => c.Enrollments)
-            .Include(s => s.Room)
-            .Include(s => s.AttendanceRecords)
-            .OrderBy(s => s.SessionDate)
-            .ThenBy(s => s.StartTime)
-            .ToListAsync(ct);
+        var weeklySessions = await repository.WeekSessions(activeClassIds, startOfWeek, endOfWeek, ct);
 
         var sessionMapByClass = classes.ToDictionary(c => c.ClassId, c => c.ClassSessions);
 
@@ -110,20 +59,14 @@ public class TeacherService : ITeacherService
             PresentCount = s.AttendanceRecords.Count(a => a.Status == "Present")
         }).ToList();
 
-        var recentAbsents = await _context.AttendanceRecords
-            .AsNoTracking()
-            .Where(a => a.Status == "Absent" && activeClassIds.Contains(a.Session.ClassId))
-            .OrderByDescending(a => a.MarkedAt)
-            .Take(5)
-            .Select(a => new AbsentAlertDto
-            {
-                StudentId = a.StudentId,
-                StudentName = a.Student.User.FullName,
-                ClassCode = a.Session.Class.ClassCode,
-                Date = a.Session.SessionDate,
-                Reason = a.AbsenceReason ?? "Vắng mặt đầu giờ"
-            })
-            .ToListAsync(ct);
+        var recentAbsents = (await repository.RecentAbsences(activeClassIds, 5, ct)).Select(a => new AbsentAlertDto
+        {
+            StudentId = a.StudentId,
+            StudentName = a.Student?.User?.FullName ?? "Học sinh",
+            ClassCode = a.Session?.Class?.ClassCode ?? string.Empty,
+            Date = a.Session?.SessionDate ?? default,
+            Reason = a.AbsenceReason ?? "Vắng mặt đầu giờ"
+        }).ToList();
 
         return new TeacherWorkspaceDto
         {
@@ -138,9 +81,8 @@ public class TeacherService : ITeacherService
 
     public async Task<List<TeacherClassSummaryDto>> GetTeacherClassesAsync(int teacherId, CancellationToken ct = default)
     {
-        return await _context.Classes
-            .AsNoTracking()
-            .Where(c => c.TeacherId == teacherId && (c.Status == "Open" || c.Status == "Planned"))
+        var classes = await repository.TeacherClassesIncludingPlanned(teacherId, ct);
+        return classes
             .OrderBy(c => c.ClassCode)
             .Select(c => new TeacherClassSummaryDto
             {
@@ -150,21 +92,14 @@ public class TeacherService : ITeacherService
                 Status = c.Status,
                 StudentCount = c.Enrollments.Count(e => e.Status == "Active")
             })
-            .ToListAsync(ct);
+            .ToList();
     }
 
     // ==================== SCR-TEA-02: ĐIỂM DANH 1-CHẠM, MÁY TRẠM & HỌC BÙ ====================
 
     public async Task<ClassAttendanceSessionDto> GetSessionAttendanceAsync(int sessionId, CancellationToken ct = default)
     {
-        var session = await _context.ClassSessions
-            .AsNoTracking()
-            .Include(s => s.Class)
-                .ThenInclude(c => c.Enrollments)
-                    .ThenInclude(e => e.Student)
-                        .ThenInclude(st => st.User)
-            .Include(s => s.AttendanceRecords)
-            .FirstOrDefaultAsync(s => s.SessionId == sessionId, ct)
+        var session = await repository.SessionWithAttendance(sessionId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy buổi học.");
 
         var existingMap = session.AttendanceRecords.ToDictionary(a => a.StudentId);
@@ -178,9 +113,9 @@ public class TeacherService : ITeacherService
             {
                 AttendanceId = att?.AttendanceId ?? 0,
                 StudentId = enrollment.StudentId,
-                StudentCode = enrollment.Student.StudentCode,
-                StudentName = enrollment.Student.User.FullName,
-                AvatarUrl = enrollment.Student.User.AvatarUrl,
+                StudentCode = enrollment.Student?.StudentCode ?? string.Empty,
+                StudentName = enrollment.Student?.User?.FullName ?? "Học sinh",
+                AvatarUrl = enrollment.Student?.User?.AvatarUrl,
                 Status = att?.Status ?? "Absent",
                 AbsenceReason = att?.AbsenceReason,
                 MarkedAt = att?.MarkedAt
@@ -198,9 +133,7 @@ public class TeacherService : ITeacherService
 
     public async Task<bool> UpdateSessionAttendanceAsync(UpdateClassAttendanceRequest request, int teacherId, CancellationToken ct = default)
     {
-        var session = await _context.ClassSessions
-            .Include(s => s.AttendanceRecords)
-            .FirstOrDefaultAsync(s => s.SessionId == request.SessionId, ct)
+        var session = await repository.SessionForUpdate(request.SessionId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy buổi học.");
 
         var existingMap = session.AttendanceRecords.ToDictionary(a => a.StudentId);
@@ -216,7 +149,7 @@ public class TeacherService : ITeacherService
             }
             else
             {
-                var newRecord = new AttendanceRecord
+                repository.AddAttendance(new AttendanceRecord
                 {
                     SessionId = session.SessionId,
                     StudentId = item.StudentId,
@@ -224,24 +157,20 @@ public class TeacherService : ITeacherService
                     AbsenceReason = item.Reason,
                     MarkedBy = teacherId,
                     MarkedAt = DateTime.UtcNow
-                };
-                await _context.AttendanceRecords.AddAsync(newRecord, ct);
+                });
             }
         }
 
-        await _context.SaveChangesAsync(ct);
+        await unit.SaveChangesAsync(ct);
         return true;
     }
 
     public async Task<bool> SyncWorkstationCheckInAsync(int sessionId, int studentId, string workstationIp, CancellationToken ct = default)
     {
-        var session = await _context.ClassSessions
-            .Include(s => s.Class)
-            .FirstOrDefaultAsync(s => s.SessionId == sessionId, ct)
+        var session = await repository.SessionForUpdate(sessionId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy buổi học.");
 
-        var attendance = await _context.AttendanceRecords
-            .FirstOrDefaultAsync(a => a.SessionId == sessionId && a.StudentId == studentId, ct);
+        var attendance = await repository.FindAttendance(sessionId, studentId, ct);
 
         if (attendance == null)
         {
@@ -254,7 +183,7 @@ public class TeacherService : ITeacherService
                 MarkedBy = session.Class.TeacherId ?? 0,
                 MarkedAt = DateTime.UtcNow
             };
-            await _context.AttendanceRecords.AddAsync(attendance, ct);
+            repository.AddAttendance(attendance);
         }
         else
         {
@@ -263,48 +192,44 @@ public class TeacherService : ITeacherService
             attendance.UpdatedAt = DateTime.UtcNow;
         }
 
-        var student = await _context.Users.FirstOrDefaultAsync(u => u.UserId == studentId, ct);
+        var student = await repository.FindUserForUpdate(studentId, ct);
         if (student != null)
         {
             student.LastLoginAt = DateTime.UtcNow;
         }
 
-        await _context.SaveChangesAsync(ct);
+        await unit.SaveChangesAsync(ct);
 
-        await _realtimeService.NotifyWorkstationCheckInAsync(session.ClassId, studentId, student?.FullName ?? "Học sinh", workstationIp, ct);
+        await realtimeService.NotifyWorkstationCheckInAsync(session.ClassId, studentId, student?.FullName ?? "Học sinh", workstationIp, ct);
 
         return true;
     }
 
     public async Task<List<MakeupRequestItemDto>> GetMakeupRequestsAsync(int teacherId, CancellationToken ct = default)
     {
-        return await _context.MakeupRequests
-            .AsNoTracking()
-            .Where(m => m.Attendance.Session.Class.TeacherId == teacherId)
+        var requests = await repository.TeacherMakeupRequests(teacherId, ct);
+        return requests
             .OrderBy(m => m.Status != "Pending")
             .ThenByDescending(m => m.CreatedAt)
             .Select(m => new MakeupRequestItemDto
             {
                 MakeupId = m.MakeupId,
-                StudentId = m.Attendance.StudentId,
-                StudentName = m.Attendance.Student.User.FullName,
-                ClassCode = m.Attendance.Session.Class.ClassCode,
-                MissedDate = m.Attendance.Session.SessionDate,
+                StudentId = m.Attendance?.StudentId ?? 0,
+                StudentName = m.Attendance?.Student?.User?.FullName ?? "Học sinh",
+                ClassCode = m.Attendance?.Session?.Class?.ClassCode ?? string.Empty,
+                MissedDate = m.Attendance?.Session?.SessionDate ?? default,
                 PreferredSessionId = m.PreferredSessionId,
-                PreferredDate = m.PreferredSession != null ? m.PreferredSession.SessionDate : null,
+                PreferredDate = m.PreferredSession?.SessionDate,
                 Reason = m.Reason,
                 Status = m.Status,
                 CreatedAt = m.CreatedAt
             })
-            .ToListAsync(ct);
+            .ToList();
     }
 
     public async Task<bool> ReviewMakeupRequestAsync(ReviewMakeupRequestDto request, int teacherId, CancellationToken ct = default)
     {
-        var makeup = await _context.MakeupRequests
-            .Include(m => m.Attendance)
-                .ThenInclude(a => a.Student)
-            .FirstOrDefaultAsync(m => m.MakeupId == request.MakeupId, ct)
+        var makeup = await repository.FindMakeupRequest(request.MakeupId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy đơn xin học bù.");
 
         makeup.Status = request.IsApproved ? "Approved" : "Rejected";
@@ -313,27 +238,26 @@ public class TeacherService : ITeacherService
 
         if (request.IsApproved && makeup.PreferredSessionId.HasValue)
         {
-            var existingAtt = await _context.AttendanceRecords
-                .FirstOrDefaultAsync(a => a.SessionId == makeup.PreferredSessionId.Value && a.StudentId == makeup.Attendance.StudentId, ct);
+            var existingAtt = await repository.FindAttendance(makeup.PreferredSessionId.Value, makeup.Attendance?.StudentId ?? 0, ct);
 
             if (existingAtt == null)
             {
-                await _context.AttendanceRecords.AddAsync(new AttendanceRecord
+                repository.AddAttendance(new AttendanceRecord
                 {
                     SessionId = makeup.PreferredSessionId.Value,
-                    StudentId = makeup.Attendance.StudentId,
+                    StudentId = makeup.Attendance?.StudentId ?? 0,
                     Status = "Present",
                     AbsenceReason = "Học bù đã duyệt",
                     MarkedBy = teacherId,
                     MarkedAt = DateTime.UtcNow
-                }, ct);
+                });
             }
         }
 
-        await _context.SaveChangesAsync(ct);
+        await unit.SaveChangesAsync(ct);
 
-        await _notificationService.SendNotificationAsync(
-            makeup.Attendance.StudentId,
+        await notificationService.SendNotificationAsync(
+            makeup.Attendance?.StudentId ?? 0,
             "MakeupStatusUpdated",
             "Kết quả đơn xin học bù",
             $"Đơn xin học bù của bạn đã được giáo viên {(request.IsApproved ? "CHẤP THUẬN" : "TỪ CHỐI")}.",
@@ -371,8 +295,8 @@ public class TeacherService : ITeacherService
             });
         }
 
-        await _context.ChallengeMaps.AddAsync(map, ct);
-        await _context.SaveChangesAsync(ct);
+        repository.AddChallengeMap(map);
+        await unit.SaveChangesAsync(ct);
         return map.MapId;
     }
 
@@ -380,75 +304,61 @@ public class TeacherService : ITeacherService
 
     public async Task<List<GradingQueueItemDto>> GetGradingQueueAsync(int teacherId, int? classId, CancellationToken ct = default)
     {
-        var query = _context.Submissions
-            .AsNoTracking()
-            .Where(s => s.IsCurrent && s.Assignment.Class.TeacherId == teacherId);
+        var submissions = await repository.GradingQueue(teacherId, classId, ct);
 
-        if (classId.HasValue)
-        {
-            query = query.Where(s => s.Assignment.ClassId == classId.Value);
-        }
-
-        return await query
+        return submissions
             .OrderBy(s => s.Status == "Finalized")
             .ThenByDescending(s => s.SubmittedAt)
             .Select(s => new GradingQueueItemDto
             {
                 SubmissionId = s.SubmissionId,
                 AssignmentId = s.AssignmentId,
-                AssignmentTitle = s.Assignment.Title,
-                ClassId = s.Assignment.ClassId,
-                ClassCode = s.Assignment.Class.ClassCode,
+                AssignmentTitle = s.Assignment?.Title ?? string.Empty,
+                ClassId = s.Assignment?.ClassId ?? 0,
+                ClassCode = s.Assignment?.Class?.ClassCode ?? string.Empty,
                 StudentId = s.StudentId,
-                StudentCode = s.Student.StudentCode,
-                StudentName = s.Student.User.FullName,
+                StudentCode = s.Student?.StudentCode ?? string.Empty,
+                StudentName = s.Student?.User?.FullName ?? "Học sinh",
                 AttemptNo = s.AttemptNo,
                 Status = s.Status,
                 SubmittedAt = s.SubmittedAt,
                 BlocklyJson = s.BlocklyJson,
-                AutoAstScore = s.AstEvaluation != null ? s.AstEvaluation.AutoAstScore : (decimal?)null,
-                MatchPercent = s.AstEvaluation != null ? s.AstEvaluation.MatchPercent : (decimal?)null,
-                HardwareScore = s.Grade != null ? s.Grade.HardwareScore : null,
-                FinalScore = s.Grade != null ? s.Grade.FinalScore : null,
-                RemarkText = s.Grade != null ? s.Grade.RemarkText : null,
-                RemarkSource = s.Grade != null ? s.Grade.RemarkSource : null
+                AutoAstScore = s.AstEvaluation?.AutoAstScore,
+                MatchPercent = s.AstEvaluation?.MatchPercent,
+                HardwareScore = s.Grade?.HardwareScore,
+                FinalScore = s.Grade?.FinalScore,
+                RemarkText = s.Grade?.RemarkText,
+                RemarkSource = s.Grade?.RemarkSource
             })
-            .ToListAsync(ct);
+            .ToList();
     }
 
     public async Task<SubmissionGradingResultDto> GradeSubmissionAsync(GradeSubmissionRequest request, int teacherId, CancellationToken ct = default)
     {
-        var submission = await _context.Submissions
-            .Include(s => s.Assignment)
-            .Include(s => s.AstEvaluation)
-            .Include(s => s.Grade)
-                .ThenInclude(g => g!.HardwareScores)
-            .Include(s => s.Student)
-            .FirstOrDefaultAsync(s => s.SubmissionId == request.SubmissionId, ct)
+        var submission = await repository.SubmissionForGrading(request.SubmissionId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy bài nộp.");
 
         decimal astScore = submission.AstEvaluation?.AutoAstScore ?? 0m;
         if (submission.AstEvaluation == null && !string.IsNullOrWhiteSpace(submission.Assignment?.MasterAstJson) && !string.IsNullOrWhiteSpace(submission.AstJson))
         {
-            astScore = _astService.CalculateTreeEditDistanceScore(submission.AstJson, submission.Assignment.MasterAstJson);
+            astScore = astService.CalculateTreeEditDistanceScore(submission.AstJson, submission.Assignment.MasterAstJson);
 
-            var astEval = new AstEvaluation
+            repository.AddAstEvaluation(new AstEvaluation
             {
                 SubmissionId = submission.SubmissionId,
                 AutoAstScore = astScore,
                 MatchPercent = astScore * 10m,
                 EngineVersion = "TED-v1.0",
                 EvaluatedAt = DateTime.UtcNow
-            };
-            await _context.AstEvaluations.AddAsync(astEval, ct);
+            });
         }
 
         decimal hardwareScore = Math.Round((request.AssemblyScore + request.AlgorithmExplainScore + request.TeamworkScore) / 3.0m, 2);
-        decimal finalScore = _astService.ComputeHybridScore(astScore, hardwareScore);
+        decimal finalScore = astService.ComputeHybridScore(astScore, hardwareScore);
 
         submission.Status = "Finalized";
 
-        var grade = submission.Grade;
+        var grade = await repository.FindGrade(submission.SubmissionId, ct);
         if (grade == null)
         {
             grade = new Grade
@@ -463,7 +373,7 @@ public class TeacherService : ITeacherService
                 FinalizedBy = teacherId,
                 FinalizedAt = DateTime.UtcNow
             };
-            await _context.Grades.AddAsync(grade, ct);
+            repository.AddGrade(grade);
         }
         else
         {
@@ -476,12 +386,13 @@ public class TeacherService : ITeacherService
             grade.FinalizedAt = DateTime.UtcNow;
         }
 
-        submission.Student.TotalXp += (int)(finalScore * 10m);
-        submission.Student.StemPoints += (int)(finalScore * 5m);
+        if (submission.Student != null)
+        {
+            submission.Student.TotalXp += (int)(finalScore * 10m);
+            submission.Student.StemPoints += (int)(finalScore * 5m);
+        }
 
-        var existingPortfolio = await _context.PortfolioItems
-            .Include(pi => pi.AchievementCards)
-            .FirstOrDefaultAsync(pi => pi.SubmissionId == submission.SubmissionId, ct);
+        var existingPortfolio = await repository.FindPortfolioBySubmission(submission.SubmissionId, ct);
 
         if (existingPortfolio == null && finalScore >= 8.0m)
         {
@@ -504,7 +415,7 @@ public class TeacherService : ITeacherService
                 ViewCount = 1,
                 CreatedAt = DateTime.UtcNow
             });
-            await _context.PortfolioItems.AddAsync(portfolioItem, ct);
+            repository.AddPortfolio(portfolioItem);
         }
         else if (existingPortfolio != null)
         {
@@ -515,9 +426,9 @@ public class TeacherService : ITeacherService
             }
         }
 
-        await _context.SaveChangesAsync(ct);
+        await unit.SaveChangesAsync(ct);
 
-        await _notificationService.SendNotificationAsync(
+        await notificationService.SendNotificationAsync(
             submission.StudentId,
             "GradePublished",
             "Kết quả bài thực hành STEM",
@@ -540,18 +451,10 @@ public class TeacherService : ITeacherService
 
     public async Task<ClassPerformanceAnalyticsDto> GetClassPerformanceAnalyticsAsync(int classId, CancellationToken ct = default)
     {
-        var classroom = await _context.Classes
-            .AsNoTracking()
-            .Include(c => c.Enrollments)
-            .FirstOrDefaultAsync(c => c.ClassId == classId, ct)
+        var classroom = await repository.FindClass(classId, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy lớp học.");
 
-        var grades = await _context.Grades
-            .AsNoTracking()
-            .Include(g => g.Submission)
-                .ThenInclude(s => s.Assignment)
-            .Where(g => g.Submission.Assignment.ClassId == classId && g.FinalScore.HasValue)
-            .ToListAsync(ct);
+        var grades = await repository.ClassGrades(classId, ct);
 
         if (grades.Count == 0)
         {

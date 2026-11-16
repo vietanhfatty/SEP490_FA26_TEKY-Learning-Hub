@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using TekyLearningHub.Application.DTOs;
-using TekyLearningHub.Application.Services;
+using TekyLearningHub.Application.Interfaces.Portal;
 
 namespace TekyLearningHub.Api.Controllers.Portal;
 

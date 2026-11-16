@@ -11,6 +11,7 @@ export * from './ui/LogoutConfirmDialog';
 export * from './api-client/auth';
 export * from './api-client/adminUsers';
 export * from './api-client/courses';
+export * from './api-client/lmsApi';
 export * from './auth/jwt';
 export * from './auth/shellConfig';
 export * from './auth/shellTransfer';

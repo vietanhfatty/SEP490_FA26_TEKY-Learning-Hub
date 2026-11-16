@@ -1,36 +1,21 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ClosedXML.Excel;
-using Microsoft.EntityFrameworkCore;
-using TekyLearningHub.Application.Interfaces;
+using TekyLearningHub.Application.Interfaces.Backoffice;
 
 namespace TekyLearningHub.Infrastructure.Services;
 
-public class ExcelExportService : IExcelExportService
+/// <summary>
+/// Xuất sổ điểm lớp ra Excel. Dữ liệu đã được repository vật chất hoá;
+/// adapter chỉ dựng và định dạng file.
+/// </summary>
+public class ExcelExportService(ITeacherRepository repository) : IExcelExportService
 {
-    private readonly IApplicationDbContext _context;
-
-    public ExcelExportService(IApplicationDbContext context)
-    {
-        _context = context;
-    }
-
     public async Task<byte[]> ExportClassGradebookAsync(int classId, CancellationToken cancellationToken = default)
     {
-        var classroom = await _context.Classes
-            .AsNoTracking()
-            .Include(c => c.Teacher)
-                .ThenInclude(t => t!.User)
-            .Include(c => c.Enrollments)
-                .ThenInclude(e => e.Student)
-                    .ThenInclude(s => s.User)
-            .Include(c => c.Assignments)
-                .ThenInclude(a => a.Submissions)
-                    .ThenInclude(s => s.Grade)
-            .FirstOrDefaultAsync(c => c.ClassId == classId, cancellationToken)
+        var gradebook = await repository.GradebookRow(classId, cancellationToken)
             ?? throw new KeyNotFoundException("Không tìm thấy thông tin lớp học.");
 
         using var workbook = new XLWorkbook();
@@ -45,7 +30,7 @@ public class ExcelExportService : IExcelExportService
             .Fill.SetBackgroundColor(XLColor.FromHtml("#2563EB"))
             .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
 
-        worksheet.Cell(2, 1).Value = $"Lớp: {classroom.Name} ({classroom.ClassCode}) | Giáo viên: {classroom.Teacher?.User.FullName ?? "Chưa phân công"} | Xuất ngày: {DateTime.Now:dd/MM/yyyy HH:mm}";
+        worksheet.Cell(2, 1).Value = $"Lớp: {gradebook.ClassName} ({gradebook.ClassCode}) | Giáo viên: {gradebook.TeacherName} | Xuất ngày: {DateTime.Now:dd/MM/yyyy HH:mm}";
         worksheet.Range(2, 1, 2, 7).Merge().Style
             .Font.SetItalic(true)
             .Font.SetFontSize(10)
@@ -71,29 +56,20 @@ public class ExcelExportService : IExcelExportService
         int row = 5;
         int stt = 1;
 
-        var activeStudents = classroom.Enrollments.Where(e => e.Status == "Active").OrderBy(e => e.Student.User.FullName).ToList();
-        foreach (var item in activeStudents)
+        foreach (var item in gradebook.Students)
         {
-            var student = item.Student;
-            // Latest graded submission
-            var submission = classroom.Assignments
-                .SelectMany(a => a.Submissions)
-                .Where(s => s.StudentId == student.UserId && s.Grade != null)
-                .OrderByDescending(s => s.SubmittedAt)
-                .FirstOrDefault();
-
             worksheet.Cell(row, 1).Value = stt++;
-            worksheet.Cell(row, 2).Value = student.StudentCode;
-            worksheet.Cell(row, 3).Value = student.User.FullName;
+            worksheet.Cell(row, 2).Value = item.StudentCode;
+            worksheet.Cell(row, 3).Value = item.FullName;
 
-            if (submission?.Grade != null)
+            if (item.FinalScore.HasValue)
             {
-                worksheet.Cell(row, 4).Value = submission.Grade.AutoAstScore ?? 0m;
-                worksheet.Cell(row, 5).Value = submission.Grade.HardwareScore ?? 0m;
-                worksheet.Cell(row, 6).Value = submission.Grade.FinalScore ?? 0m;
-                worksheet.Cell(row, 7).Value = submission.Grade.FinalScore >= 8.5m ? "Xuất sắc" : submission.Grade.FinalScore >= 7.0m ? "Khá" : "Đạt";
+                worksheet.Cell(row, 4).Value = item.AutoAstScore ?? 0m;
+                worksheet.Cell(row, 5).Value = item.HardwareScore ?? 0m;
+                worksheet.Cell(row, 6).Value = item.FinalScore.Value;
+                worksheet.Cell(row, 7).Value = item.FinalScore.Value >= 8.5m ? "Xuất sắc" : item.FinalScore.Value >= 7.0m ? "Khá" : "Đạt";
 
-                if (submission.Grade.FinalScore >= 8.5m)
+                if (item.FinalScore.Value >= 8.5m)
                 {
                     worksheet.Cell(row, 6).Style.Font.SetBold(true).Font.SetFontColor(XLColor.FromHtml("#16A34A"));
                 }

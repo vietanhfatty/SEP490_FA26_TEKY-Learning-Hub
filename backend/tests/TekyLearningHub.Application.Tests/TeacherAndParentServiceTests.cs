@@ -6,14 +6,23 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.DTOs;
 using TekyLearningHub.Application.Interfaces;
-using TekyLearningHub.Application.Services;
+using TekyLearningHub.Application.Interfaces.Backoffice;
+using TekyLearningHub.Application.Interfaces.Portal;
+using TekyLearningHub.Application.Services.Backoffice;
+using TekyLearningHub.Application.Services.Portal;
 using TekyLearningHub.Domain.Entities;
 using TekyLearningHub.Infrastructure.Data;
+using TekyLearningHub.Infrastructure.Repositories.Backoffice;
+using TekyLearningHub.Infrastructure.Repositories.Portal;
 using TekyLearningHub.Infrastructure.Services;
 using Xunit;
 
 namespace TekyLearningHub.Application.Tests;
 
+/// <summary>
+/// Test use case giáo viên và phụ huynh chạy trên repository EF thật với DbContext InMemory,
+/// nên không phụ thuộc SQL Server nhưng vẫn kiểm tra đúng đường đi của tầng.
+/// </summary>
 public class TeacherAndParentServiceTests
 {
     private sealed class FakeRealtimeService : IClassroomRealtimeService
@@ -70,9 +79,9 @@ public class TeacherAndParentServiceTests
         var ctx = new ApplicationDbContext(options);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var teacherUser = new User { UserId = 1, Email = "gv@teky.edu.vn", PasswordHash = "hash", FullName = "Thầy Nguyễn Văn Nam", Status = "Active", ThemeMode = "Light", RoleId = 2 };
-        var studentUser = new User { UserId = 2, Email = "hs@teky.edu.vn", PasswordHash = "hash", FullName = "Lê Bảo An", Status = "Active", ThemeMode = "Light", RoleId = 1 };
-        var parentUser = new User { UserId = 5, Email = "ph@teky.edu.vn", PasswordHash = "hash", FullName = "Chị Nguyễn Thị Lan", Status = "Active", ThemeMode = "Light", RoleId = 4 };
+        var teacherUser = new User { UserId = 1, Email = "gv@teky.edu.vn", PasswordHash = "hash", FullName = "Thầy Nguyễn Văn Nam", Status = "Active", ThemeMode = "Light", PrimaryRoleId = 2 };
+        var studentUser = new User { UserId = 2, Email = "hs@teky.edu.vn", PasswordHash = "hash", FullName = "Lê Bảo An", Status = "Active", ThemeMode = "Light", PrimaryRoleId = 1 };
+        var parentUser = new User { UserId = 5, Email = "ph@teky.edu.vn", PasswordHash = "hash", FullName = "Chị Nguyễn Thị Lan", Status = "Active", ThemeMode = "Light", PrimaryRoleId = 4 };
 
         var teacher = new TeacherProfile { UserId = 1, User = teacherUser, TeacherCode = "TEKY-TEA-001", Bio = "Master Robotics" };
         var student = new StudentProfile { UserId = 2, User = studentUser, StudentCode = "TEKY-STU-001", TotalXp = 100, StemPoints = 50, Status = "Active" };
@@ -171,13 +180,27 @@ public class TeacherAndParentServiceTests
         return ctx;
     }
 
+    private static TeacherService CreateTeacherService(ApplicationDbContext ctx, FakeRealtimeService realtime, FakeNotificationService notify) =>
+        new(new TeacherRepository(ctx), new TestUnitOfWork(ctx), new AstAnalysisService(), realtime, notify);
+
+    private static ParentService CreateParentService(ApplicationDbContext ctx, FakeRealtimeService realtime) =>
+        new(new ParentRepository(ctx), new TestUnitOfWork(ctx), realtime);
+
+    /// <summary>Unit of work gom thao tác ghi về DbContext InMemory đang dùng trong test.</summary>
+    private sealed class TestUnitOfWork(ApplicationDbContext db) : IUnitOfWork
+    {
+        public Task<int> SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
+        public Task<T> ExecuteAsync<T>(TransactionKind kind, Func<Task<T>> operation, CancellationToken ct = default) => operation();
+        public void Reset() => db.ChangeTracker.Clear();
+    }
+
     [Fact]
     public async Task GradeSubmissionAsync_ComputesHybridScore_NormalizesRemarkSource_AndCreatesQrPortfolio()
     {
         using var ctx = CreateSeededContext();
         var realtime = new FakeRealtimeService();
         var notify = new FakeNotificationService();
-        var service = new TeacherService(ctx, new AstAnalysisService(), realtime, notify);
+        var service = CreateTeacherService(ctx, realtime, notify);
 
         var result = await service.GradeSubmissionAsync(new GradeSubmissionRequest
         {
@@ -210,7 +233,7 @@ public class TeacherAndParentServiceTests
         using var ctx = CreateSeededContext();
         var realtime = new FakeRealtimeService();
         var notify = new FakeNotificationService();
-        var service = new TeacherService(ctx, new AstAnalysisService(), realtime, notify);
+        var service = CreateTeacherService(ctx, realtime, notify);
 
         var ok = await service.SyncWorkstationCheckInAsync(sessionId: 6, studentId: 2, workstationIp: "192.168.1.108");
         Assert.True(ok);
@@ -227,8 +250,8 @@ public class TeacherAndParentServiceTests
         using var ctx = CreateSeededContext();
         var realtime = new FakeRealtimeService();
         var notify = new FakeNotificationService();
-        var teacherService = new TeacherService(ctx, new AstAnalysisService(), realtime, notify);
-        var parentService = new ParentService(ctx, realtime);
+        var teacherService = CreateTeacherService(ctx, realtime, notify);
+        var parentService = CreateParentService(ctx, realtime);
 
         await teacherService.GradeSubmissionAsync(new GradeSubmissionRequest
         {
@@ -269,7 +292,7 @@ public class TeacherAndParentServiceTests
         using var ctx = CreateSeededContext();
         var realtime = new FakeRealtimeService();
         var notify = new FakeNotificationService();
-        var service = new TeacherService(ctx, new AstAnalysisService(), realtime, notify);
+        var service = CreateTeacherService(ctx, realtime, notify);
 
         // 1. GetTeacherWorkspaceAsync & GetTeacherClassesAsync
         var workspace = await service.GetTeacherWorkspaceAsync(teacherId: 1);
@@ -339,7 +362,7 @@ public class TeacherAndParentServiceTests
         Assert.True(analytics.AverageScore >= 9.0m);
 
         // 6. ExportClassGradebookAsync
-        var excelService = new ExcelExportService(ctx);
+        var excelService = new ExcelExportService(new TeacherRepository(ctx));
         var excelBytes = await excelService.ExportClassGradebookAsync(classId: 3);
         Assert.NotEmpty(excelBytes);
     }
@@ -349,8 +372,8 @@ public class TeacherAndParentServiceTests
     {
         using var ctx = CreateSeededContext();
         var realtime = new FakeRealtimeService();
-        var parentService = new ParentService(ctx, realtime);
-        var aiService = new AiAssistantService(ctx);
+        var parentService = CreateParentService(ctx, realtime);
+        var aiService = new AiAssistantService(new ParentRepository(ctx));
 
         // 1. GetParentDashboardAsync
         var dash = await parentService.GetParentDashboardAsync(parentId: 5);

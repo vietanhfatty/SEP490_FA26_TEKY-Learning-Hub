@@ -1,4 +1,4 @@
-using TekyLearningHub.Application.Services;
+using TekyLearningHub.Application.Services.Backoffice;
 using Xunit;
 
 namespace TekyLearningHub.Application.Tests;
