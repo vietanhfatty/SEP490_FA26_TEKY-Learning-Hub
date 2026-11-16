@@ -28,26 +28,51 @@ public class StudentClassesService(IStudentClassesRepository db, IUnitOfWork uni
         if (!await db.IsStudent(userId, cancellationToken)) return null;
         var session = await db.Session(userId, sessionId, cancellationToken);
         if (session is null) return null;
-        var assignments = await GetAssignmentsAsync(userId, session, cancellationToken);
-        return MapSession(session, true) with { Assignments = assignments };
+        var assignments = await ReadAssignmentsAsync(userId, sessionId, null, session, cancellationToken);
+        return MapSession(session, true) with { Assignments = assignments.Select(a => a.Assignment).ToList() };
     }
-
-    private async Task<IReadOnlyList<StudentAssignmentDto>> GetAssignmentsAsync(
-        int userId, ClassSession session, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<StudentAssignmentItemDto>?> GetAssignmentsAsync(int userId, CancellationToken cancellationToken)
     {
-        if (session.Lesson is not { IsDeleted: false }) return [];
-
+        if (!await db.IsStudent(userId, cancellationToken)) return null;
+        return await ReadAssignmentsAsync(userId, null, null, null, cancellationToken);
+    }
+    public async Task<StudentAssignmentDetailDto?> GetAssignmentAsync(int userId, int assignmentId, CancellationToken cancellationToken)
+    {
+        var items = await ReadAssignmentsAsync(userId, null, assignmentId, null, cancellationToken);
+        if (items.Count == 0) return null;
+        var versions = await db.Versions(userId, assignmentId, cancellationToken);
+        return new(items[0], versions.Select(v => new StudentProjectDto(v.FileName, Utc(v.SubmittedAt), v.AttemptNo, v.ReviewStatus, v.Feedback, v.ReviewedAt is { } reviewed ? Utc(reviewed) : null)).ToList());
+    }
+    private async Task<IReadOnlyList<StudentAssignmentItemDto>> ReadAssignmentsAsync(int userId, int? sessionId, int? assignmentId, ClassSession? session, CancellationToken cancellationToken)
+    {
         var now = DateTime.UtcNow;
-        var active = session.Status != "Cancelled" && await db.ActiveEnrollment(userId, session.ClassId, cancellationToken);
-        var assignments = await db.Assignments(userId, session.SessionId, cancellationToken);
-
-        return assignments.Select(a => new StudentAssignmentDto(a.AssignmentId, a.Title, a.Instructions,
-            a.DueAt is { } dueAt ? Utc(dueAt) : null,
-            active && a.Status == "Published" && (a.DueAt is null || a.DueAt > now) && (a.SubmittedAt is null || a.ReviewStatus == "NeedsRevision"),
-            a.SubmittedAt is { } submittedAt ? new StudentProjectDto(a.FileName!, Utc(submittedAt), a.AttemptNo, a.ReviewStatus!, a.Feedback, a.ReviewedAt is { } reviewed ? Utc(reviewed) : null) : null)).ToList();
+        var rows = await db.AssignmentRows(userId, sessionId, assignmentId, cancellationToken);
+        return rows.Select(a => new StudentAssignmentItemDto(
+            new(a.AssignmentId, a.Title, a.Instructions, a.DueAt is { } dueAt ? Utc(dueAt) : null,
+                session?.Status != "Cancelled" && a.Active && a.Status == "Published"
+                    && (a.DueAt is null || a.DueAt > now) && a.CodeSubmittedAt is null
+                    && (a.FileSubmittedAt is null || a.ReviewStatus == "NeedsRevision"),
+                a.FileSubmittedAt is { } submittedAt ? new(a.FileName!, Utc(submittedAt), a.FileAttempt,
+                    a.ReviewStatus!, a.Feedback, a.ReviewedAt is { } reviewed ? Utc(reviewed) : null) : null,
+                a.CodeSubmittedAt is { } codedAt ? new(a.CodeAttempt, Utc(codedAt), a.IsFinalized,
+                    a.Score, a.MaxScore, a.Remark) : null),
+            a.ClassId, a.ClassCode, a.ClassName, a.CourseId, a.CourseName, a.LessonId, a.LessonTitle,
+            session?.SessionId ?? a.SessionId)).ToList();
     }
 
-    public async Task<StudentProjectOutcome> SubmitProjectAsync(int userId, int sessionId, int assignmentId,
+    public async Task<IReadOnlyList<StudentProjectItemDto>?> GetProjectsAsync(int userId, CancellationToken cancellationToken)
+    {
+        if (!await db.IsStudent(userId, cancellationToken)) return null;
+        var data = await db.Projects(userId, cancellationToken); var files = data.Files; var portfolio = data.Portfolio;
+        return files.Select(file => new StudentProjectItemDto(file.AssignmentId, file.Title, file.ClassCode, file.CourseName,
+                Utc(file.SubmittedAt), file.AttemptNo, file.ReviewStatus, file.FileName, file.Feedback))
+            .Concat(portfolio.Select(item => new StudentProjectItemDto(item.AssignmentId, item.Title, item.ClassCode, item.CourseName,
+                Utc(item.SubmittedAt), item.AttemptNo, item.Finalized ? "Graded" : "Pending", null,
+                item.Feedback, item.Summary, item.Score, item.MaxScore)))
+            .OrderByDescending(project => project.SubmittedAt).ThenBy(project => project.AssignmentId).ToList();
+    }
+
+    public async Task<StudentProjectOutcome> SubmitProjectAsync(int userId, int? sessionId, int assignmentId,
         string fileName, byte[] content, CancellationToken cancellationToken)
     {
         return await unit.ExecuteAsync(TransactionKind.ProjectSubmission, async () =>
@@ -60,6 +85,7 @@ public class StudentClassesService(IStudentClassesRepository db, IUnitOfWork uni
             if (assignment.Status != "Published" || assignment.DueAt <= now)
                 return new StudentProjectOutcome(StudentProjectResult.Closed);
 
+            if (await db.HasCodeSubmission(userId, assignmentId, cancellation)) return new StudentProjectOutcome(StudentProjectResult.AlreadySubmitted);
             var previous = await db.Submission(userId, assignmentId, cancellation);
             if (previous != null && previous.ReviewStatus != "NeedsRevision")
                 return new StudentProjectOutcome(StudentProjectResult.AlreadySubmitted);
@@ -109,7 +135,7 @@ public class StudentClassesService(IStudentClassesRepository db, IUnitOfWork uni
         }, cancellationToken);
     }
 
-    public Task<StudentProjectFile?> GetProjectFileAsync(int userId, int sessionId, int assignmentId,
+    public Task<StudentProjectFile?> GetProjectFileAsync(int userId, int? sessionId, int assignmentId,
         CancellationToken cancellationToken)
     {
         return db.File(userId, sessionId, assignmentId, cancellationToken);

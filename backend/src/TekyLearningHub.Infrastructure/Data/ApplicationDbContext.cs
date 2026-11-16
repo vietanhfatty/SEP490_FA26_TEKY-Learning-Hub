@@ -12,6 +12,9 @@ public class ApplicationDbContext : TekyLearningHubContext
     public DbSet<StudentProjectSubmission> StudentProjectSubmissions => Set<StudentProjectSubmission>();
     public DbSet<AccountEmail> AccountEmails => Set<AccountEmail>();
     public DbSet<AccountInvitation> AccountInvitations => Set<AccountInvitation>();
+    public DbSet<Assessment> Assessments => Set<Assessment>();
+    public DbSet<AssessmentAttempt> AssessmentAttempts => Set<AssessmentAttempt>();
+
     private void ValidateAuditActors()
     {
         foreach (var entry in ChangeTracker.Entries<AuditLog>()
@@ -33,6 +36,11 @@ public class ApplicationDbContext : TekyLearningHubContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<AssessmentAttempt>(entity =>
+        {
+            entity.HasKey(a => a.AttemptId);
+            entity.Property(a => a.AttemptId).ValueGeneratedNever();
+        });
         modelBuilder.Entity<UserRoleAssignment>(entity =>
         {
             entity.ToTable("UserRoles");

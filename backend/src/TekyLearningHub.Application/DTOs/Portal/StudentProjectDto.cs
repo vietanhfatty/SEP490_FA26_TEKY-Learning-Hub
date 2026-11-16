@@ -1,7 +1,7 @@
 namespace TekyLearningHub.Application.DTOs.Portal;
 
 public record StudentAssignmentDto(int AssignmentId, string Title, string? Instructions, DateTimeOffset? DueAt,
-    bool CanSubmit, StudentProjectDto? Submission);
+    bool CanSubmit, StudentProjectDto? Submission, StudentCodeSubmissionDto? CodeSubmission = null);
 
 public record StudentProjectDto(string FileName, DateTimeOffset SubmittedAt, int AttemptNo = 1,
     string ReviewStatus = "Pending", string? Feedback = null, DateTimeOffset? ReviewedAt = null);

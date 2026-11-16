@@ -1,9 +1,12 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { StudentProjectsView } from '@teky/shared/ui/StudentProjectsView';
+import { StudentAssessmentsView } from '@teky/shared/ui/StudentAssessmentsView';
+import { StudentAssignmentsView } from '@teky/shared/ui/StudentAssignmentsView';
+import { StudentOverviewView } from '@teky/shared/ui/StudentOverviewView';
 import { StudentCoursesView } from '@teky/shared/ui/StudentCoursesView';
 import { StudentClassesView } from '@teky/shared/ui/StudentClassesView';
 import React, { useEffect, useRef, useState } from 'react';
-import { IconArrowRight, IconBookOpen, IconCalendar, IconCheckCircle, IconClock, IconCode, IconGrid, IconMenu, IconSearch, IconTrophy, IconVideo, IconX } from '../common/Icons';
-import { Badge } from '../common/Badge';
+import { IconArrowRight, IconBookOpen, IconCalendar, IconCheckCircle, IconClock, IconCode, IconGrid, IconMenu, IconSearch, IconVideo, IconX } from '../common/Icons';
 import { getStudentData, sessionStatus } from '@teky/shared/api-client/studentClasses';
 import type { StudentClasses, StudentSession } from '@teky/shared/api-client/studentClasses';
 import './StudentClasses.css';
@@ -70,24 +73,6 @@ function SessionBadge({ session, now }: { session: StudentSession; now: number }
   return <span className={`student-status ${status.kind}`}>{status.label}</span>;
 }
 
-// Upload icon
-const IconUploadSimple: React.FC<{ size?: number; className?: string }> = ({ size = 20, className = '' }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" x2="12" y1="3" y2="15" />
-  </svg>
-);
 
 interface StudentDashboardProps {
   activeNavId?: string;
@@ -117,7 +102,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
   }, [selectedCourse]);
 
   // Fallback demo state
-  const [projectUploaded, setProjectUploaded] = useState(false);
 
   const match = /^\/dashboard\/timetable\/(\d+)$/.exec(path);
   const detailId = match ? Number(match[1]) : null;
@@ -222,14 +206,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
     },
   ];
 
-  const recentBadges = [
-    { title: 'Chăm Chỉ 100%', desc: 'Điểm danh đầy đủ 8 buổi liên tiếp', icon: '🏆', date: '02/11/2026' },
-    { title: 'Coder Tốc Độ', desc: 'Nộp bài tập Scratch sớm nhất lớp', icon: '⚡', date: '28/10/2026' },
-    { title: 'Sáng Tạo Vô Cực', desc: 'Dự án game có cốt truyện độc đáo', icon: '🎨', date: '20/10/2026' },
-    { title: 'Chuyên Gia Bug Hunter', desc: 'Tự sửa 5 lỗi logic thuật toán', icon: '🐞', date: '15/10/2026' },
-    { title: 'Đồng Đội Xuất Sắc', desc: 'Hỗ trợ bạn cùng bàn hoàn thiện code', icon: '🤝', date: '08/10/2026' },
-  ];
-
 
   // Session details stay in this workspace; no unsupported route is pushed.
   if (detailId !== null) {
@@ -257,71 +233,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
             </section>
           </div>
         </>}
-      </div>
-    );
-  }
-
-  // 4. VIEW: DỰ ÁN & BÀI TẬP (DROPZONE)
-  if (activeNavId === 'assignments') {
-    return (
-      <div className="space-y-6 py-6">
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Assignments</h3>
-          <p className="text-xs text-slate-500">
-            Hạn nộp: Chủ Nhật, 23:59. Hỗ trợ định dạng file Scratch (.sb3), Python (.py), Arduino (.ino) hoặc file nén (.zip).
-          </p>
-
-          <div
-            onClick={() => setProjectUploaded(true)}
-            className="border-2 border-dashed border-blue-400 dark:border-blue-700 rounded-3xl p-10 text-center hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer transition-all"
-          >
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center mb-4">
-              <IconUploadSimple size={32} />
-            </div>
-            {projectUploaded ? (
-              <div className="text-sm font-bold text-emerald-600 flex items-center justify-center gap-2">
-                <IconCheckCircle size={20} />
-                <span>Đã nộp thành công: flappy_bird_scratch_final.sb3 (1.4 MB) • Điểm chờ chấm</span>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Kéo thả file mã nguồn dự án vào đây, hoặc nhấn để chọn từ máy tính
-                </p>
-                <p className="text-xs text-slate-400 mt-1">Dung lượng tối đa 25MB • Chuẩn định dạng TEKY</p>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 5. VIEW: BẢNG VÀNG THÀNH TÍCH (TROPHY CABINET)
-  if (activeNavId === 'achievements') {
-    return (
-      <div className="space-y-6 py-6">
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
-              <IconTrophy size={22} className="text-amber-500" /> Gamification &amp; Leaderboard
-            </h3>
-            <Badge variant="success">8/20 Huy hiệu đã mở khóa</Badge>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-            {recentBadges.map((b, idx) => (
-              <div key={idx} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-700/40 border border-slate-200/80 dark:border-slate-700 flex items-start gap-3">
-                <span className="text-3xl">{b.icon}</span>
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{b.title}</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">{b.desc}</p>
-                  <span className="text-[10px] text-slate-400 mt-2 block font-medium">Đạt được: {b.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     );
   }
@@ -354,7 +265,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
   const trainingHours = data ? data.classes.flatMap((course) => course.sessions)
     .filter((session) => session.status === 'Done')
     .reduce((hours, session) => hours + Math.max(0, Date.parse(session.endsAt) - Date.parse(session.startsAt)) / 3600000, 0) : 24.5;
-  const experiencePoints = data ? undefined : 950;
   const fullName = data?.fullName || 'Học viên TEKY';
   const isDemo = !data;
   const courses = overviewCourses;
@@ -378,7 +288,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
   });
   const sessionLive = nextSession && Date.parse(nextSession.startsAt) <= now;
   const hoursText = typeof trainingHours === 'number' && Number.isFinite(trainingHours) ? Math.max(0, trainingHours).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : null;
-  const pointsText = typeof experiencePoints === 'number' && Number.isFinite(experiencePoints) ? Math.max(0, experiencePoints).toLocaleString('vi-VN', { maximumFractionDigits: 0 }) : null;
 
   return (
     <div className="tl-learner">
@@ -396,7 +305,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
           <div className="tl-kpi"><span className="tl-kpi-icon"><IconBookOpen size={22} /></span><div><p>Khóa học đang học</p><strong>{courses.length - completed}<span> khóa</span></strong><small>{completed} khóa đã hoàn thành</small></div></div>
           <div className="tl-kpi"><span className="tl-kpi-icon tl-kpi-success"><IconCheckCircle size={22} /></span><div><p>Tiến độ trung bình</p><strong>{average}<span>%</span></strong><small>Trên {courses.length} khóa học</small></div></div>
           <div className="tl-kpi"><span className="tl-kpi-icon"><IconClock size={22} /></span><div><p>Thời lượng học tập</p><strong>{hoursText ?? '—'}{hoursText !== null && <span> giờ</span>}</strong><small>{hoursText === null ? 'Chưa có dữ liệu' : 'Theo các buổi đã hoàn thành'}</small></div></div>
-          <div className="tl-kpi"><span className="tl-kpi-icon tl-kpi-reward"><IconTrophy size={22} /></span><div><p>Điểm thưởng</p><strong>{pointsText ?? '—'}{pointsText !== null && <span> điểm</span>}</strong><small>{pointsText === null ? 'Chưa có dữ liệu' : 'Thành tích học tập của bạn'}</small></div></div>
         </div>
         <div className="tl-dashboard-grid">
           <div className="tl-main-column">
@@ -426,7 +334,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
           <aside className="tl-side-column" aria-label="Tổng quan và lịch học">
             <section className="tl-panel tl-training-summary"><h2>Training Overview</h2><div className="tl-progress-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" className="tl-ring-track" /><circle cx="60" cy="60" r="50" className="tl-ring-value" strokeDasharray={`${average * Math.PI} ${100 * Math.PI}`} /></svg><div><strong>{average}%</strong><span>Tiến độ trung bình</span></div></div><dl className="tl-summary-stats"><div><dt><IconBookOpen size={18} />Đang học</dt><dd>{courses.length - completed}<span> khóa</span></dd></div><div><dt><IconCheckCircle size={18} />Đã hoàn thành</dt><dd>{completed}<span> khóa</span></dd></div><div><dt><IconCode size={18} />Bài học hoàn thành</dt><dd>{completedLessons}<span>/{totalLessons}</span></dd></div><div><dt><IconCalendar size={18} />Buổi học sắp tới</dt><dd>{upcoming.length}</dd></div></dl></section>
             <section className="tl-panel tl-coming-up"><div className="tl-section-heading"><h2>Don't Miss</h2><IconCalendar size={18} /></div>{upcoming.length ? <ul>{upcoming.slice(0, 3).map((session) => <li key={session.id}><span className="tl-agenda-date"><strong>{new Date(session.startsAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit' })}</strong><span>Tháng {new Date(session.startsAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', month: 'numeric' })}</span></span><div><h3>{session.title}</h3><p>{time(session.startsAt)} · {session.courseName}</p>{!isDemo && <button type="button" className="tl-text-button" onClick={() => openSession(session.id)}>Xem chi tiết<IconArrowRight size={14} /></button>}</div></li>)}</ul> : <p className="tl-muted">Bạn chưa có lịch học sắp tới. Hãy quay lại sau để xem cập nhật từ giảng viên.</p>}</section>
-            <section className="tl-panel tl-rewards"><span className="tl-reward-symbol"><IconTrophy size={25} /></span><h2>Gamification &amp; Leaderboard</h2>{pointsText !== null ? <><p className="tl-reward-points">{pointsText}<span> điểm thưởng</span></p><p className="tl-muted">Mỗi bước tiến trong học tập đều đáng được ghi nhận.</p></> : <p className="tl-muted">Điểm thưởng sẽ được cập nhật khi dữ liệu thành tích được kết nối.</p>}<p className="tl-reward-note">Huy hiệu sẽ xuất hiện khi có thông tin thành tích từ hệ thống.</p></section>
             <div className="tl-learning-note"><IconBookOpen size={23} /><h3>Học theo nhịp của bạn</h3><p>Xem lại kiến thức đã học và chuẩn bị cho bài tiếp theo để tự tin hơn trong mỗi buổi học.</p>{onSelectNav && <button type="button" className="tl-text-button" onClick={() => onSelectNav('courses')}>Xem lộ trình học<IconArrowRight size={15} /></button>}</div>
           </aside>
         </div>
@@ -442,7 +349,11 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
 
 export function StudentDashboard(props: StudentDashboardProps) {
  const location=useLocation();const navigate=useNavigate();
- if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses'||props.activeNavId==='assignments')return <StudentCoursesView />;
- if(location.pathname.startsWith('/dashboard/timetable')||!props.activeNavId||props.activeNavId==='overview'||props.activeNavId==='live')return <StudentClassesView sessionParam={location.pathname.match(/^\/dashboard\/timetable\/([^/]+)$/)?.[1]} onNavigate={navigate} />;
+ if(props.activeNavId==='projects')return <StudentProjectsView />;
+ if(props.activeNavId==='assessments')return <StudentAssessmentsView />;
+ if(props.activeNavId==='assignments')return <StudentAssignmentsView />;
+ if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses')return <StudentCoursesView />;
+ if(location.pathname.startsWith('/dashboard/timetable')||props.activeNavId==='classes'||props.activeNavId==='live')return <StudentClassesView sessionParam={location.pathname.match(/^\/dashboard\/timetable\/([^/]+)$/)?.[1]} onNavigate={navigate} />;
+ if(!props.activeNavId||props.activeNavId==='overview')return <StudentOverviewView/>;
  return <LegacyStudentDashboard {...props}/>;
 }

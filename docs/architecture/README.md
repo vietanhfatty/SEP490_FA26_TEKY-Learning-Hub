@@ -24,7 +24,7 @@ backend/src/
     Services/
       Auth/                     Auth, account, shell transfer, session validation
       Admin/                    UserAdministrationService, CourseService
-      Portal/                   StudentClassesService, StudentLearningService
+      Portal/                   Classes, learning, assignments/projects, overview, assessments
       Backoffice/               ProjectReviewService
     Interfaces/
       Auth/                     Service/repository tài khoản, avatar, chuyển phiên
@@ -63,6 +63,8 @@ Application quản lý điều kiện đăng nhập, lockout, role/scope, cấp 
 Application yêu cầu enqueue email qua outbox; Infrastructure mã hóa và ghi cùng dữ liệu nghiệp vụ, worker gửi SMTP riêng. Avatar được kiểm tra trong Application, đọc/ghi file qua `IAvatarStorage`. Ticket chuyển phiên có kho bộ nhớ singleton, giới hạn dung lượng và thao tác lấy/xóa nguyên tử; thời hạn, origin và PKCE được kiểm tra trong Application.
 
 Controller không còn truy cập database, filesystem hoặc worker. `AccountController` và `ShellTransferController` gọi use case tương ứng. Xác thực JWT trích claim tại API rồi gọi `ISessionValidationService` với dữ liệu danh tính thuần; Application kiểm tra với tài khoản hiện tại. `SessionAuthorization` trong Infrastructure chỉ là adapter claim phục vụ kiểm tra tương thích.
+
+Các chức năng Portal được tích hợp từ Dev gồm danh sách/chi tiết bài tập, thư viện dự án, tổng quan/lớp học và bài kiểm tra. Controller nằm trong `Controllers/Portal`, gọi interface Application; service nghiệp vụ ở `Application/Services/Portal`, repository EF ở `Infrastructure/Repositories/Portal`. Bài kiểm tra giữ snapshot đề, chống nộp lại và chỉ trả đáp án khi cấu hình cho phép. Dữ liệu bài tập/điểm/notification vẫn lọc theo quyền của học sinh.
 
 HTTP route, JSON response, mã lỗi, rate limit và điều kiện phân quyền được giữ nguyên. Không thay schema hoặc thêm SQL migration cho lần tách tầng này.
 

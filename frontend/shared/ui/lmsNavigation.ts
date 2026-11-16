@@ -5,14 +5,12 @@ import {
   IconBookOpen,
   IconCalendar,
   IconCheckCircle,
-  IconTrophy,
   IconSparkles,
   IconUsers,
   IconShieldCheck,
   IconActivity,
   IconCreditCard,
   IconFileText,
-  IconVideo,
   IconLayers,
   IconBell,
   IconSettings,
@@ -84,11 +82,12 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
   switch (role) {
     case 'student':
       return [
-        { id: 'overview', label: 'Lớp học', icon: IconCalendar },
-        { id: 'courses', label: 'Khoá học', icon: IconBookOpen },
-        { id: 'live', label: 'Today', icon: IconVideo },
-        { id: 'assignments', label: 'Ôn tập & Bài tập', icon: IconFileText },
-        { id: 'achievements', label: 'Gamification', icon: IconTrophy },
+        { id: 'overview', label: 'Dashboard', icon: IconHome },
+        { id: 'classes', label: 'My Classes', icon: IconCalendar },
+        { id: 'courses', label: 'My Courses', icon: IconBookOpen },
+        { id: 'projects', label: 'My Projects', icon: IconLayers },
+        { id: 'assignments', label: 'Assignments', icon: IconFileText },
+        { id: 'assessments', label: 'Assessments', icon: IconCheckCircle },
       ];
     case 'teacher':
       return [

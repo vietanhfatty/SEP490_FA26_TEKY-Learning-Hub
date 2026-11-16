@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { downloadStudentProject, submitStudentProject } from '../api-client/studentClasses';
 import type { StudentAssignment, StudentSession } from '../api-client/studentClasses';
+import { assignmentLabels, assignmentState } from '../api-client/studentAssignments';
 import { IconBookOpen, IconDownload, IconFileText } from './Icons';
 
 const maxBytes = 10 * 1024 * 1024;
@@ -10,13 +11,15 @@ const localDateTime = new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
 });
 
-export function ProjectForm({ sessionId, assignment, onSubmitted }: { sessionId: number; assignment: StudentAssignment; onSubmitted?: () => void }) {
+export function ProjectForm({ sessionId, assignment, onSubmitted }: { sessionId: number | null; assignment: StudentAssignment; onSubmitted?: () => void }) {
   const inputId = useId();
   const [file, setFile] = useState<File>();
   const [submission, setSubmission] = useState(assignment.submission);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const canSubmit = assignment.canSubmit && (!submission || submission.reviewStatus === 'NeedsRevision');
+  const code = assignment.codeSubmission;
+  const state = assignmentState({ ...assignment, submission });
+  const canSubmit = !code && assignment.canSubmit && (!submission || submission.reviewStatus === 'NeedsRevision');
 
   function chooseFile(value?: File) {
     setError('');
@@ -62,13 +65,18 @@ export function ProjectForm({ sessionId, assignment, onSubmitted }: { sessionId:
   return <article className="sc-work-item">
     <div className="sc-work-line">
       <h3>{assignment.title}</h3>
-      <span role="status" className="sc-status" data-status={submission ? 'done' : canSubmit ? 'upcoming' : 'ended'}>
-        {submission ? submission.reviewStatus === 'Passed' ? 'Đạt yêu cầu' : submission.reviewStatus === 'NeedsRevision' ? 'Cần luyện thêm' : 'Chờ phản hồi' : canSubmit ? 'Chưa nộp' : 'Đã đóng nộp'}
+      <span role="status" className="sc-status" data-status={state === 'passed' || state === 'graded' ? 'done' : canSubmit || state === 'pending' ? 'upcoming' : 'ended'}>
+        {assignmentLabels[state]}
       </span>
     </div>
     {assignment.dueAt && <p className="sc-muted">Hạn nộp: {localDateTime.format(Date.parse(assignment.dueAt))}</p>}
+    {code && <>
+      <p className="sc-muted">Bài lập trình · Lần {code.attemptNo} · Đã nộp lúc {localDateTime.format(Date.parse(code.submittedAt))}</p>
+      {code.score !== null && <p><strong>Điểm: {code.score}/{code.maxScore}</strong></p>}
+      {code.feedback && <blockquote className="sc-feedback"><strong>Nhận xét bài lập trình</strong><p>{code.feedback}</p></blockquote>}
+    </>}
     {submission?.feedback && <blockquote className="sc-feedback"><strong>Phản hồi của giáo viên · Lần {submission.attemptNo}</strong><p>{submission.feedback}</p></blockquote>}
-    {submission?.reviewStatus === 'NeedsRevision' && <p>Ôn lại học liệu và sửa sản phẩm theo góp ý trước khi nộp lại.{!canSubmit && ' Bài tập đã đóng hoặc hết hạn; cần giáo viên mở lại hạn nộp.'}</p>}
+    {submission?.reviewStatus === 'NeedsRevision' && <p>Ôn lại học liệu và sửa sản phẩm theo góp ý trước khi nộp lại.{!canSubmit && ' Hiện không thể nộp lại; liên hệ giáo viên nếu em cần hỗ trợ.'}</p>}
     {submission && <>
       <p className="sc-meta"><IconFileText size={17} aria-hidden="true" /> {submission.fileName}</p>
       <p className="sc-muted">Đã nộp lúc {localDateTime.format(Date.parse(submission.submittedAt))}</p>

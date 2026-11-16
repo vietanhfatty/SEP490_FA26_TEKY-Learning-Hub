@@ -66,6 +66,8 @@ public static class DependencyInjection
         services.AddDataProtection();
         services.AddHostedService<AccountEmailWorker>();
 
+        services.AddScoped<IStudentAssessmentsRepository, StudentAssessmentsRepository>();
+        services.AddScoped<IStudentOverviewRepository, StudentOverviewRepository>();
         return services;
     }
 }

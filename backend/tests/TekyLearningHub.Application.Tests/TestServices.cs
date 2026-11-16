@@ -25,6 +25,8 @@ internal static class TestServices
     public static UserAdministrationService Administration(ApplicationDbContext db, IPasswordHasher hasher, IDataProtectionProvider protection, IConfiguration configuration) =>
         new(new UserAdministrationRepository(db), new UnitOfWork(db), hasher, new AccountEmailOutbox(db, protection), new AccountOptions { InvitationBaseUrl = configuration["Account:InvitationBaseUrl"] });
 
+    public static StudentAssessmentsService Assessments(ApplicationDbContext db) => new(new StudentAssessmentsRepository(db),new UnitOfWork(db));
+    public static StudentOverviewService Overview(ApplicationDbContext db,StudentClassesService classes) => new(new StudentOverviewRepository(db),classes);
     public static StudentClassesService Classes(ApplicationDbContext db) => new(new StudentClassesRepository(db), new UnitOfWork(db));
     public static StudentLearningService Learning(ApplicationDbContext db, StudentClassesService classes) => new(new StudentLearningRepository(db), classes);
     public static ProjectReviewService Reviews(ApplicationDbContext db) => new(new ProjectReviewRepository(db));
