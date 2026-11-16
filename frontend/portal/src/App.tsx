@@ -128,6 +128,9 @@ export function App() {
         {/* Dashboard Học sinh - chỉ dành cho role student */}
         {['/student', '/dashboard/projects', '/dashboard/assessments', '/dashboard/assessments/:assessmentId', '/dashboard/assignments', '/dashboard/assignments/:assignmentId', '/dashboard/timetable/*', '/dashboard/courses', '/dashboard/courses/:courseId', '/dashboard/courses/:courseId/lessons/:lessonId'].map(path => (
           <Route key={path} path={path} element={
+            path === '/student' && new URLSearchParams(location.search).get('tab') === 'achievements'
+              ? <Navigate to="/student" replace />
+              : (
             <RoleGuard
               allowedRoles={['student']}
               fallback={
@@ -151,6 +154,7 @@ export function App() {
                 {(activeNavId, onSelectNav) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'classes' : activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>
             </RoleGuard>
+              )
           } />
         ))}
 
