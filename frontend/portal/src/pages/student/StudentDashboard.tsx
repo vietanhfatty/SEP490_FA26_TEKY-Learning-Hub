@@ -1,5 +1,4 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { StudentProjectsView } from '@teky/shared/ui/StudentProjectsView';
 import { StudentAssessmentsView } from '@teky/shared/ui/StudentAssessmentsView';
 import { StudentAssignmentsView } from '@teky/shared/ui/StudentAssignmentsView';
 import { StudentOverviewView } from '@teky/shared/ui/StudentOverviewView';
@@ -349,7 +348,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
 
 export function StudentDashboard(props: StudentDashboardProps) {
  const location=useLocation();const navigate=useNavigate();
- if(props.activeNavId==='projects')return <StudentProjectsView />;
  if(props.activeNavId==='assessments')return <StudentAssessmentsView />;
  if(props.activeNavId==='assignments')return <StudentAssignmentsView />;
  if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses')return <StudentCoursesView />;
