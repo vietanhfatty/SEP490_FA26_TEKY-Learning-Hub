@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using TekyLearningHub.Application.DTOs.Auth;
-using TekyLearningHub.Application.Validators;
+using TekyLearningHub.Application.Validators.Auth;
 using TekyLearningHub.Domain.Entities;
 using TekyLearningHub.Infrastructure.Security;
 using Xunit;

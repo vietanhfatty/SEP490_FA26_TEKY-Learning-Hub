@@ -1,0 +1,21 @@
+---
+description: Backend layers, feature folders, namespaces, dependency injection and verification
+globs: "backend/**/*.cs,backend/**/*.csproj,backend/**/*.sln,database/migrations/*.sql"
+alwaysApply: false
+---
+
+# Backend architecture
+
+- Read `docs/architecture/README.md` and `docs/architecture/conventions.md` before changing backend structure.
+- Preserve the four projects: Domain (entities/enums/constants), Application (contracts/DTOs/validators), Infrastructure (EF/SQL/security/email/service implementations), Api (HTTP/host).
+- Group feature code by Auth, Admin, Portal or Backoffice within its layer; create only groups with actual code. Shared persistence/security interfaces remain in `Application/Interfaces`.
+- Match namespaces to folders. Example: `Controllers/Admin/AdminUsersController.cs` uses `TekyLearningHub.Api.Controllers.Admin`.
+- Give each controller a file named after the class. Invitation activation belongs to Auth; teacher project reviews belong to Backoffice.
+- Move related DTOs/interfaces/validators with a feature and update imports, fully qualified types, DI and tests. DbContext services are scoped in `Infrastructure/DependencyInjection.cs`.
+- Keep explicit HTTP routes, authorization, permission/scope checks, ownership, rate limits, audit and concurrency behavior when moving code.
+- Add new persistence/business operations to services; do not expand the existing direct DbContext use in Account/ShellTransfer controllers. Document remaining architecture exceptions honestly.
+- Do not add reverse project references from Application/Domain to Infrastructure/Api. Do not overwrite scaffolded entities or alter applied migrations to reorganize folders.
+- Verify backend with `dotnet test backend/tests/TekyLearningHub.Application.Tests/TekyLearningHub.Application.Tests.csproj`; the solution currently contains only source projects.
+- If a running API locks DLLs, use `--no-restore -p:BaseOutputPath=bin/Verification/` for a separate test output.
+- Report skipped SQL Server tests; enable them only with a configured `TEKY_MIGRATION_TEST_CONNECTION` for disposable test databases.
+- Update architecture docs and these conventions in the same change as structural changes.

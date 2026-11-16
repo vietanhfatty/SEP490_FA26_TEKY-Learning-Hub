@@ -1,0 +1,19 @@
+---
+description: Shared authentication, role shells and logout across frontend origins
+globs: "frontend/**/*.ts,frontend/**/*.tsx,frontend/tests/*.mjs"
+alwaysApply: false
+---
+
+# Frontend authentication
+
+- Read `frontend/README.md` and `docs/architecture/conventions.md` when changing auth or role navigation.
+- Public pages run on 5173, Student/Parent on Portal 3000, staff roles on Backoffice 3001. Resolve configured origins through `shared/auth/shellConfig.ts`.
+- Share auth through `shared/auth/AuthProvider.tsx`; verify identity and role with the backend, not cached role strings.
+- All roles and password-change flows call `AuthProvider.logout()`. Keep the redirect in `shared/auth/logout.ts` and return to PUBLIC_ORIGIN with full-page replacement.
+- Do not append relative login navigation after awaiting logout; it can keep the browser on the role app's port.
+- Clear the current origin's session before waiting on logout API calls. On a public logout return, consume the marker and clear that origin's old session before restoring AuthProvider.
+- Preserve newer logins when old logout/refresh requests finish; API failures must still end the local session and return to public login.
+- Transfer sessions with one-use codes and PKCE; never include access/refresh tokens in URLs.
+- Keep the six role mappings synchronized with the Domain enum and backend normalizer.
+- Run `pnpm.cmd --filter frontend test:rbac` and builds for frontend, @teky/portal and @teky/backoffice. Cover six roles, both storage modes, cross-origin logout and request failures.
+- Update architecture/convention docs with changes to ports, role ownership or session flow.

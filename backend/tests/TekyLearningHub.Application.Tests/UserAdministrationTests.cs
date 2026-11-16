@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using TekyLearningHub.Application.DTOs.Admin;
 using TekyLearningHub.Application.DTOs.Auth;
 using TekyLearningHub.Infrastructure.Data;
 using TekyLearningHub.Infrastructure.Security;
-using TekyLearningHub.Infrastructure.Services;
+using TekyLearningHub.Infrastructure.Services.Admin;
 using Xunit;
+
 namespace TekyLearningHub.Application.Tests;
 public class UserAdministrationTests
 {

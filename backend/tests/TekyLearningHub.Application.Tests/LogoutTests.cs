@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using TekyLearningHub.Domain.Entities;
 using TekyLearningHub.Infrastructure.Data;
 using TekyLearningHub.Infrastructure.Security;
-using TekyLearningHub.Infrastructure.Services;
+using TekyLearningHub.Infrastructure.Services.Auth;
 using Xunit;
 
 namespace TekyLearningHub.Application.Tests;

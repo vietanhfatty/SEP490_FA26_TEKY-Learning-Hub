@@ -2,10 +2,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TekyLearningHub.Application.Interfaces;
+using TekyLearningHub.Application.Interfaces.Admin;
+using TekyLearningHub.Application.Interfaces.Auth;
+using TekyLearningHub.Application.Interfaces.Portal;
 using TekyLearningHub.Domain.Entities;
 using TekyLearningHub.Infrastructure.Data;
 using TekyLearningHub.Infrastructure.Security;
-using TekyLearningHub.Infrastructure.Services;
+using TekyLearningHub.Infrastructure.Services.Admin;
+using TekyLearningHub.Infrastructure.Services.Auth;
+using TekyLearningHub.Infrastructure.Services.Backoffice;
+using TekyLearningHub.Infrastructure.Services.Portal;
 
 namespace TekyLearningHub.Infrastructure;
 
@@ -40,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<UserAdministrationService>();
         services.AddScoped<IStudentClassesService, StudentClassesService>();
         services.AddScoped<StudentLearningService>();
+        services.AddScoped<ProjectReviewService>();
         services.AddScoped<ICourseService, CourseService>();
         services.AddDataProtection();
         services.AddHostedService<AccountEmailWorker>();

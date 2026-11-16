@@ -1,6 +1,14 @@
 # SEP490_FA26_TEKY-Learning-Hub
 An Integrated Learning Management and Online Tutor Platform for TEKY
 
+## Kiến trúc và quy ước
+
+- [Kiến trúc và cấu trúc source hiện tại](docs/architecture/README.md): bốn project backend, nhóm nghiệp vụ và ba ứng dụng frontend.
+- [Quy ước phát triển](docs/architecture/conventions.md): vị trí đặt file, namespace, DI, xác thực, migration và kiểm thử.
+- [Chạy frontend](frontend/README.md): cổng công khai `5173`, Portal `3000`, Backoffice `3001`.
+
+Controller, DTO, interface và service được nhóm theo nghiệp vụ `Auth`, `Admin`, `Portal`, `Backoffice` trong từng tầng có triển khai tương ứng. Đăng xuất ở mọi role trở về trang đăng nhập công khai tại cổng `5173`.
+
 ## Cập nhật database sau khi pull
 
 Backend tự chạy các SQL migration còn thiếu trước khi phục vụ request ở môi trường Development.

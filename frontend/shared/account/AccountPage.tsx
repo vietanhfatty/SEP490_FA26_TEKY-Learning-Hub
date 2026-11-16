@@ -169,7 +169,6 @@ export function AccountPage() {
         confirmPassword,
       });
       await auth.logout();
-      window.location.assign('/login');
     } catch (e) {
       setPasswordError(e instanceof Error ? e.message : 'Không thể đổi mật khẩu.');
     } finally {

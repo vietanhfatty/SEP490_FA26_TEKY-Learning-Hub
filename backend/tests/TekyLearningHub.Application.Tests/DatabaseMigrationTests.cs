@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
 using TekyLearningHub.Infrastructure.Data.Migrations;
+using TekyLearningHub.Infrastructure.Services.Auth;
 using Xunit;
 
 namespace TekyLearningHub.Application.Tests;
@@ -163,7 +164,7 @@ public class DatabaseMigrationTests
             Microsoft.EntityFrameworkCore.SqlServerDbContextOptionsExtensions.UseSqlServer(
                 new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<TekyLearningHub.Infrastructure.Data.ApplicationDbContext>(), database.ConnectionString).Options);
         var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
-        var service = new TekyLearningHub.Infrastructure.Services.AuthService(db,
+        var service = new TekyLearningHub.Infrastructure.Services.Auth.AuthService(db,
             new TekyLearningHub.Infrastructure.Security.PasswordHasher(),
             new TekyLearningHub.Infrastructure.Security.JwtTokenGenerator(config));
         string[] roles = ["Student", "Teacher", "SystemAdmin", "Parent", "AcademicStaff", "AcademicManager"];

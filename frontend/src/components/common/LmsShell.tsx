@@ -1,4 +1,3 @@
-import { useLocation } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import type { UserRole } from '../../types';
 import { LmsSidebar } from './LmsSidebar';
@@ -9,7 +8,6 @@ import '@teky/shared/ui/lms.css';
 interface LmsShellProps {
   currentRole: UserRole;
   activeNavId?: string;
-  onSelectNav?: (id: string) => void;
   userName?: string;
   userEmail?: string;
   isDarkMode: boolean;

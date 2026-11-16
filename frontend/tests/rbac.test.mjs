@@ -28,6 +28,7 @@ const { decodeJwtClaims, roleFromClaims, isTokenExpired } = await import('../sha
 const { PUBLIC_ORIGIN, PORTAL_ORIGIN, BACKOFFICE_ORIGIN, resolveShellForRole, shellOrigin } = await import('../shared/auth/shellConfig.ts');
 const { buildCrossAppUrl } = await import('../shared/auth/shellTransfer.ts');
 const { processShellHandshake } = await import('../shared/auth/shellHandshake.ts');
+const { logoutAndRedirect, consumeLogoutRedirect } = await import('../shared/auth/logout.ts');
 const storage = () => {
   const values = new Map();
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)),
@@ -146,6 +147,58 @@ test('logout clears immediately and its delayed response cannot erase a newer lo
   assert.equal(sessionStorage.getItem('teky_refresh_token'), 'new-refresh');
 });
 
+for (const status of [401, 503, 'offline']) {
+  test(`logout returns to public login when the API is ${status}`, async () => {
+    let destination;
+    globalThis.window = { location: { replace: url => { destination = url; } } };
+    sessionStorage.setItem('teky_access_token', 'old-access');
+    sessionStorage.setItem('teky_refresh_token', 'old-refresh');
+    mock.method(globalThis, 'fetch', async () => {
+      if (status === 'offline') throw new TypeError('Failed to fetch');
+      return reply({}, status);
+    });
+    await logoutAndRedirect();
+    assert.equal(sessionStorage.getItem('teky_access_token'), null);
+    assert.equal(sessionStorage.getItem('teky_refresh_token'), null);
+    assert.equal(destination, `${PUBLIC_ORIGIN}/login?loggedOut=1`);
+  });
+}
+
+test('a delayed logout does not redirect a newer login', async () => {
+  let resolve;
+  const navigations = [];
+  globalThis.window = { location: { replace: url => navigations.push(url) } };
+  sessionStorage.setItem('teky_access_token', 'old-access');
+  mock.method(globalThis, 'fetch', () => new Promise(done => { resolve = done; }));
+  const pending = logoutAndRedirect();
+  sessionStorage.setItem('teky_access_token', 'new-access');
+  resolve(reply({ success: true }));
+  await pending;
+  assert.deepEqual(navigations, []);
+  assert.equal(sessionStorage.getItem('teky_access_token'), 'new-access');
+});
+
+test('logout return only clears the public login origin and preserves other URL parameters', () => {
+  localStorage.setItem('teky_access_token', 'public-access');
+  for (const href of [`${PORTAL_ORIGIN}/login?loggedOut=1`, `${PUBLIC_ORIGIN}/courses?loggedOut=1`, `${PUBLIC_ORIGIN}/login`]) {
+    globalThis.window = { location: { href } };
+    consumeLogoutRedirect();
+    assert.equal(localStorage.getItem('teky_access_token'), 'public-access');
+  }
+  let cleanedUrl;
+  const state = { key: 'existing' };
+  globalThis.window = {
+    location: { href: `${PUBLIC_ORIGIN}/login?loggedOut=1&lang=vi#form` },
+    history: { state, replaceState: (nextState, _unused, url) => {
+      assert.equal(nextState, state);
+      cleanedUrl = url;
+    } },
+  };
+  consumeLogoutRedirect();
+  assert.equal(localStorage.getItem('teky_access_token'), null);
+  assert.equal(cleanedUrl, '/login?lang=vi#form');
+});
+
 for (const [roleId, role, destination, path] of [
   [1, 'student', PORTAL_ORIGIN, '/student'],
   [2, 'teacher', BACKOFFICE_ORIGIN, '/teacher'],
@@ -155,7 +208,7 @@ for (const [roleId, role, destination, path] of [
   [6, 'academic_manager', BACKOFFICE_ORIGIN, '/academic-manager'],
 ]) {
   for (const rememberMe of [false, true]) {
-    test(`public login transfers ${role} with remember-me ${rememberMe}`, async () => {
+    test(`public login and logout return ${role} to the public app with remember-me ${rememberMe}`, async () => {
       const origins = new Map();
       const navigations = [];
       const visit = url => {
@@ -165,8 +218,11 @@ for (const [roleId, role, destination, path] of [
         globalThis.localStorage = current.local;
         globalThis.sessionStorage = current.session;
         globalThis.window = { location: {
-          origin: location.origin, hash: location.hash,
+          href: location.href, origin: location.origin, hash: location.hash,
           replace: next => navigations.push(new URL(next, location.origin).href),
+        }, history: {
+          state: null,
+          replaceState: (_state, _unused, next) => { window.location.href = new URL(next, location.origin).href; },
         } };
       };
       const accessToken = token({ role_id: roleId, role });
@@ -174,6 +230,7 @@ for (const [roleId, role, destination, path] of [
       const identity = user(roleId, role);
       let challenge;
       let exchanges = 0;
+      let logouts = 0;
       mock.method(globalThis, 'fetch', async (url, options) => {
         const body = options.body ? JSON.parse(options.body) : null;
         if (url === '/api/auth/login') {
@@ -181,6 +238,13 @@ for (const [roleId, role, destination, path] of [
           return reply({ success: true, data: { accessToken, refreshToken: 'source-refresh', user: identity } });
         }
         if (url === '/api/auth/me') return reply({ success: true, data: identity });
+        if (url === '/api/auth/logout') {
+          assert.equal(window.location.origin, destination);
+          assert.equal(options.headers.Authorization, `Bearer ${transferredToken}`);
+          assert.equal(body.refreshToken, 'destination-refresh');
+          logouts++;
+          return reply({ success: true });
+        }
         if (url === '/api/auth/shell-transfer') {
           assert.equal(window.location.origin, PUBLIC_ORIGIN);
           assert.equal(options.headers.Authorization, `Bearer ${accessToken}`);
@@ -224,6 +288,20 @@ for (const [roleId, role, destination, path] of [
       assert.equal(other.getItem('teky_access_token'), null);
       assert.equal(other.getItem('teky_refresh_token'), null);
       assert.equal((await verifySession(transferredToken, 'destination-refresh')).role, role);
+      await logoutAndRedirect();
+      assert.equal(logouts, 1);
+      assert.equal(navigations.at(-1), `${PUBLIC_ORIGIN}/login?loggedOut=1`);
+      assert.equal(localStorage.getItem('teky_access_token'), null);
+      assert.equal(sessionStorage.getItem('teky_access_token'), null);
+      visit(navigations.at(-1));
+      assert.equal((rememberMe ? localStorage : sessionStorage).getItem('teky_access_token'), accessToken);
+      consumeLogoutRedirect();
+      assert.equal(window.location.href, `${PUBLIC_ORIGIN}/login`);
+      for (const storage of [localStorage, sessionStorage]) {
+        for (const key of ['teky_access_token', 'teky_refresh_token', 'teky_token', 'teky_user', 'teky_role']) {
+          assert.equal(storage.getItem(key), null);
+        }
+      }
       for (const url of navigations) {
         assert.ok(!decodeURIComponent(url).includes(accessToken));
         assert.ok(!decodeURIComponent(url).includes('source-refresh'));
