@@ -48,70 +48,115 @@ public class StudentClassesService(ApplicationDbContext db) : IStudentClassesSer
             .Include(s => s.Lesson!).ThenInclude(l => l.LessonMaterials)
             .Include(s => s.Room).SingleOrDefaultAsync(cancellationToken);
         if (session is null) return null;
-        var assignments = await GetAssignmentsAsync(userId, session, cancellationToken);
-        return MapSession(session, true) with { Assignments = assignments };
+        var assignments = await ReadAssignmentsAsync(userId, AccessibleAssignments(userId, sessionId), session, cancellationToken);
+        return MapSession(session, true) with { Assignments = assignments.Select(a => a.Assignment).ToList() };
     }
 
-    private IQueryable<Assignment> SessionAssignments(int userId, int sessionId, bool writable)
+    private IQueryable<Assignment> AccessibleAssignments(int userId, int? sessionId, bool writable = false)
     {
         var enrollment = Enrollments(userId);
         if (writable) enrollment = enrollment.Where(e => e.Status == "Active");
-
-        return from session in db.ClassSessions.AsNoTracking()
-               join assignment in db.Assignments.AsNoTracking()
-                   on new { session.ClassId, session.LessonId } equals new { assignment.ClassId, assignment.LessonId }
-               where session.SessionId == sessionId && session.Lesson != null && !session.Lesson.IsDeleted
-                   && (!writable || session.Status != "Cancelled")
-                   && Students(userId).Any() && enrollment.Any(e => e.ClassId == session.ClassId)
-                   && (assignment.Status == "Published" || assignment.Status == "Closed")
-               select assignment;
+        var query = db.Assignments.AsNoTracking().Where(a =>
+            Students(userId).Any() && enrollment.Any(e => e.ClassId == a.ClassId)
+            && (a.Status == "Published" || a.Status == "Closed")
+            && (a.LessonId == null || (!a.Lesson!.IsDeleted && a.Lesson.CourseId == a.Class.CourseId)));
+        if (writable) query = query.Where(a => a.Class.Status != "Cancelled" && a.Class.Status != "Completed");
+        if (sessionId is int id)
+            query = query.Where(a => a.LessonId != null && db.ClassSessions.Any(s =>
+                s.SessionId == id && s.ClassId == a.ClassId && s.LessonId == a.LessonId
+                && (!writable || s.Status != "Cancelled")));
+        return query;
     }
 
-    private async Task<IReadOnlyList<StudentAssignmentDto>> GetAssignmentsAsync(
-        int userId, ClassSession session, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<StudentAssignmentItemDto>?> GetAssignmentsAsync(int userId, CancellationToken cancellationToken)
     {
-        if (session.Lesson is not { IsDeleted: false }) return [];
+        if (!await Students(userId).AnyAsync(cancellationToken)) return null;
+        return await ReadAssignmentsAsync(userId, AccessibleAssignments(userId, null), null, cancellationToken);
+    }
 
+    public async Task<StudentAssignmentDetailDto?> GetAssignmentAsync(int userId, int assignmentId, CancellationToken cancellationToken)
+    {
+        var items = await ReadAssignmentsAsync(userId,
+            AccessibleAssignments(userId, null).Where(a => a.AssignmentId == assignmentId), null, cancellationToken);
+        if (items.Count == 0) return null;
+        var accessible = AccessibleAssignments(userId, null);
+        var versions = await db.StudentProjectVersions.AsNoTracking()
+            .Where(v => v.AssignmentId == assignmentId && v.StudentId == userId &&
+                accessible.Any(a => a.AssignmentId == v.AssignmentId))
+            .OrderByDescending(v => v.AttemptNo)
+            .Select(v => new { v.FileName, v.SubmittedAt, v.AttemptNo, v.ReviewStatus, v.Feedback, v.ReviewedAt })
+            .ToListAsync(cancellationToken);
+        return new(items[0], versions.Select(v => new StudentProjectDto(v.FileName, Utc(v.SubmittedAt),
+            v.AttemptNo, v.ReviewStatus, v.Feedback, v.ReviewedAt is { } reviewed ? Utc(reviewed) : null)).ToList());
+    }
+
+    private async Task<IReadOnlyList<StudentAssignmentItemDto>> ReadAssignmentsAsync(
+        int userId, IQueryable<Assignment> query, ClassSession? session, CancellationToken cancellationToken)
+    {
         var now = DateTime.UtcNow;
-        var active = session.Status != "Cancelled" && await Enrollments(userId)
-            .AnyAsync(e => e.ClassId == session.ClassId && e.Status == "Active", cancellationToken);
-        var assignments = await (
-            from assignment in SessionAssignments(userId, session.SessionId, writable: false)
-            join submission in db.StudentProjectSubmissions.AsNoTracking().Where(s => s.StudentId == userId)
-                on assignment.AssignmentId equals submission.AssignmentId into submissions
-            from submission in submissions.DefaultIfEmpty()
-            orderby assignment.AssignmentId
+        var active = Enrollments(userId).Where(e => e.Status == "Active");
+        var rows = await (
+            from a in query
+            join file in db.StudentProjectSubmissions.AsNoTracking().Where(s => s.StudentId == userId)
+                on a.AssignmentId equals file.AssignmentId into files
+            from file in files.DefaultIfEmpty()
+            join code in db.Submissions.AsNoTracking().Where(s => s.StudentId == userId && s.IsCurrent)
+                on a.AssignmentId equals code.AssignmentId into codes
+            from code in codes.DefaultIfEmpty()
+            orderby a.DueAt == null, a.DueAt, a.AssignmentId
             select new
             {
-                assignment.AssignmentId, assignment.Title, assignment.Instructions, assignment.DueAt, assignment.Status,
-                FileName = submission == null ? null : submission.FileName,
-                SubmittedAt = submission == null ? (DateTime?)null : submission.SubmittedAt,
-                AttemptNo = submission == null ? 0 : submission.AttemptNo,
-                ReviewStatus = submission == null ? null : submission.ReviewStatus,
-                Feedback = submission == null ? null : submission.Feedback,
-                ReviewedAt = submission == null ? (DateTime?)null : submission.ReviewedAt
+                a.AssignmentId, a.Title, a.Instructions, a.DueAt, a.Status, a.ClassId, a.LessonId, a.MaxScore,
+                a.Class.ClassCode, ClassName = a.Class.Name, a.Class.CourseId, CourseName = a.Class.Course.Name,
+                LessonTitle = a.Lesson == null ? null : a.Lesson!.Title,
+                Active = a.Class.Status != "Cancelled" && a.Class.Status != "Completed" && active.Any(e => e.ClassId == a.ClassId),
+                SessionId = db.ClassSessions.Where(s => s.ClassId == a.ClassId && a.LessonId != null &&
+                    s.LessonId == a.LessonId && s.Status != "Cancelled")
+                    .OrderBy(s => s.SessionDate).ThenBy(s => s.StartTime).ThenBy(s => s.SessionId)
+                    .Select(s => (int?)s.SessionId).FirstOrDefault(),
+                FileName = file == null ? null : file.FileName,
+                FileSubmittedAt = file == null ? (DateTime?)null : file.SubmittedAt,
+                FileAttempt = file == null ? 0 : file.AttemptNo,
+                ReviewStatus = file == null ? null : file.ReviewStatus,
+                Feedback = file == null ? null : file.Feedback,
+                ReviewedAt = file == null ? (DateTime?)null : file.ReviewedAt,
+                CodeSubmittedAt = code == null ? (DateTime?)null : code.SubmittedAt,
+                CodeAttempt = code == null ? 0 : code.AttemptNo,
+                IsFinalized = code != null && code.Grade != null && code.Grade.IsFinalized,
+                Score = code != null && code.Grade != null && code.Grade.IsFinalized ? code.Grade.FinalScore : null,
+                Remark = code != null && code.Grade != null && code.Grade.IsFinalized ? code.Grade.RemarkText : null
             }).ToListAsync(cancellationToken);
 
-        return assignments.Select(a => new StudentAssignmentDto(a.AssignmentId, a.Title, a.Instructions,
-            a.DueAt is { } dueAt ? Utc(dueAt) : null,
-            active && a.Status == "Published" && (a.DueAt is null || a.DueAt > now) && (a.SubmittedAt is null || a.ReviewStatus == "NeedsRevision"),
-            a.SubmittedAt is { } submittedAt ? new StudentProjectDto(a.FileName!, Utc(submittedAt), a.AttemptNo, a.ReviewStatus!, a.Feedback, a.ReviewedAt is {} reviewed ? Utc(reviewed) : null) : null)).ToList();
+        return rows.Select(a => new StudentAssignmentItemDto(
+            new(a.AssignmentId, a.Title, a.Instructions, a.DueAt is { } dueAt ? Utc(dueAt) : null,
+                session?.Status != "Cancelled" && a.Active && a.Status == "Published"
+                    && (a.DueAt is null || a.DueAt > now) && a.CodeSubmittedAt is null
+                    && (a.FileSubmittedAt is null || a.ReviewStatus == "NeedsRevision"),
+                a.FileSubmittedAt is { } submittedAt ? new(a.FileName!, Utc(submittedAt), a.FileAttempt,
+                    a.ReviewStatus!, a.Feedback, a.ReviewedAt is { } reviewed ? Utc(reviewed) : null) : null,
+                a.CodeSubmittedAt is { } codedAt ? new(a.CodeAttempt, Utc(codedAt), a.IsFinalized,
+                    a.Score, a.MaxScore, a.Remark) : null),
+            a.ClassId, a.ClassCode, a.ClassName, a.CourseId, a.CourseName, a.LessonId, a.LessonTitle,
+            session?.SessionId ?? a.SessionId)).ToList();
     }
 
-    public async Task<StudentProjectOutcome> SubmitProjectAsync(int userId, int sessionId, int assignmentId,
+    public async Task<StudentProjectOutcome> SubmitProjectAsync(int userId, int? sessionId, int assignmentId,
         string fileName, byte[] content, CancellationToken cancellationToken)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync<StudentProjectOutcome>(async cancellation =>
         {
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellation);
-            var assignment = await SessionAssignments(userId, sessionId, writable: true)
+            var assignment = await AccessibleAssignments(userId, sessionId, writable: true)
                 .SingleOrDefaultAsync(a => a.AssignmentId == assignmentId, cancellation);
             if (assignment is null) return new StudentProjectOutcome(StudentProjectResult.NotFound);
 
             var now = DateTime.UtcNow;
             if (assignment.Status != "Published" || assignment.DueAt <= now)
                 return new StudentProjectOutcome(StudentProjectResult.Closed);
+
+            if (await db.Submissions.AnyAsync(s => s.AssignmentId == assignmentId && s.StudentId == userId && s.IsCurrent, cancellation))
+                return new StudentProjectOutcome(StudentProjectResult.AlreadySubmitted);
 
             var previous = await db.StudentProjectSubmissions.SingleOrDefaultAsync(
                 s => s.AssignmentId == assignmentId && s.StudentId == userId, cancellation);
@@ -157,10 +202,10 @@ public class StudentClassesService(ApplicationDbContext db) : IStudentClassesSer
         }, cancellationToken);
     }
 
-    public Task<StudentProjectFile?> GetProjectFileAsync(int userId, int sessionId, int assignmentId,
+    public Task<StudentProjectFile?> GetProjectFileAsync(int userId, int? sessionId, int assignmentId,
         CancellationToken cancellationToken)
     {
-        var assignments = SessionAssignments(userId, sessionId, writable: false);
+        var assignments = AccessibleAssignments(userId, sessionId, writable: false);
         return db.StudentProjectSubmissions.AsNoTracking()
             .Where(s => s.AssignmentId == assignmentId && s.StudentId == userId &&
                 assignments.Any(a => a.AssignmentId == s.AssignmentId))

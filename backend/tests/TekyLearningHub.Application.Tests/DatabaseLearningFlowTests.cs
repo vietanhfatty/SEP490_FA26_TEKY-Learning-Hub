@@ -54,5 +54,48 @@ public class DatabaseLearningFlowTests {
   Assert.False(final.Assignments.Single().CanSubmit);
   Assert.Equal(StudentProjectResult.AlreadySubmitted,(await classes.SubmitProjectAsync(student,session,assignment,"v3.py",[3],default)).Result);
   Assert.NotNull(await learning.Course(student,course,default));
+  var detail = await classes.GetAssignmentAsync(student, assignment, default);
+  Assert.Equal("Meets requirements", detail!.Item.Assignment.Submission!.Feedback);
+  Assert.Equal("Add a loop", Assert.Single(detail.History).Feedback);
+  Assert.Null(await classes.GetAssignmentAsync(other, assignment, default));
+  Assert.Null(await classes.GetProjectFileAsync(other, null, assignment, default));
+
+  await fixture.Execute($$"""
+    INSERT dbo.ClassSessions(ClassId,LessonId,SessionDate,StartTime,EndTime)
+      SELECT ClassId,LessonId,'20261116','14:00','16:00' FROM dbo.ClassSessions WHERE SessionId={{session}};
+    INSERT dbo.Assignments(ClassId,Title,Status,CreatedBy)
+      SELECT ClassId,'Class project','Published',{{teacher}} FROM dbo.Assignments WHERE AssignmentId={{assignment}};
+    INSERT dbo.Assignments(ClassId,Title,Status,CreatedBy)
+      SELECT ClassId,'Code exercise','Published',{{teacher}} FROM dbo.Assignments WHERE AssignmentId={{assignment}};
+    INSERT dbo.Assignments(ClassId,Title,Status,CreatedBy)
+      SELECT ClassId,'Hidden draft','Draft',{{teacher}} FROM dbo.Assignments WHERE AssignmentId={{assignment}};
+    INSERT dbo.Submissions(AssignmentId,StudentId,AttemptNo,BlocklyJson)
+      SELECT AssignmentId,{{student}},1,'{}' FROM dbo.Assignments WHERE Title='Code exercise';
+    INSERT dbo.Grades(SubmissionId,FinalScore,RemarkText,IsFinalized)
+      SELECT SubmissionId,8.5,'Keep practising',0 FROM dbo.Submissions;
+  """);
+  var items = await classes.GetAssignmentsAsync(student, default);
+  Assert.NotNull(items);
+  Assert.Equal(3, items.Count);
+  Assert.Equal(session, items.Single(a => a.Assignment.AssignmentId == assignment).SessionId);
+  var classProject = items.Single(a => a.Assignment.Title == "Class project");
+  var classAssignment = classProject.Assignment.AssignmentId;
+  Assert.Null(classProject.SessionId);
+  Assert.True(classProject.Assignment.CanSubmit);
+  Assert.Equal(StudentProjectResult.NotFound,
+    (await classes.SubmitProjectAsync(student, session, classAssignment, "work.py", [3], default)).Result);
+  Assert.Equal(StudentProjectResult.Submitted,
+    (await classes.SubmitProjectAsync(student, null, classAssignment, "work.py", [3], default)).Result);
+  Assert.Equal("work.py", (await classes.GetProjectFileAsync(student, null, classAssignment, default))!.FileName);
+  var code = items.Single(a => a.Assignment.Title == "Code exercise").Assignment;
+  Assert.False(code.CanSubmit);
+  Assert.Null(code.CodeSubmission!.Score);
+  Assert.Null(code.CodeSubmission.Feedback);
+  Assert.Equal(StudentProjectResult.AlreadySubmitted,
+    (await classes.SubmitProjectAsync(student, null, code.AssignmentId, "work.py", [3], default)).Result);
+  await fixture.Execute("UPDATE dbo.Grades SET IsFinalized=1;");
+  var graded = await classes.GetAssignmentAsync(student, code.AssignmentId, default);
+  Assert.Equal(8.5m, graded!.Item.Assignment.CodeSubmission!.Score);
+  Assert.Equal("Keep practising", graded.Item.Assignment.CodeSubmission.Feedback);
  }
 }

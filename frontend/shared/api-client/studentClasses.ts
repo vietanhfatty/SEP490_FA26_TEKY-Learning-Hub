@@ -6,6 +6,15 @@ export interface StudentProject {
   submittedAt: string;
 }
 
+export interface StudentCodeSubmission {
+  attemptNo: number;
+  submittedAt: string;
+  isFinalized: boolean;
+  score: number | null;
+  maxScore: number;
+  feedback: string | null;
+}
+
 export interface StudentAssignment {
   assignmentId: number;
   title: string;
@@ -13,6 +22,7 @@ export interface StudentAssignment {
   dueAt: string | null;
   canSubmit: boolean;
   submission: StudentProject | null;
+  codeSubmission?: StudentCodeSubmission | null;
 }
 
 export interface StudentSession {
@@ -34,20 +44,26 @@ export interface StudentClasses {
 
 export async function requestStudent(path: string, init: RequestInit = {}): Promise<Response> {
   const token = sessionStorage.getItem('teky_access_token') || localStorage.getItem('teky_access_token') || localStorage.getItem('teky_token') || sessionStorage.getItem('teky_token');
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${token || ''}`);
   const response = await fetch(`${API_BASE_URL}/student/${path}`, {
     ...init,
-    headers: { Authorization: `Bearer ${token || ''}` },
+    headers,
   });
   if (!response.ok) {
     const messages: Record<number, string> = {
       401: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
       403: 'Tài khoản hiện tại chưa có quyền truy cập hồ sơ học sinh.',
-      404: 'Buổi học không tồn tại hoặc bạn chưa được ghi danh vào lớp này.',
+      404: path.startsWith('assignments/')
+        ? 'Bài tập không tồn tại hoặc em không có quyền truy cập.'
+        : path.startsWith('assessments/')
+          ? 'Bài kiểm tra không tồn tại hoặc em không có quyền truy cập.'
+          : 'Buổi học không tồn tại hoặc bạn chưa được ghi danh vào lớp này.',
     };
     if (response.status === 413) throw new Error('Tệp vượt quá giới hạn 10 MB.');
     if (response.status === 400 || response.status === 409) {
       const problem = await response.json().catch(() => null) as { title?: string } | null;
-      throw new Error(problem?.title || 'Chưa nộp được sản phẩm.');
+      throw new Error(problem?.title || 'Không thể thực hiện thao tác này.');
     }
     throw new Error(messages[response.status] || 'Không thể tải dữ liệu. Kiểm tra kết nối và thử lại.');
   }
@@ -59,17 +75,17 @@ export async function getStudentData<T>(path: string, signal: AbortSignal): Prom
   return response.json() as Promise<T>;
 }
 
-const projectPath = (sessionId: number, assignmentId: number) =>
-  `sessions/${sessionId}/assignments/${assignmentId}/project`;
+const projectPath = (sessionId: number | null, assignmentId: number) =>
+  sessionId === null ? `assignments/${assignmentId}/project` : `sessions/${sessionId}/assignments/${assignmentId}/project`;
 
-export async function submitStudentProject(sessionId: number, assignmentId: number, file: File): Promise<StudentProject> {
+export async function submitStudentProject(sessionId: number | null, assignmentId: number, file: File): Promise<StudentProject> {
   const body = new FormData();
   body.set('file', file);
   const response = await requestStudent(projectPath(sessionId, assignmentId), { method: 'POST', body });
   return response.json() as Promise<StudentProject>;
 }
 
-export async function downloadStudentProject(sessionId: number, assignmentId: number, fileName: string) {
+export async function downloadStudentProject(sessionId: number | null, assignmentId: number, fileName: string) {
   const response = await requestStudent(projectPath(sessionId, assignmentId));
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement('a');

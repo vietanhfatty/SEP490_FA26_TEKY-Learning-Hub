@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IStudentClassesService, StudentClassesService>();
         services.AddScoped<StudentLearningService>();
         services.AddScoped<StudentOverviewService>();
+        services.AddScoped<StudentAssessmentsService>();
         services.AddScoped<ICourseService, CourseService>();
         services.AddDataProtection();
         services.AddHostedService<AccountEmailWorker>();

@@ -30,7 +30,7 @@ public sealed class StudentOverviewService(ApplicationDbContext db,IStudentClass
             .ToListAsync(ct);
         var activeIds=active.Select(c=>c.ClassId).ToList();
         var assignments=db.Assignments.AsNoTracking().Where(a=>activeIds.Contains(a.ClassId)&&
-            (a.Status=="Published"||a.Status=="Closed")&&(a.LessonId==null||!a.Lesson!.IsDeleted));
+            (a.Status=="Published"||a.Status=="Closed")&&(a.LessonId==null||(!a.Lesson!.IsDeleted&&a.Lesson.CourseId==a.Class.CourseId)));
         var projectCount=await db.StudentProjectSubmissions.CountAsync(s=>s.StudentId==userId&&assignments.Any(a=>a.AssignmentId==s.AssignmentId),ct);
         var passed=await db.StudentProjectSubmissions.CountAsync(s=>s.StudentId==userId&&s.ReviewStatus=="Passed"&&assignments.Any(a=>a.AssignmentId==s.AssignmentId),ct);
         var end=now.UtcDateTime.AddDays(7);var start=now.UtcDateTime;

@@ -88,7 +88,8 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
         { id: 'classes', label: 'Lớp học của tôi', icon: IconCalendar },
         { id: 'courses', label: 'Khoá học', icon: IconBookOpen },
         { id: 'live', label: 'Today', icon: IconVideo },
-        { id: 'assignments', label: 'Ôn tập & Bài tập', icon: IconFileText },
+        { id: 'assignments', label: 'Bài tập của em', icon: IconFileText },
+        { id: 'assessments', label: 'Kiểm tra & Đánh giá', icon: IconCheckCircle },
         { id: 'achievements', label: 'Gamification', icon: IconTrophy },
       ];
     case 'teacher':

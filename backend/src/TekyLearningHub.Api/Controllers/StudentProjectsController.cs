@@ -8,6 +8,7 @@ namespace TekyLearningHub.Api.Controllers;
 
 [ApiController]
 [Authorize(Roles = "student")]
+[Route("api/student/assignments/{assignmentId:int:min(1)}/project")]
 [Route("api/student/sessions/{sessionId:int:min(1)}/assignments/{assignmentId:int:min(1)}/project")]
 public sealed class StudentProjectsController(IStudentClassesService service) : ControllerBase
 {
@@ -21,7 +22,7 @@ public sealed class StudentProjectsController(IStudentClassesService service) : 
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxFileBytes + 64 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxFileBytes)]
-    public async Task<IActionResult> Submit(int sessionId, int assignmentId, [FromForm] IFormFile? file,
+    public async Task<IActionResult> Submit([FromRoute] int? sessionId, [FromRoute] int assignmentId, [FromForm] IFormFile? file,
         CancellationToken cancellationToken)
     {
         if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)) return Unauthorized();
@@ -40,14 +41,14 @@ public sealed class StudentProjectsController(IStudentClassesService service) : 
         {
             StudentProjectResult.Submitted => Ok(result.Submission),
             StudentProjectResult.NotFound => NotFound(),
-            StudentProjectResult.AlreadySubmitted => Problem(statusCode: 409, title: "Em đã nộp sản phẩm cho bài tập này."),
+            StudentProjectResult.AlreadySubmitted => Problem(statusCode: 409, title: "Em đã có bài nộp và chưa được yêu cầu nộp lại."),
             _ => Problem(statusCode: 409, title: "Bài tập hiện đã đóng hoặc hết hạn nộp.")
         };
     }
 
     [HttpGet]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> Download(int sessionId, int assignmentId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Download([FromRoute] int? sessionId, [FromRoute] int assignmentId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)) return Unauthorized();
         var file = await service.GetProjectFileAsync(userId, sessionId, assignmentId, cancellationToken);

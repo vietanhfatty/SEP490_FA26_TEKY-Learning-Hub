@@ -1,4 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { StudentAssessmentsView } from '@teky/shared/ui/StudentAssessmentsView';
+import { StudentAssignmentsView } from '@teky/shared/ui/StudentAssignmentsView';
 import { StudentOverviewView } from '@teky/shared/ui/StudentOverviewView';
 import { StudentCoursesView } from '@teky/shared/ui/StudentCoursesView';
 import { StudentClassesView } from '@teky/shared/ui/StudentClassesView';
@@ -71,24 +73,6 @@ function SessionBadge({ session, now }: { session: StudentSession; now: number }
   return <span className={`student-status ${status.kind}`}>{status.label}</span>;
 }
 
-// Upload icon
-const IconUploadSimple: React.FC<{ size?: number; className?: string }> = ({ size = 20, className = '' }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" x2="12" y1="3" y2="15" />
-  </svg>
-);
 
 interface StudentDashboardProps {
   activeNavId?: string;
@@ -118,7 +102,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
   }, [selectedCourse]);
 
   // Fallback demo state
-  const [projectUploaded, setProjectUploaded] = useState(false);
 
   const match = /^\/dashboard\/timetable\/(\d+)$/.exec(path);
   const detailId = match ? Number(match[1]) : null;
@@ -258,42 +241,6 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
             </section>
           </div>
         </>}
-      </div>
-    );
-  }
-
-  // 4. VIEW: DỰ ÁN & BÀI TẬP (DROPZONE)
-  if (activeNavId === 'assignments') {
-    return (
-      <div className="space-y-6 py-6">
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Assignments</h3>
-          <p className="text-xs text-slate-500">
-            Hạn nộp: Chủ Nhật, 23:59. Hỗ trợ định dạng file Scratch (.sb3), Python (.py), Arduino (.ino) hoặc file nén (.zip).
-          </p>
-
-          <div
-            onClick={() => setProjectUploaded(true)}
-            className="border-2 border-dashed border-blue-400 dark:border-blue-700 rounded-3xl p-10 text-center hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer transition-all"
-          >
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center mb-4">
-              <IconUploadSimple size={32} />
-            </div>
-            {projectUploaded ? (
-              <div className="text-sm font-bold text-emerald-600 flex items-center justify-center gap-2">
-                <IconCheckCircle size={20} />
-                <span>Đã nộp thành công: flappy_bird_scratch_final.sb3 (1.4 MB) • Điểm chờ chấm</span>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Kéo thả file mã nguồn dự án vào đây, hoặc nhấn để chọn từ máy tính
-                </p>
-                <p className="text-xs text-slate-400 mt-1">Dung lượng tối đa 25MB • Chuẩn định dạng TEKY</p>
-              </>
-            )}
-          </div>
-        </div>
       </div>
     );
   }
@@ -443,7 +390,9 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
 
 export function StudentDashboard(props: StudentDashboardProps) {
  const location=useLocation();const navigate=useNavigate();
- if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses'||props.activeNavId==='assignments')return <StudentCoursesView />;
+ if(props.activeNavId==='assessments')return <StudentAssessmentsView />;
+ if(props.activeNavId==='assignments')return <StudentAssignmentsView />;
+ if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses')return <StudentCoursesView />;
  if(location.pathname.startsWith('/dashboard/timetable')||props.activeNavId==='classes'||props.activeNavId==='live')return <StudentClassesView sessionParam={location.pathname.match(/^\/dashboard\/timetable\/([^/]+)$/)?.[1]} onNavigate={navigate} />;
  if(!props.activeNavId||props.activeNavId==='overview')return <StudentOverviewView/>;
  return <LegacyStudentDashboard {...props}/>;
