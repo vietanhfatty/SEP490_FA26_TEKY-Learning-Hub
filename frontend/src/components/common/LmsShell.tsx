@@ -1,4 +1,3 @@
-import { useLocation } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import type { UserRole } from '../../types';
 import { LmsSidebar } from './LmsSidebar';
@@ -15,7 +14,7 @@ interface LmsShellProps {
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onLogout: () => Promise<void> | void;
-  onSelectNav?: (id: string) => void;
+
   children: (activeNavId: string, onSelectNav: (id: string) => void) => React.ReactNode;
 }
 export const LmsShell: React.FC<LmsShellProps> = ({ currentRole, userName, userEmail, isDarkMode, onToggleTheme, onLogout, activeNavId: controlledNavId, onSelectNav, children }) => {

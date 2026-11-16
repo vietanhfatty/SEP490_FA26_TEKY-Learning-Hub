@@ -140,14 +140,15 @@ export function App() {
             >
               <LmsShell
                 currentRole="student"
+                activeNavId={location.pathname.startsWith('/dashboard/courses') ? 'courses' : location.pathname.startsWith('/dashboard/timetable') ? 'classes' : location.pathname === '/student' ? new URLSearchParams(location.search).get('tab') || 'overview' : undefined}
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}
                 onToggleTheme={() => setIsDarkMode((previous) => !previous)}
                 onLogout={logout}
-                onSelectNav={(id) => navigate(id === 'courses' || id === 'assignments' ? '/dashboard/courses' : '/student')}
+                onSelectNav={(id) => navigate(id === 'courses' || id === 'assignments' ? '/dashboard/courses' : id === 'classes' || id === 'live' ? '/dashboard/timetable' : id === 'overview' ? '/student' : `/student?tab=${encodeURIComponent(id)}`)}
               >
-                {(activeNavId, onSelectNav) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'overview' : activeNavId} onSelectNav={onSelectNav} />}
+                {(activeNavId, onSelectNav) => <StudentDashboard activeNavId={location.pathname.startsWith('/dashboard/timetable') ? 'classes' : activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>
             </RoleGuard>
           } />

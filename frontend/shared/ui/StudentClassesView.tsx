@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { StudentClassDetails } from './StudentClassDetails';
 import type { MouseEvent } from 'react';
 import { getStudentData, sessionStatus } from '../api-client/studentClasses';
 import type { StudentClass, StudentClasses, StudentSession } from '../api-client/studentClasses';
@@ -16,12 +18,14 @@ const time = new Intl.DateTimeFormat('vi-VN', { timeZone: zone, hour: '2-digit',
 const when = (session: StudentSession) => `${time.format(Date.parse(session.startsAt))} – ${time.format(Date.parse(session.endsAt))}`;
 const sessionPath = (session: StudentSession) => `${timetablePath}/${session.sessionId}`;
 const fold = (value: string) => value.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replaceAll('đ', 'd');
+const cancelled = (item: StudentClass) => item.status === 'Cancelled';
 const finished = (item: StudentClass) => item.enrollmentStatus === 'Completed' || item.status === 'Completed';
 const progress = (item: StudentClass) => Math.max(0, Math.min(100, item.progressPercent));
 const filters = [
   { id: 'all', label: 'Tất cả' },
   { id: 'active', label: 'Đang học' },
   { id: 'completed', label: 'Đã học' },
+  { id: 'cancelled', label: 'Đã huỷ' },
 ] as const;
 type Filter = typeof filters[number]['id'];
 
@@ -72,7 +76,8 @@ export function StudentClassesView({ sessionParam, onNavigate }: StudentClassesV
   const detail = useStudentResource<StudentSession>(validSession ? `sessions/${sessionParam}` : null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const [selectedId, setSelectedId] = useState<number>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedId = Number(searchParams.get('classId')) || undefined;
   const [weekOffset, setWeekOffset] = useState(0);
   const [now, setNow] = useState(Date.now);
   const classPanel = useRef<HTMLElement>(null);
@@ -92,11 +97,11 @@ export function StudentClassesView({ sessionParam, onNavigate }: StudentClassesV
   const allClasses = classes.data?.classes ?? [];
   const term = fold(query.trim());
   const visible = allClasses.filter(item =>
-    (filter === 'all' || (filter === 'completed' ? finished(item) : item.enrollmentStatus === 'Active' && !finished(item))) &&
+    (filter === 'all' || (filter === 'completed' ? finished(item) : filter === 'cancelled' ? cancelled(item) : item.enrollmentStatus === 'Active' && !finished(item) && !cancelled(item))) &&
     fold(`${item.name} ${item.classCode} ${item.courseName} ${item.courseCode}`).includes(term));
   const selected = visible.find(item => item.classId === selectedId) ?? visible[0];
   const next = allClasses
-    .filter(item => item.enrollmentStatus === 'Active' && !finished(item))
+    .filter(item => item.enrollmentStatus === 'Active' && !finished(item) && !cancelled(item))
     .flatMap(item => item.sessions)
     .filter(session => session.status === 'Scheduled' && Date.parse(session.endsAt) > now)
     .sort((first, second) => Date.parse(first.startsAt) - Date.parse(second.startsAt))[0];
@@ -185,18 +190,18 @@ export function StudentClassesView({ sessionParam, onNavigate }: StudentClassesV
               <article className="sc-class-card" key={item.classId} data-selected={item.classId === selected.classId}>
                 <div className="sc-class-strip">
                   <IconBookOpen size={22} aria-hidden="true" />
-                  <span className="sc-status" data-status={finished(item) ? 'done' : item.enrollmentStatus === 'Active' ? 'upcoming' : 'ended'}>
-                    {finished(item) ? 'Đã học' : item.enrollmentStatus === 'Active' ? 'Đang học' : 'Đã ngừng học'}
+                  <span className="sc-status" data-status={cancelled(item) ? 'cancelled' : finished(item) ? 'done' : item.enrollmentStatus === 'Active' ? 'upcoming' : 'ended'}>
+                    {cancelled(item) ? 'Đã huỷ' : finished(item) ? 'Đã học' : item.enrollmentStatus === 'Active' ? 'Đang học' : 'Đã ngừng học'}
                   </span>
                 </div>
                 <div className="sc-card-body">
                   <p className="sc-kicker">{item.classCode}</p>
                   <h2>{item.name}</h2>
                   <p className="sc-muted">{item.courseName}</p>
-                  <div className="sc-progress"><span>Tiến độ</span><strong>{progress(item)}%</strong></div>
+                  <div className="sc-progress"><span>Tiến độ ghi danh</span><strong>{progress(item)}%</strong></div>
                   <progress value={progress(item)} max={100} aria-label={`Tiến độ lớp ${item.name}`} />
                   <button type="button" className="sc-button" aria-label={`Xem lớp ${item.name}`} aria-controls="sc-selected-class" aria-pressed={item.classId === selected.classId} onClick={() => {
-                    setSelectedId(item.classId);
+                    setSearchParams({classId:String(item.classId)}, {replace:true});
                     setWeekOffset(0);
                     classPanel.current?.focus({ preventScroll: true });
                     classPanel.current?.scrollIntoView({ block: 'start' });
@@ -205,8 +210,9 @@ export function StudentClassesView({ sessionParam, onNavigate }: StudentClassesV
               </article>
             ))}
           </div>
+          <section id="sc-selected-class" ref={classPanel} tabIndex={-1}><StudentClassDetails key={selected.classId} classId={selected.classId} /></section>
           <div className="sc-agenda-grid">
-            <section id="sc-selected-class" className="sc-panel" ref={classPanel} tabIndex={-1} aria-labelledby="sc-selected-heading">
+            <section className="sc-panel" aria-labelledby="sc-selected-heading">
               <p className="sc-kicker">{selected.classCode}</p>
               <h2 id="sc-selected-heading">{selected.name}</h2>
               <p className="sc-muted">{selected.courseCode} · ID khóa {selected.courseId} · ID lớp {selected.classId}</p>

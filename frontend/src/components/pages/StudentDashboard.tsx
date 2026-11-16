@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { StudentOverviewView } from '@teky/shared/ui/StudentOverviewView';
 import { StudentCoursesView } from '@teky/shared/ui/StudentCoursesView';
 import { StudentClassesView } from '@teky/shared/ui/StudentClassesView';
 import React, { useEffect, useRef, useState } from 'react';
@@ -443,6 +444,7 @@ const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId =
 export function StudentDashboard(props: StudentDashboardProps) {
  const location=useLocation();const navigate=useNavigate();
  if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses'||props.activeNavId==='assignments')return <StudentCoursesView />;
- if(location.pathname.startsWith('/dashboard/timetable')||!props.activeNavId||props.activeNavId==='overview'||props.activeNavId==='live')return <StudentClassesView sessionParam={location.pathname.match(/^\/dashboard\/timetable\/([^/]+)$/)?.[1]} onNavigate={navigate} />;
+ if(location.pathname.startsWith('/dashboard/timetable')||props.activeNavId==='classes'||props.activeNavId==='live')return <StudentClassesView sessionParam={location.pathname.match(/^\/dashboard\/timetable\/([^/]+)$/)?.[1]} onNavigate={navigate} />;
+ if(!props.activeNavId||props.activeNavId==='overview')return <StudentOverviewView/>;
  return <LegacyStudentDashboard {...props}/>;
 }
