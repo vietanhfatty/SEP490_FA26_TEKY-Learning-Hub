@@ -17,7 +17,7 @@ interface LmsHeaderProps {
   navigationExpanded?: boolean;
 }
 const normalize = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
-const roleNames: Record<UserRole, string> = { student: 'Learner', parent: 'Parent', teacher: 'Instructor', staff: 'Academic staff', academic_manager: 'Academic manager', admin: 'Administrator' };
+const roleNames: Record<UserRole, string> = { student: 'Learner', parent: 'Parent', teacher: 'Instructor', academic_staff: 'Academic staff', academic_manager: 'Academic manager', system_admin: 'Administrator' };
 
 export const LmsHeader: React.FC<LmsHeaderProps> = ({ currentRole, activeNavTitle, activeNavId = 'overview', onToggleSidebarMobile, onLogoutClick, isDarkMode, onToggleTheme, userName, userEmail, onSelectNav, navigationExpanded }) => {
   const [query, setQuery] = useState('');
@@ -59,8 +59,9 @@ export const LmsHeader: React.FC<LmsHeaderProps> = ({ currentRole, activeNavTitl
         <div className="lms-header-dropdown">
           <button className="lms-profile" aria-label={`Account: ${name}`} aria-expanded={openMenu === 'profile'} onClick={() => { setQuery(''); setOpenMenu(openMenu === 'profile' ? null : 'profile'); }}><span><strong>{name}</strong><small>{roleNames[currentRole]}</small></span><span className="lms-profile-avatar"><IconUser size={31} /></span></button>
           {openMenu === 'profile' && <section className="lms-menu lms-account-menu"><h2>{name}</h2>{userEmail && <p>{userEmail}</p>}
+            <a href="/account"><IconUser size={18} />Tài khoản</a>
             <button onClick={onToggleTheme}>{isDarkMode ? <IconSun size={18} /> : <IconMoon size={18} />}Appearance</button>
-            {currentRole === 'admin' && <button onClick={() => select('settings')}><IconUser size={18} />Account &amp; Settings</button>}
+            {currentRole === 'system_admin' && <button onClick={() => select('settings')}><IconUser size={18} />Account &amp; Settings</button>}
             <button onClick={() => { setOpenMenu(null); onLogoutClick(); }}><IconLogOut size={18} />Log out</button>
             <span className="lms-sr-only">Current page: {activeNavId}</span>
           </section>}

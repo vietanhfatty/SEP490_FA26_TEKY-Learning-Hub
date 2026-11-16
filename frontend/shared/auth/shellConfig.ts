@@ -26,9 +26,9 @@ export const SHELL_BY_ROLE: Record<UserRole, ShellTarget> = {
   student: { app: 'portal', path: '/student', label: 'Học sinh', labelEn: 'Student' },
   parent: { app: 'portal', path: '/parent', label: 'Phụ huynh', labelEn: 'Parent' },
   teacher: { app: 'backoffice', path: '/teacher', label: 'Giáo viên', labelEn: 'Teacher' },
-  staff: { app: 'backoffice', path: '/staff', label: 'Giáo vụ', labelEn: 'Staff' },
+  academic_staff: { app: 'backoffice', path: '/staff', label: 'Chuyên môn', labelEn: 'Academic staff' },
   academic_manager: { app: 'backoffice', path: '/academic-manager', label: 'Quản lý học thuật', labelEn: 'Academic Manager' },
-  admin: { app: 'backoffice', path: '/admin', label: 'Quản trị hệ thống', labelEn: 'System Admin' },
+  system_admin: { app: 'backoffice', path: '/admin', label: 'Quản trị hệ thống', labelEn: 'System Admin' },
 };
 
 /**
@@ -36,13 +36,16 @@ export const SHELL_BY_ROLE: Record<UserRole, ShellTarget> = {
  */
 export const ROLES_BY_SHELL: Record<ShellApp, UserRole[]> = {
   portal: ['student', 'parent'],
-  backoffice: ['teacher', 'staff', 'academic_manager', 'admin'],
+  backoffice: ['teacher', 'academic_staff', 'academic_manager', 'system_admin'],
 };
 
 function readEnv(key: string): string | undefined {
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
   return env?.[key];
 }
+
+/** Public home and login app; may initiate a handoff but cannot receive one. */
+export const PUBLIC_ORIGIN = readEnv('VITE_PUBLIC_ORIGIN') ?? 'http://localhost:5173';
 
 /** Origin của Portal (Học sinh & Phụ huynh). */
 export const PORTAL_ORIGIN = readEnv('VITE_PORTAL_ORIGIN') ?? 'http://localhost:3000';

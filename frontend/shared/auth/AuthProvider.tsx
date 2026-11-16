@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthContext } from './authContext';
 import type { AuthContextType } from './authContext';
-import { clearAuthSession, verifySession, refreshTokenApi, logoutApi } from '../api-client/auth';
+import { clearAuthSession, verifySession, refreshTokenApi } from '../api-client/auth';
 import type { VerifiedSession } from '../api-client/auth';
 import { isTokenExpired } from './jwt';
 import { consumeSsoPayload } from './shellTransfer';
 import { processShellHandshake, shellHandshakePending } from './shellHandshake';
+import { consumeLogoutRedirect, logoutAndRedirect } from './logout';
 
 const readStored = (key: string) => localStorage.getItem(key) || sessionStorage.getItem(key);
 const readToken = () => readStored('teky_access_token') || readStored('teky_token');
@@ -37,6 +38,7 @@ async function restoreStoredSession(forceRefresh = false): Promise<VerifiedSessi
 }
 
 // Legacy token-in-URL payloads are rejected; supported handoffs use a one-use code.
+consumeLogoutRedirect();
 consumeSsoPayload();
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -83,8 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async () => {
     ++revision.current;
     setSession(null);
-    // Clear UI immediately; logoutApi revokes the server refresh token and clears storage.
-    await logoutApi();
+    await logoutAndRedirect();
   }, []);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {

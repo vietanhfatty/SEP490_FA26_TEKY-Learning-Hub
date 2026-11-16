@@ -1,6 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { IconShieldCheck, IconSearch, IconPlus, IconUsers, IconBookOpen, IconClock, IconActivity, IconSettings, IconChevronRight, IconX, IconSparkles, IconLayers } from '../common/Icons';
 import { Badge } from '../common/Badge';
+import { AdminUsersView } from '@teky/shared/ui/AdminUsersView';
+import { AdminDirectoryView } from '@teky/shared/ui/AdminDirectoryView';
+import { AdminCoursesView } from '@teky/shared/ui/AdminCoursesView';
 
 interface AdminDashboardProps {
   activeNavId?: string;
@@ -14,26 +17,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
   const setActiveTab = (id: string) => { if (onSelectNav) onSelectNav(id); else setLocalTab(id); };
   const [filterRole, setFilterRole] = useState<string>('All');
   const [searchUser, setSearchUser] = useState('');
-  const [catalogQuery, setCatalogQuery] = useState('');
   const [period, setPeriod] = useState<'Week' | 'Month'>('Week');
   const [editing, setEditing] = useState(false);
   const defaultWidgets = ['overview', 'progress', 'activity', 'actions', 'users', 'timeline'];
   const [widgets, setWidgets] = useState(defaultWidgets);
   const widgetDialog = useRef<HTMLDialogElement>(null);
-  const createDialog = useRef<HTMLDialogElement>(null);
-  const [creating, setCreating] = useState<'user' | 'course'>('user');
   const [notice, setNotice] = useState('');
-  const [addedUsers, setAddedUsers] = useState<{ id: string; name: string; email: string; role: string; branch: string; status: string }[]>([]);
-  const [addedCourses, setAddedCourses] = useState<{ code: string; title: string; subject: string; lessons: number; status: string }[]>([]);
-  const courses = [
-    { code: 'SCRATCH-01', title: 'Lập trình Scratch Game 3.0', subject: 'Scratch', lessons: 12, status: 'Published' },
-    { code: 'PY-GAME-02', title: 'Python Ứng dụng & Mini Games', subject: 'Python', lessons: 14, status: 'Published' },
-    { code: 'ROBO-WEDO-01', title: 'Chế tạo Robotics LEGO WeDo', subject: 'Robotics', lessons: 10, status: 'Published' },
-    { code: 'AI-VISION-04', title: 'Nhập môn Trí tuệ Nhân tạo & Computer Vision', subject: 'AI', lessons: 16, status: 'Draft' },
-    ...addedCourses,
-  ];
   const widgetNames: Record<string, string> = { overview: 'Overview', progress: "Courses' progress status", activity: 'Portal activity', actions: 'Quick actions', users: 'Users', timeline: 'Timeline' };
-  const openCreate = (type: 'user' | 'course') => { setNotice(''); setCreating(type); createDialog.current?.showModal(); };
+  const openCreate = (type: 'user' | 'course') => {
+    setNotice('');
+    if (type === 'course') { setActiveTab('courses'); return; }
+    setActiveTab('users');
+  };
   const moveWidget = (id: string, direction: number) => setWidgets((current) => {
     const next = [...current]; const index = next.indexOf(id); const target = index + direction;
     if (target < 0 || target >= next.length) return current;
@@ -61,11 +56,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
     { time: '13:00:24', actor: 'nam.hv', role: 'Teacher', action: 'Submit Attendance', target: 'Class SCRATCH-01', ip: '118.70.12.45', status: 'Success' },
     { time: '12:45:10', actor: 'hong.dt', role: 'Manager', action: 'Modify Timetable', target: 'Class PY-02 Room Lab 201', ip: '14.162.88.20', status: 'Success' },
     { time: '11:15:02', actor: 'unknown_ip', role: 'Anonymous', action: 'Failed Login Attempt', target: 'admin@teky.edu.vn', ip: '203.113.152.9', status: 'Warning' },
-    { time: '09:30:18', actor: 'admin', role: 'Admin', action: 'Create New User', target: 'Student TEKY-2026-105', ip: '192.168.1.10', status: 'Success' },
+    { time: '09:30:18', actor: 'system_admin', role: 'Admin', action: 'Create New User', target: 'Student TEKY-2026-105', ip: '192.168.1.10', status: 'Success' },
     { time: '08:15:40', actor: 'auth_system', role: 'System', action: 'User Logout & Revoke Session', target: 'Session US-904 (quan.nm)', ip: '118.70.12.45', status: 'Success' },
   ];
 
-  const users = [...baseUsers, ...addedUsers];
+  const users = baseUsers;
   const activeUsers = users.filter((user) => user.status === 'Active');
   const userGroups = [
     { label: 'Admins', count: activeUsers.filter((user) => user.role === 'System Admin').length, color: '#0169ff' },
@@ -85,25 +80,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
     return matchRole && matchSearch;
   });
 
-  function createPreview(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const values = new FormData(form);
-    const name = String(values.get('name') || '').trim();
-    const identifier = String(values.get('identifier') || '').trim();
-    if (!name || !identifier) return;
-    if (creating === 'user') {
-      if (users.some((user) => user.email.toLowerCase() === identifier.toLowerCase())) { setNotice('Email đã tồn tại trong dữ liệu minh họa.'); return; }
-      setAddedUsers((current) => [...current, { id: `DEMO-${users.length + 1}`, name, email: identifier, role: String(values.get('role') || 'Student'), branch: 'Online Campus', status: 'Active' }]);
-    } else {
-      if (courses.some((course) => course.code.toLowerCase() === identifier.toLowerCase())) { setNotice('Mã khóa học đã tồn tại trong dữ liệu minh họa.'); return; }
-      setAddedCourses((current) => [...current, { code: identifier, title: name, subject: 'STEAM', lessons: Number(values.get('lessons') || 1), status: 'Draft' }]);
-    }
-    form.reset(); createDialog.current?.close();
-    setNotice(`Đã thêm ${creating === 'user' ? 'người dùng' : 'khóa học'} vào dữ liệu minh họa của phiên này.`);
-  }
-  const creation = <dialog ref={createDialog} className="admin-dialog" aria-labelledby="admin-create-title"><form onSubmit={createPreview}><div className="admin-dialog-title"><h2 id="admin-create-title">{creating === 'user' ? 'Add user' : 'Add course'}</h2><button type="button" className="lms-icon-button" aria-label="Close" onClick={() => createDialog.current?.close()}><IconX size={20} /></button></div><p>Thao tác này chỉ thay đổi dữ liệu minh họa trong phiên xem thử.</p><label>{creating === 'user' ? 'Full name' : 'Course name'}<input name="name" required maxLength={150} /></label><label>{creating === 'user' ? 'Email' : 'Course code'}<input name="identifier" type={creating === 'user' ? 'email' : 'text'} required maxLength={150} /></label>{creating === 'user' ? <label>Role<select name="role">{['Student','Parent','Teacher','Academic Manager','System Admin'].map((role) => <option key={role}>{role}</option>)}</select></label> : <label>Lessons<input name="lessons" type="number" min={1} max={100} defaultValue={12} required /></label>}{notice && <p role="status">{notice}</p>}<div className="admin-dialog-actions"><button type="button" className="admin-outline-button" onClick={() => createDialog.current?.close()}>Cancel</button><button type="submit" className="admin-primary-button">{creating === 'user' ? 'Add user' : 'Add course'}</button></div></form></dialog>;
-
   if (activeTab === 'overview') return (
     <div className="admin-home">
       <div className="admin-page-heading"><h1><IconSparkles size={25} />Welcome, {userName}!</h1><div><button className="admin-outline-button" onClick={() => widgetDialog.current?.showModal()}>Add widgets</button><button className={`admin-outline-button admin-edit-button${editing ? ' is-active' : ''}`} aria-label={editing ? 'Finish editing widgets' : 'Edit dashboard'} aria-pressed={editing} onClick={() => setEditing(!editing)}><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M12 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7"/><path d="m16 3 5 5M10 14l-1 4 4-1L22 8l-4-4z"/></svg></button></div></div>
@@ -122,10 +98,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
       </div>
       {!widgets.length && <div className="admin-widget admin-no-stats"><IconLayers size={36} /><h2>Your dashboard is ready to customize</h2><button className="admin-outline-button" onClick={() => widgetDialog.current?.showModal()}>Add widgets</button></div>}
       <dialog ref={widgetDialog} className="admin-dialog" aria-labelledby="widget-dialog-title"><div className="admin-dialog-title"><h2 id="widget-dialog-title">Add widgets</h2><button className="lms-icon-button" aria-label="Close" onClick={() => widgetDialog.current?.close()}><IconX size={20} /></button></div><p>Chọn nội dung bạn muốn hiển thị trên Home.</p><div className="admin-widget-options">{defaultWidgets.map((id) => <label key={id}><input type="checkbox" checked={widgets.includes(id)} onChange={(event) => setWidgets((current) => event.target.checked ? [...current, id] : current.filter((widget) => widget !== id))} />{widgetNames[id]}</label>)}</div><div className="admin-dialog-actions"><button className="admin-outline-button" onClick={() => setWidgets(defaultWidgets)}>Restore default</button><button className="admin-primary-button" onClick={() => widgetDialog.current?.close()}>Done</button></div></dialog>
-      {creation}
     </div>
   );
-  if (activeTab === 'courses') return <div className="admin-home"><div className="admin-page-heading"><h1>Courses</h1><button className="admin-primary-button" onClick={() => openCreate('course')}><IconPlus size={18} />Add course</button></div><p className="admin-demo-label">Dữ liệu minh họa TEKY</p>{notice && <p role="status" className="admin-status">{notice}</p>}<label className="admin-catalog-search"><IconSearch size={20} /><input type="search" placeholder="Search courses" aria-label="Search courses" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} /></label><div className="admin-catalog-grid">{courses.filter((course) => `${course.title} ${course.code}`.toLocaleLowerCase('vi').includes(catalogQuery.toLocaleLowerCase('vi'))).map((course) => <article key={course.code} className="admin-widget admin-catalog-card"><div><IconBookOpen size={30} /><span>{course.subject}</span></div><h2>{course.title}</h2><p>{course.code}</p><footer><span>{course.lessons} lessons</span><span>{course.status}</span></footer></article>)}</div>{!courses.some((course) => `${course.title} ${course.code}`.toLocaleLowerCase('vi').includes(catalogQuery.toLocaleLowerCase('vi'))) && <div className="admin-no-stats"><h2>No courses found</h2><button className="admin-text-button" onClick={() => setCatalogQuery('')}>Clear search</button></div>}{creation}</div>;
+  if (activeTab === 'directory') return <AdminDirectoryView />;
+  if (activeTab === 'users') return <AdminUsersView />;
+  if (activeTab === 'courses') return <AdminCoursesView />;
   if (['groups','notifications','settings'].includes(activeTab)) return <div className="admin-home"><div className="admin-page-heading"><h1>{activeTab === 'groups' ? 'Groups' : activeTab === 'notifications' ? 'Notifications' : 'Account & Settings'}</h1></div><section className="admin-widget admin-no-stats">{activeTab === 'groups' ? <IconUsers size={42} /> : activeTab === 'notifications' ? <IconActivity size={42} /> : <IconSettings size={42} />}<h2>{activeTab === 'groups' ? 'No groups to show' : activeTab === 'notifications' ? 'No notifications to show' : 'TEKY Learning Hub'}</h2><p>{activeTab === 'settings' ? 'Không gian quản trị dành cho TEKY STEAM Academy.' : 'Dữ liệu sẽ xuất hiện khi dịch vụ quản trị được kết nối.'}</p><button className="admin-text-button" onClick={() => setActiveTab('overview')}>Back to Home</button></section></div>;
 
   return (
@@ -133,7 +110,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
       <div className="admin-page-heading"><h1>{activeTab === 'users' ? 'Users' : activeTab === 'branches' ? 'Branches' : 'Reports'}</h1></div>
       <p className="admin-demo-label">Dữ liệu minh họa TEKY</p>
       {notice && <p role="status" className="admin-status">{notice}</p>}
-      {creation}
       {/* Tabs Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 text-xs font-semibold overflow-x-auto">
         <button
@@ -241,7 +217,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeNavId = 'o
       )}
 
       {/* Content: Users & RBAC */}
-      {(activeTab === 'users' || activeTab === 'overview') && (
+      {(activeTab === 'overview') && (
         <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>

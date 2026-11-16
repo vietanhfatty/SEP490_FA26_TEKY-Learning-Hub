@@ -1,7 +1,9 @@
+import { useLocation, useNavigate } from 'react-router-dom';
+import { StudentOverviewView } from '@teky/shared/ui/StudentOverviewView';
+import { StudentCoursesView } from '@teky/shared/ui/StudentCoursesView';
+import { StudentClassesView } from '@teky/shared/ui/StudentClassesView';
 import React, { useEffect, useRef, useState } from 'react';
-import { IconArrowRight, IconBookOpen, IconCalendar, IconCheckCircle, IconClock, IconCode, IconGrid, IconMenu, IconSearch, IconTrophy, IconVideo, IconX } from '../common/Icons';
-import { Badge } from '../common/Badge';
-import { subscribeRealtimeEvents } from '../../services/lmsApi';
+import { IconArrowRight, IconBookOpen, IconCalendar, IconCheckCircle, IconClock, IconCode, IconGrid, IconMenu, IconSearch, IconVideo, IconX } from '../common/Icons';
 import { getStudentData, sessionStatus } from '@teky/shared/api-client/studentClasses';
 import type { StudentClasses, StudentSession } from '@teky/shared/api-client/studentClasses';
 import './StudentClasses.css';
@@ -92,7 +94,7 @@ interface StudentDashboardProps {
   onSelectNav?: (id: string) => void;
 }
 
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId = 'overview', onSelectNav }) => {
+const LegacyStudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId = 'overview', onSelectNav }) => {
   // Backend dynamic classes & timetable state
   const [data, setData] = useState<StudentClasses | null>(null);
   const [path, setPath] = useState(window.location.pathname);
@@ -116,21 +118,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
 
   // Fallback demo state
   const [projectUploaded, setProjectUploaded] = useState(false);
-  const [focusLock, setFocusLock] = useState<{ isLocked: boolean; message: string } | null>(null);
-  const [spotlightBanner, setSpotlightBanner] = useState<{ studentName: string; payload: string } | null>(null);
-  const [cheerCelebration, setCheerCelebration] = useState<{ stickerName: string; message: string } | null>(null);
-
-  useEffect(() => {
-    return subscribeRealtimeEvents((ev) => {
-      if (ev.type === 'FOCUS_MODE') {
-        setFocusLock(ev.isLocked ? { isLocked: true, message: ev.message } : null);
-      } else if (ev.type === 'SPOTLIGHT') {
-        setSpotlightBanner({ studentName: ev.studentName, payload: ev.screenPayload });
-      } else if (ev.type === 'CHEER_CONFETTI') {
-        setCheerCelebration({ stickerName: ev.stickerName, message: ev.message });
-      }
-    });
-  }, []);
 
   const match = /^\/dashboard\/timetable\/(\d+)$/.exec(path);
   const detailId = match ? Number(match[1]) : null;
@@ -235,13 +222,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
     },
   ];
 
-  const recentBadges = [
-    { title: 'Chăm Chỉ 100%', desc: 'Điểm danh đầy đủ 8 buổi liên tiếp', icon: '🏆', date: '02/11/2026' },
-    { title: 'Coder Tốc Độ', desc: 'Nộp bài tập Scratch sớm nhất lớp', icon: '⚡', date: '28/10/2026' },
-    { title: 'Sáng Tạo Vô Cực', desc: 'Dự án game có cốt truyện độc đáo', icon: '🎨', date: '20/10/2026' },
-    { title: 'Chuyên Gia Bug Hunter', desc: 'Tự sửa 5 lỗi logic thuật toán', icon: '🐞', date: '15/10/2026' },
-    { title: 'Đồng Đội Xuất Sắc', desc: 'Hỗ trợ bạn cùng bàn hoàn thiện code', icon: '🤝', date: '08/10/2026' },
-  ];
 
   // Session details stay in this workspace; no unsupported route is pushed.
   if (detailId !== null) {
@@ -309,35 +289,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
     );
   }
 
-  // 5. VIEW: BẢNG VÀNG THÀNH TÍCH (TROPHY CABINET)
-  if (activeNavId === 'achievements') {
-    return (
-      <div className="space-y-6 py-6">
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
-              <IconTrophy size={22} className="text-amber-500" /> Gamification &amp; Leaderboard
-            </h3>
-            <Badge variant="success">8/20 Huy hiệu đã mở khóa</Badge>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-            {recentBadges.map((b, idx) => (
-              <div key={idx} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-700/40 border border-slate-200/80 dark:border-slate-700 flex items-start gap-3">
-                <span className="text-3xl">{b.icon}</span>
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{b.title}</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">{b.desc}</p>
-                  <span className="text-[10px] text-slate-400 mt-2 block font-medium">Đạt được: {b.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // TalentLMS-inspired overview; API classes take precedence over labelled demo data.
   const overviewCourses: CourseSummary[] = data ? data.classes.map((course) => {
     const completed = course.sessions.filter((session) => session.status === 'Done').length;
@@ -366,7 +317,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
   const trainingHours = data ? data.classes.flatMap((course) => course.sessions)
     .filter((session) => session.status === 'Done')
     .reduce((hours, session) => hours + Math.max(0, Date.parse(session.endsAt) - Date.parse(session.startsAt)) / 3600000, 0) : 24.5;
-  const experiencePoints = data ? undefined : 950;
   const fullName = data?.fullName || 'Học viên TEKY';
   const isDemo = !data;
   const courses = overviewCourses;
@@ -390,72 +340,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
   });
   const sessionLive = nextSession && Date.parse(nextSession.startsAt) <= now;
   const hoursText = typeof trainingHours === 'number' && Number.isFinite(trainingHours) ? Math.max(0, trainingHours).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : null;
-  const pointsText = typeof experiencePoints === 'number' && Number.isFinite(experiencePoints) ? Math.max(0, experiencePoints).toLocaleString('vi-VN', { maximumFractionDigits: 0 }) : null;
 
   return (
     <div className="tl-learner">
-      {/* SCR-TEA-03: Classroom Focus Mode Full-Screen Lock Overlay */}
-      {focusLock?.isLocked && (
-        <div className="fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white">
-          <div className="max-w-lg w-full p-8 rounded-2xl bg-slate-800 border border-slate-700 shadow-2xl space-y-4">
-            <Badge variant="danger">🔒 CLASSROOM FOCUS MODE (SCR-TEA-03)</Badge>
-            <h2 className="text-2xl font-extrabold">Giáo viên đang khóa màn hình phòng Lab</h2>
-            <p className="text-sm text-slate-300 leading-relaxed">{focusLock.message}</p>
-            <button
-              type="button"
-              onClick={() => setFocusLock(null)}
-              className="mt-2 min-h-[44px] px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-bold"
-            >
-              Đã hiểu (Tạm đóng lớp phủ demo)
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* SCR-PAR-04: Parent Live Cheer Box & Confetti Celebration Banner */}
-      {cheerCelebration && (
-        <div className="mb-4 p-5 rounded-2xl bg-orange-50 dark:bg-orange-950/60 border-2 border-orange-400 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🎊🎆🏆</span>
-              <Badge variant="accent">Pháo hoa cổ vũ từ Bố Mẹ ({cheerCelebration.stickerName})</Badge>
-            </div>
-            <p className="text-sm font-bold text-orange-950 dark:text-orange-100">
-              "{cheerCelebration.message}"
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCheerCelebration(null)}
-            className="min-h-[44px] px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shrink-0"
-          >
-            Con cảm ơn Bố Mẹ! ❤️
-          </button>
-        </div>
-      )}
-
-      {/* SCR-TEA-03: Live Screen Spotlight Broadcast Banner */}
-      {spotlightBanner && (
-        <div className="mb-4 p-5 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2">
-              <Badge variant="info">📡 Spotlight toàn phòng Lab</Badge>
-              <strong className="text-blue-950 dark:text-blue-100">
-                Giáo viên đang chiếu bài làm mẫu của bạn {spotlightBanner.studentName}
-              </strong>
-            </div>
-            <p className="font-mono text-blue-900 dark:text-blue-200">{spotlightBanner.payload}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSpotlightBanner(null)}
-            className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold shrink-0"
-          >
-            Đóng Spotlight
-          </button>
-        </div>
-      )}
-
       <div className="tl-welcome">
         <div><p className="tl-eyebrow">DASHBOARD</p><h1>{section === 'courses' ? 'My Courses' : section === 'live' ? 'Today' : `Welcome, ${fullName || 'learner'}!`}</h1><p>{section === 'courses' ? 'Theo dõi tiến độ và tiếp tục hành trình khám phá STEAM.' : section === 'live' ? 'Theo dõi lịch học và chuẩn bị cho buổi học tiếp theo.' : 'Tiếp tục khám phá, sáng tạo và chinh phục những điều mới.'}</p></div>
         <span className="tl-today"><IconCalendar size={18} />{new Date(now).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
@@ -470,7 +357,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
           <div className="tl-kpi"><span className="tl-kpi-icon"><IconBookOpen size={22} /></span><div><p>Khóa học đang học</p><strong>{courses.length - completed}<span> khóa</span></strong><small>{completed} khóa đã hoàn thành</small></div></div>
           <div className="tl-kpi"><span className="tl-kpi-icon tl-kpi-success"><IconCheckCircle size={22} /></span><div><p>Tiến độ trung bình</p><strong>{average}<span>%</span></strong><small>Trên {courses.length} khóa học</small></div></div>
           <div className="tl-kpi"><span className="tl-kpi-icon"><IconClock size={22} /></span><div><p>Thời lượng học tập</p><strong>{hoursText ?? '—'}{hoursText !== null && <span> giờ</span>}</strong><small>{hoursText === null ? 'Chưa có dữ liệu' : 'Theo các buổi đã hoàn thành'}</small></div></div>
-          <div className="tl-kpi"><span className="tl-kpi-icon tl-kpi-reward"><IconTrophy size={22} /></span><div><p>Điểm thưởng</p><strong>{pointsText ?? '—'}{pointsText !== null && <span> điểm</span>}</strong><small>{pointsText === null ? 'Chưa có dữ liệu' : 'Thành tích học tập của bạn'}</small></div></div>
         </div>
         <div className="tl-dashboard-grid">
           <div className="tl-main-column">
@@ -500,7 +386,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
           <aside className="tl-side-column" aria-label="Tổng quan và lịch học">
             <section className="tl-panel tl-training-summary"><h2>Training Overview</h2><div className="tl-progress-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" className="tl-ring-track" /><circle cx="60" cy="60" r="50" className="tl-ring-value" strokeDasharray={`${average * Math.PI} ${100 * Math.PI}`} /></svg><div><strong>{average}%</strong><span>Tiến độ trung bình</span></div></div><dl className="tl-summary-stats"><div><dt><IconBookOpen size={18} />Đang học</dt><dd>{courses.length - completed}<span> khóa</span></dd></div><div><dt><IconCheckCircle size={18} />Đã hoàn thành</dt><dd>{completed}<span> khóa</span></dd></div><div><dt><IconCode size={18} />Bài học hoàn thành</dt><dd>{completedLessons}<span>/{totalLessons}</span></dd></div><div><dt><IconCalendar size={18} />Buổi học sắp tới</dt><dd>{upcoming.length}</dd></div></dl></section>
             <section className="tl-panel tl-coming-up"><div className="tl-section-heading"><h2>Don't Miss</h2><IconCalendar size={18} /></div>{upcoming.length ? <ul>{upcoming.slice(0, 3).map((session) => <li key={session.id}><span className="tl-agenda-date"><strong>{new Date(session.startsAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit' })}</strong><span>Tháng {new Date(session.startsAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', month: 'numeric' })}</span></span><div><h3>{session.title}</h3><p>{time(session.startsAt)} · {session.courseName}</p>{!isDemo && <button type="button" className="tl-text-button" onClick={() => openSession(session.id)}>Xem chi tiết<IconArrowRight size={14} /></button>}</div></li>)}</ul> : <p className="tl-muted">Bạn chưa có lịch học sắp tới. Hãy quay lại sau để xem cập nhật từ giảng viên.</p>}</section>
-            <section className="tl-panel tl-rewards"><span className="tl-reward-symbol"><IconTrophy size={25} /></span><h2>Gamification &amp; Leaderboard</h2>{pointsText !== null ? <><p className="tl-reward-points">{pointsText}<span> điểm thưởng</span></p><p className="tl-muted">Mỗi bước tiến trong học tập đều đáng được ghi nhận.</p></> : <p className="tl-muted">Điểm thưởng sẽ được cập nhật khi dữ liệu thành tích được kết nối.</p>}<p className="tl-reward-note">Huy hiệu sẽ xuất hiện khi có thông tin thành tích từ hệ thống.</p></section>
             <div className="tl-learning-note"><IconBookOpen size={23} /><h3>Học theo nhịp của bạn</h3><p>Xem lại kiến thức đã học và chuẩn bị cho bài tiếp theo để tự tin hơn trong mỗi buổi học.</p>{onSelectNav && <button type="button" className="tl-text-button" onClick={() => onSelectNav('courses')}>Xem lộ trình học<IconArrowRight size={15} /></button>}</div>
           </aside>
         </div>
@@ -513,3 +398,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ activeNavId 
     </div>
   );
 };
+
+export function StudentDashboard(props: StudentDashboardProps) {
+ const location=useLocation();const navigate=useNavigate();
+ if(location.pathname.startsWith('/dashboard/courses')||props.activeNavId==='courses'||props.activeNavId==='assignments')return <StudentCoursesView />;
+ if(location.pathname.startsWith('/dashboard/timetable')||props.activeNavId==='classes'||props.activeNavId==='live')return <StudentClassesView sessionParam={location.pathname.match(/^\/dashboard\/timetable\/([^/]+)$/)?.[1]} onNavigate={navigate} />;
+ if(!props.activeNavId||props.activeNavId==='overview')return <StudentOverviewView/>;
+ return <LegacyStudentDashboard {...props}/>;
+}

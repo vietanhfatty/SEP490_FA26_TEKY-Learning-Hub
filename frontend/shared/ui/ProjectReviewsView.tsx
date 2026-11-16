@@ -1,0 +1,21 @@
+import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../api-client/auth';
+import './StudentClassesView.css';
+import './StudentCoursesView.css';
+type Review={assignmentId:number;studentId:number;attemptNo:number;fileName:string;reviewStatus:string;feedback:string|null;studentName:string;assignmentTitle:string;classCode:string};
+async function request(path:string,init:RequestInit={}) {
+ const token=sessionStorage.getItem('teky_access_token')||localStorage.getItem('teky_access_token')||localStorage.getItem('teky_token')||sessionStorage.getItem('teky_token');
+ const r=await fetch(`${API_BASE_URL}/teacher/project-reviews${path}`,{...init,headers:{Authorization:`Bearer ${token||''}`,'Content-Type':'application/json'}});
+ if(!r.ok){const p=await r.json().catch(()=>null);throw new Error(p?.title||'Không tải được bài nộp. Kiểm tra quyền giáo viên và thử lại.');}return r;
+}
+function ReviewCard({item,reload}:{item:Review;reload:()=>void}) {
+ const [status,setStatus]=useState('NeedsRevision'); const [feedback,setFeedback]=useState(''); const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+ async function download(){setBusy(true);setError('');try{const r=await request(`/${item.assignmentId}/${item.studentId}/file`);const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=item.fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ async function save(){setBusy(true);setError('');try{await request(`/${item.assignmentId}/${item.studentId}`,{method:'POST',body:JSON.stringify({attemptNo:item.attemptNo,status,feedback})});reload();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ return <article className="sc-panel"><p className="lc-eyebrow">{item.classCode} · LẦN {item.attemptNo}</p><h2>{item.studentName}</h2><h3>{item.assignmentTitle}</h3><button className="sc-button" disabled={busy} onClick={download}>Tải sản phẩm: {item.fileName}</button>{item.reviewStatus==='Pending'?<form className="lc-review-form" onSubmit={e=>{e.preventDefault();void save();}}><label>Kết quả<select value={status} onChange={e=>setStatus(e.target.value)}><option value="NeedsRevision">Cần luyện thêm</option><option value="Passed">Đạt yêu cầu</option></select></label><label>Phản hồi cụ thể cho học sinh<textarea required maxLength={2000} value={feedback} onChange={e=>setFeedback(e.target.value)} placeholder="Điểm đã làm tốt, nội dung cần sửa và hướng dẫn ôn tập…" /></label><button className="sc-button sc-primary" disabled={busy||!feedback.trim()}>{busy?'Đang lưu…':'Gửi phản hồi'}</button></form>:<><p>{item.reviewStatus==='Passed'?'Đạt yêu cầu':'Cần luyện thêm'}</p><blockquote className="sc-feedback">{item.feedback}</blockquote></>}{error&&<p role="alert">{error}</p>}</article>;
+}
+export function ProjectReviewsView(){
+ const [items,setItems]=useState<Review[]>();const [error,setError]=useState('');const [revision,setRevision]=useState(0);const [filter,setFilter]=useState('Pending');
+ useEffect(()=>{let active=true;setError('');request('').then(r=>r.json()).then((data:Review[])=>{if(active)setItems(data);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[revision]);
+ return <div className="lc-page"><header className="lc-intro"><h1>Phản hồi sản phẩm học tập</h1><p>Chỉ hiển thị bài nộp thuộc lớp được phân công. Phản hồi sẽ xuất hiện trong Khoá học và Lớp học của học sinh.</p></header><label>Lọc kết quả<select value={filter} onChange={e=>setFilter(e.target.value)}><option value="Pending">Chờ phản hồi</option><option value="NeedsRevision">Cần luyện thêm</option><option value="Passed">Đạt yêu cầu</option><option value="all">Tất cả</option></select></label>{error?<p role="alert">{error} <button className="sc-button" onClick={()=>setRevision(v=>v+1)}>Thử lại</button></p>:!items?<p role="status">Đang tải bài nộp…</p>:<>{items.filter(i=>filter==='all'||i.reviewStatus===filter).map(i=><ReviewCard key={`${i.assignmentId}-${i.studentId}-${i.attemptNo}`} item={i} reload={()=>setRevision(v=>v+1)}/>)}{!items.some(i=>filter==='all'||i.reviewStatus===filter)&&<section className="sc-panel">Chưa có bài nộp trong mục này.</section>}</>}</div>;
+}

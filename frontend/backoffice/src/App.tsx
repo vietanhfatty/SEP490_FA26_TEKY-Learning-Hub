@@ -1,3 +1,4 @@
+import { AcceptInvitationPage } from '@teky/shared/account/AcceptInvitationPage';
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { useAuth } from '@teky/shared/auth/authContext';
 import { detectCurrentShell, resolveShellForRole, shellOrigin } from '@teky/shared/auth/shellConfig';
 import { buildCrossAppUrl } from '@teky/shared/auth/shellTransfer';
 import { Forbidden } from '@teky/shared/ui/Forbidden';
+import { useAdminNavigation } from '@teky/shared/ui/useAdminNavigation';
 import { LmsShell } from '@teky/shared/ui/LmsShell';
 import type { UserRole } from '@teky/shared/types';
 
@@ -22,14 +24,14 @@ import type { UserRole } from '@teky/shared/types';
 function RoleRedirect() {
   const { role } = useAuth();
   const target = resolveShellForRole(role);
-  return <RoleGuard allowedRoles={['teacher', 'staff', 'academic_manager', 'admin']}><Navigate to={target.path} replace /></RoleGuard>;
+  return <RoleGuard allowedRoles={['teacher', 'academic_staff', 'academic_manager', 'system_admin']}><Navigate to={target.path} replace /></RoleGuard>;
 }
 
 export function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   useEffect(() => { document.documentElement.classList.toggle('dark', isDarkMode); }, [isDarkMode]);
   const navigate = useNavigate();
-  const isAccountVisible = useAuth().isLoggedIn;
+  const adminNavigation = useAdminNavigation('/admin');
   const { role, accessToken, refreshToken, user, logout } = useAuth();
 
   /**
@@ -73,9 +75,31 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans">
-      {isAccountVisible && <a href="/account" className="fixed bottom-4 left-4 z-50 rounded-xl bg-blue-700 px-4 py-3 text-white shadow-md focus-visible:ring-2">Tài khoản</a>}
       <Routes>
-        <Route path="/account" element={<AccountPage />} />
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+        <Route
+          path="/account"
+          element={
+            role ? (
+              <LmsShell
+                currentRole={role}
+                userName={user?.fullName}
+                userEmail={user?.email}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((value) => !value)}
+                onLogout={logout}
+                onSelectNav={(navId) => {
+                  const target = resolveShellForRole(role);
+                  navigate(`${target.path}?tab=${navId}`);
+                }}
+              >
+                {() => <AccountPage />}
+              </LmsShell>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
         <Route path="/forgot-password" element={<RecoveryPage />} />
         {/* Cổng đăng nhập Backoffice */}
         <Route
@@ -114,9 +138,9 @@ export function App() {
         <Route
           path="/staff"
           element={
-            <RoleGuard allowedRoles={['staff']} fallback={forbidden('Giáo vụ')}>
+            <RoleGuard allowedRoles={['academic_staff']} fallback={forbidden('Giáo vụ')}>
               <LmsShell
-                currentRole="staff"
+                currentRole="academic_staff"
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}
@@ -149,12 +173,14 @@ export function App() {
         />
 
         {/* Dashboard Quản trị hệ thống - chỉ dành cho role admin */}
-        <Route
-          path="/admin"
+        {['/admin', '/admin/directory'].map(path => (
+        <Route key={path}
+          path={path}
           element={
-            <RoleGuard allowedRoles={['admin']} fallback={forbidden('Quản trị hệ thống')}>
+            <RoleGuard allowedRoles={['system_admin']} fallback={forbidden('Quản trị hệ thống')}>
               <LmsShell
-                currentRole="admin"
+                currentRole="system_admin"
+                {...adminNavigation}
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}
@@ -166,6 +192,7 @@ export function App() {
             </RoleGuard>
           }
         />
+        ))}
 
         {/* Bất kỳ đường dẫn nào khác -> điều hướng theo vai trò trong claim JWT */}
         <Route path="*" element={<RoleRedirect />} />

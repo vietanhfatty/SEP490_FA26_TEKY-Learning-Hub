@@ -4,9 +4,9 @@ public enum UserRole : byte
 {
     Student = 1,
     Teacher = 2,
-    Admin = 3,
+    SystemAdmin = 3,
     Parent = 4,
-    Staff = 5,
+    AcademicStaff = 5,
     AcademicManager = 6
 }
 

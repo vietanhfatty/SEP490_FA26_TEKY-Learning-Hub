@@ -1,5 +1,28 @@
 DEVELOPMENT DATABASE UPDATES
 
+TEAM PULL CHECKLIST (current schema)
+  Pull the backend code AND every new SQL migration together. Run the http/https profile
+  normally; it automatically applies missing migrations before API requests are accepted.
+  Or apply migrations only (without HTTP server or demo seeding):
+    dotnet run --project backend/src/TekyLearningHub.Api --launch-profile migrate
+  Override the connection for your own machine without editing committed settings:
+    $env:ConnectionStrings__DefaultConnection = 'Server=.\SQLEXPRESS;Database=Teky_Learning_Hub;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;'
+
+  Ordered scripts embedded in every backend build:
+    00000000_baseline.sql (Infrastructure/Data/Migrations; empty DB or baseline existing DB)
+    20261113_account_security.sql
+    20261114_course_lifecycle_status.sql
+    20261114_student_project_submissions.sql
+    20261115_academic_governance.sql
+    20261116_account_administration.sql
+  Governance preserves existing role IDs and accounts, changes Users.RoleId to PrimaryRoleId,
+  and adds scoped grants/content approval tables. Administration adds invitations, normalized
+  email uniqueness, activation state, and administration concurrency version. Existing users
+  are not converted to pending activation. Existing duplicate normalized emails stop migration
+  with an explicit error; resolve those records rather than resetting the database.
+  Each machine applies its own missing scripts using its own migration journal.
+  No dotnet ef database update or hand-run SQL is required.
+
 After pulling code, configure ConnectionStrings:DefaultConnection for your SQL Server instance,
 then run from the repository root:
   dotnet run --project backend/src/TekyLearningHub.Api --launch-profile http

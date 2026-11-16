@@ -5,14 +5,12 @@ import {
   IconBookOpen,
   IconCalendar,
   IconCheckCircle,
-  IconTrophy,
   IconSparkles,
   IconUsers,
   IconShieldCheck,
   IconActivity,
   IconCreditCard,
   IconFileText,
-  IconVideo,
   IconLayers,
   IconBell,
   IconSettings,
@@ -57,7 +55,7 @@ export const ROLE_DISPLAY_CONFIG: Record<
     avatarEmoji: '👨‍🏫',
     campus: 'Khoa Lập trình & Robotics',
   },
-  staff: {
+  academic_staff: {
     label: 'Giáo vụ',
     badge: 'info',
     defaultName: 'Nguyễn Thu Nga',
@@ -71,7 +69,7 @@ export const ROLE_DISPLAY_CONFIG: Record<
     avatarEmoji: '👩‍💻',
     campus: 'Hội đồng chuyên môn CSTA',
   },
-  admin: {
+  system_admin: {
     label: 'Quản trị hệ thống',
     badge: 'neutral',
     defaultName: 'Admin Kỹ Thuật',
@@ -84,11 +82,12 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
   switch (role) {
     case 'student':
       return [
-        { id: 'overview', label: 'Home', icon: IconHome },
+        { id: 'overview', label: 'Dashboard', icon: IconHome },
+        { id: 'classes', label: 'My Classes', icon: IconCalendar },
         { id: 'courses', label: 'My Courses', icon: IconBookOpen },
-        { id: 'live', label: 'Today', icon: IconVideo },
+        { id: 'projects', label: 'My Projects', icon: IconLayers },
         { id: 'assignments', label: 'Assignments', icon: IconFileText },
-        { id: 'achievements', label: 'Gamification', icon: IconTrophy },
+        { id: 'assessments', label: 'Assessments', icon: IconCheckCircle },
       ];
     case 'teacher':
       return [
@@ -115,10 +114,11 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
         { id: 'teachers', label: 'Điều phối Giảng viên', icon: IconUsers },
         { id: 'surveys', label: 'Khảo sát chất lượng', icon: IconSparkles },
       ];
-    case 'admin':
+    case 'system_admin':
       return [
         { id: 'overview', label: 'Home', icon: IconHome },
         { id: 'users', label: 'Users', icon: IconUsers },
+        { id: 'directory', label: 'Phòng ban & chức danh', icon: IconLayers },
         { id: 'courses', label: 'Courses', icon: IconBookOpen },
         { id: 'groups', label: 'Groups', icon: IconUsers },
         { id: 'branches', label: 'Branches', icon: IconLayers },
@@ -126,7 +126,7 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
         { id: 'audit', label: 'Reports', icon: IconActivity },
         { id: 'settings', label: 'Account & Settings', icon: IconSettings },
       ];
-    case 'staff':
+    case 'academic_staff':
       return [
         { id: 'overview', label: 'Home', icon: IconHome },
         { id: 'users', label: 'Users', icon: IconUsers },

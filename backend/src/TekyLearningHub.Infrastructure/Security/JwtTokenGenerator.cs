@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
+using TekyLearningHub.Domain.Security;
 
 namespace TekyLearningHub.Infrastructure.Security;
 
@@ -28,19 +29,21 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var roleName = RoleNameNormalizer.Normalize(user.Role?.RoleName) ?? RoleNameNormalizer.FromRoleId(user.RoleId);
+        if (!UserAuthorization.HasValidPrimaryRole(user))
+            throw new InvalidOperationException("Account has no active primary role grant.");
+        var roleName = RoleNameNormalizer.FromRoleId(user.PrimaryRoleId);
 
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, user.FullName),
-            new(ClaimTypes.Role, roleName),
             new("security_version", user.SecurityVersion.ToString()),
-            new("role_id", user.RoleId.ToString()),
+            new("role_id", user.PrimaryRoleId.ToString()),
             new("role_name", roleName),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+        claims.AddRange(UserAuthorization.Roles(user).Select(role => new Claim(ClaimTypes.Role, role)));
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
