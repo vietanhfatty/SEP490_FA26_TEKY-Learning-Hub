@@ -44,9 +44,6 @@ function AppRoutes() {
   useEffect(() => { document.documentElement.classList.toggle('dark', isDarkMode); }, [isDarkMode]);
 
   const openDashboard = useCallback(() => { navigate('/dashboard', { replace: true }); }, [navigate]);
-  const handleLogout = useCallback(async () => {
-    await logout(); navigate('/login');
-  }, [logout, navigate]);
   const handleNavigate = useCallback((view: string) => {
     if (view === 'dashboard') navigate(isLoggedIn ? '/dashboard' : '/login');
     else if (view === 'courses') navigate('/courses');
@@ -57,7 +54,7 @@ function AppRoutes() {
   return <div className={`public-site${isDarkMode ? ' public-dark' : ''}`}>
     <Navbar currentView={location.pathname} onNavigate={handleNavigate} currentRole={currentRole}
       userName={currentUser?.fullName} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(value => !value)}
-      isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+      isLoggedIn={isLoggedIn} onLogout={logout} />
     <main id="public-content" className="public-main">
       <Routes>
         <Route path="/" element={<Navigate to="/landing" replace />} />

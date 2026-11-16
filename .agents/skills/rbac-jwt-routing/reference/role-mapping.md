@@ -1,131 +1,41 @@
-# Role mapping sites in detail
+# Role mapping and shell routing
 
-The role ID to name mapping exists in several places. They must all agree, or users land on the wrong dashboard.
+Keep this reference synchronized with `docs/architecture/README.md`, `docs/architecture/conventions.md` and `frontend/README.md`. Paths below are relative to the repository root.
 
-## Canonical source
+## Canonical roles
 
-`backend/src/TekyLearningHub.Domain/Enums/UserRole.cs`
+The source of role IDs is `backend/src/TekyLearningHub.Domain/Enums/UserRole.cs`.
 
-```csharp
-public enum UserRole : byte
-{
-    Student = 1,
-    Teacher = 2,
-    Admin = 3,
-    Parent = 4,
-    Staff = 5,
-    AcademicManager = 6
-}
-```
+| ID | Domain enum | Claim/DTO/frontend role | App and dashboard |
+| --- | --- | --- | --- |
+| 1 | Student | student | Portal 3000 `/student` |
+| 2 | Teacher | teacher | Backoffice 3001 `/teacher` |
+| 3 | SystemAdmin | system_admin | Backoffice 3001 `/admin` |
+| 4 | Parent | parent | Portal 3000 `/parent` |
+| 5 | AcademicStaff | academic_staff | Backoffice 3001 `/staff` |
+| 6 | AcademicManager | academic_manager | Backoffice 3001 `/academic-manager` |
 
-## Backend sites
+`admin` and `staff` are legacy aliases; emitted claims and shared frontend types use `system_admin` and `academic_staff`. Role IDs do not express a permission hierarchy.
 
-### `RoleNameNormalizer.cs` (canonical helper)
+## Backend ownership
 
-Single place that owns both directions:
+- `Domain/Security/RoleNameNormalizer.cs` normalizes aliases and maps IDs to canonical strings.
+- `Infrastructure/Security/JwtTokenGenerator.cs` takes `role_id` and `role_name` from `PrimaryRoleId`. The `role` claim contains all active role memberships and can be an array. It also emits `security_version`.
+- `Domain/Security/UserAuthorization.cs` validates active grants and primary-role membership. `Application/Services/Auth/SessionValidationService.cs` compares plain JWT identity data with the current account; the Infrastructure claim adapter delegates to that policy.
+- `Application/Services/Auth/AuthService.cs` maps `PrimaryRole`/`PrimaryRoleId` and active role memberships into `UserDto`.
+- Auth controllers are in `Api/Controllers/Auth`; administrative controllers are in `Api/Controllers/Admin`; student controllers are in `Api/Controllers/Portal`; teacher reviews are in `Api/Controllers/Backoffice`.
 
-- `Normalize(string? rawRoleName)` — PascalCase from the `Roles` table to snake_case for claims and DTOs. Handles aliases (`tutor`, `gv`, `administrator`, `guardian`, `giao_vu`, `academicmanager`, `manager`).
-- `FromRoleId(byte roleId)` — enum-driven fallback when `user.Role` is not loaded.
+Application use cases depend on repository/security ports; Infrastructure implements queries and JWT/hash/email/storage adapters. Controllers call Application service interfaces. See the architecture docs for transaction and DI ownership.
 
-### `JwtTokenGenerator.cs`
+## Frontend ownership
 
-Emits the claims:
+- `frontend/shared/auth/jwt.ts` decodes claims and normalizes roles. A supplied unknown `role_id` fails closed; it must not fall back to a privileged role string.
+- `frontend/shared/api-client/auth.ts` verifies identity and the complete set of role memberships with `/api/auth/me`. Cached role/profile values do not authorize a session.
+- `frontend/src/services/auth.ts` re-exports the shared API client. Do not introduce a second implementation.
+- `frontend/shared/auth/shellConfig.ts` owns app origins and role-to-dashboard mapping. Origins are configurable using `VITE_PUBLIC_ORIGIN`, `VITE_PORTAL_ORIGIN`, `VITE_BACKOFFICE_ORIGIN`.
+- `shellTransfer.ts` and `shellHandshake.ts` transfer sessions using a one-use code and PKCE; tokens must not appear in URLs.
+- `AuthProvider.logout()` calls `frontend/shared/auth/logout.ts` for every role and password-change flow. It clears/revokes the current session and replaces the page with public login at port 5173 by default. The public app consumes `?loggedOut=1` and clears its own stale session before restoration.
 
-```csharp
-var roleName = RoleNameNormalizer.Normalize(user.Role?.RoleName) ?? RoleNameNormalizer.FromRoleId(user.RoleId);
+## Verification
 
-var claims = new List<Claim>
-{
-    new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-    new(ClaimTypes.Email, user.Email),
-    new(ClaimTypes.Name, user.FullName),
-    new(ClaimTypes.Role, roleName),
-    new("role_id", user.RoleId.ToString()),
-    new("role_name", roleName),
-    new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-};
-```
-
-`role` and `role_name` carry the same snake_case value, so the frontend never has to guess.
-
-### `AuthService.cs`
-
-`MapToUserDto` sets `UserDto.Role`. It must use the same normalizer, otherwise the login response body and the token claim disagree.
-
-## Frontend sites
-
-### `frontend/shared/auth/jwt.ts`
-
-`ROLE_ID_MAP` mirrors the enum:
-
-```typescript
-const ROLE_ID_MAP: Record<number, UserRole> = {
-  1: 'student',
-  2: 'teacher',
-  3: 'admin',
-  4: 'parent',
-  5: 'staff',
-  6: 'academic_manager',
-};
-```
-
-`roleFromClaims` prefers `role_id`, then falls back to `role_name`, then `role`. All three go through `normalizeRoleString`.
-
-### `frontend/shared/api-client/auth.ts`
-
-`normalizeRole(backendRole)` handles the raw role string from the API. It maps both names and numeric IDs.
-
-### `frontend/src/services/auth.ts`
-
-An app-root copy of the same function. Must be edited in lockstep with the shared one.
-
-## Verifying they agree
-
-After any role change, decode a real token and check the claims:
-
-```bash
-# with a live token
-echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null
-```
-
-Expect:
-
-```json
-{
-  "role_id": "2",
-  "role": "teacher",
-  "role_name": "teacher"
-}
-```
-
-For `manager@teky.edu.vn` (role_id 6), expect `academic_manager` in both `role` and `role_name`.
-
-Then confirm the login response body agrees:
-
-```json
-{
-  "data": {
-    "user": {
-      "roleId": 6,
-      "role": "academic_manager"
-    }
-  }
-}
-```
-
-If `roleId` and `role` disagree, `AuthService.MapToUserDto` is out of sync.
-
-## Historical drift (fixed)
-
-Before the fix, `JwtTokenGenerator` and `shared/api-client/auth.ts` both used this wrong table:
-
-| RoleId | Correct | Was |
-|---|---|---|
-| 1 | student | student |
-| 2 | teacher | parent |
-| 3 | admin | teacher |
-| 4 | parent | academic_manager |
-| 5 | staff | admin |
-| 6 | academic_manager | missing |
-
-Effect: a teacher logged into the Parent Dashboard, and admins landed on the Teacher Dashboard.
+Run `pnpm.cmd --filter frontend test:rbac` and build the public, Portal and Backoffice apps. Check all six roles with remember-me enabled and disabled, logout return to the public origin, failed API calls and delayed responses. Run backend tests against the test `.csproj`; SQL integration tests require `TEKY_MIGRATION_TEST_CONNECTION` and use disposable databases.

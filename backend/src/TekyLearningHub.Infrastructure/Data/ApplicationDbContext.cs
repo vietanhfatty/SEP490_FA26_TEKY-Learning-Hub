@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
 
 namespace TekyLearningHub.Infrastructure.Data;
 
-public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContext
+public class ApplicationDbContext : TekyLearningHubContext
 {
     public DbSet<UserRoleAssignment> UserRoles => Set<UserRoleAssignment>();
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -34,7 +33,8 @@ public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContex
         ValidateAuditActors();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
-    protected override void OnModelCreating(ModelBuilder modelBuilder) {
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<AssessmentAttempt>(entity =>
         {
@@ -61,7 +61,8 @@ public class ApplicationDbContext : TekyLearningHubContext, IApplicationDbContex
             entity.HasOne(x => x.Role).WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Permission).WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Restrict);
         });
-        modelBuilder.Entity<StudentProjectVersion>(entity => {
+        modelBuilder.Entity<StudentProjectVersion>(entity =>
+        {
             entity.ToTable("StudentProjectVersions");
             entity.HasKey(x => new { x.AssignmentId, x.StudentId, x.AttemptNo });
             entity.Property(x => x.FileName).HasMaxLength(180);

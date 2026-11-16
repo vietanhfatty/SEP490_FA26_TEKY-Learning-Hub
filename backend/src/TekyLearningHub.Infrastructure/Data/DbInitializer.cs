@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
+using TekyLearningHub.Infrastructure.Data;
 
 namespace TekyLearningHub.Infrastructure.Data;
 
 public static class DbInitializer
 {
-    public static async Task SeedAsync(IApplicationDbContext context, IPasswordHasher passwordHasher)
+    public static async Task SeedAsync(ApplicationDbContext context, IPasswordHasher passwordHasher)
     {
         // 1. Seed Roles if missing
         var existingRoles = await context.Roles.ToListAsync();
@@ -112,10 +113,11 @@ public static class DbInitializer
                     ? await ((ApplicationDbContext)context).Database.SqlQuery<int>(
                         $"SELECT DepartmentId AS Value FROM dbo.Departments WHERE Code='ACADEMIC'").SingleAsync()
                     : (int?)null;
-                user.RoleAssignments.Add(new UserRoleAssignment {
-                    RoleId=user.PrimaryRoleId,
-                    ScopeType=academicDepartmentId.HasValue ? "DEPARTMENT" : "GLOBAL",
-                    DepartmentId=academicDepartmentId
+                user.RoleAssignments.Add(new UserRoleAssignment
+                {
+                    RoleId = user.PrimaryRoleId,
+                    ScopeType = academicDepartmentId.HasValue ? "DEPARTMENT" : "GLOBAL",
+                    DepartmentId = academicDepartmentId
                 });
                 context.Users.Add(user);
             }

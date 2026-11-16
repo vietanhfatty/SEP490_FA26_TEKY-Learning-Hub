@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Infrastructure.Data;
-using TekyLearningHub.Infrastructure.Services;
+using TekyLearningHub.Application.Services.Portal;
 using Xunit;
 namespace TekyLearningHub.Application.Tests;
 public class StudentOverviewTests {
@@ -21,7 +21,7 @@ public class StudentOverviewTests {
     INSERT dbo.Enrollments(ClassId,StudentId) SELECT c.ClassId,u.UserId FROM dbo.Classes c CROSS JOIN dbo.Users u WHERE c.ClassCode='FLOW-CLASS' AND u.Email='student@flow.test';
     INSERT dbo.ClassSessions(ClassId,LessonId,SessionDate,StartTime,EndTime) SELECT c.ClassId,l.LessonId,CONVERT(date,DATEADD(day,1,SYSUTCDATETIME())),'23:00','23:59' FROM dbo.Classes c JOIN dbo.Lessons l ON l.CourseId=c.CourseId WHERE c.ClassCode='FLOW-CLASS';
     INSERT dbo.Assignments(ClassId,LessonId,Title,Status,CreatedBy) SELECT c.ClassId,l.LessonId,'Practice','Published',c.TeacherId FROM dbo.Classes c JOIN dbo.Lessons l ON l.CourseId=c.CourseId WHERE c.ClassCode='FLOW-CLASS';
-  
+
   """);
   var student=await fixture.Scalar("SELECT UserId FROM dbo.Users WHERE Email='student@flow.test'");
   var other=await fixture.Scalar("SELECT UserId FROM dbo.Users WHERE Email='other@flow.test'");
@@ -38,7 +38,7 @@ public class StudentOverviewTests {
       ({student},'Class','Other class notice','Not for this class','Class',999999);
   """);
   using var db=new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(fixture.ConnectionString).Options);
-  var service=new StudentOverviewService(db,new StudentClassesService(db));
+  var service=TestServices.Overview(db,TestServices.Classes(db));
   Assert.Null(await service.Overview(other,default));
   Assert.Null(await service.ClassDetails(other,cls,default));
   var overview=await service.Overview(student,default);

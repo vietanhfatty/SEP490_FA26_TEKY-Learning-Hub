@@ -8,13 +8,12 @@ import '@teky/shared/ui/lms.css';
 interface LmsShellProps {
   currentRole: UserRole;
   activeNavId?: string;
-  onSelectNav?: (id: string) => void;
   userName?: string;
   userEmail?: string;
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onLogout: () => Promise<void> | void;
-
+  onSelectNav?: (id: string) => void;
   children: (activeNavId: string, onSelectNav: (id: string) => void) => React.ReactNode;
 }
 export const LmsShell: React.FC<LmsShellProps> = ({ currentRole, userName, userEmail, isDarkMode, onToggleTheme, onLogout, activeNavId: controlledNavId, onSelectNav, children }) => {

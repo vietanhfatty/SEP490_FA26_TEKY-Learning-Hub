@@ -1,22 +1,20 @@
 using System.Security.Claims;
+using TekyLearningHub.Application.Interfaces.Auth;
+using TekyLearningHub.Application.Services.Auth;
 using TekyLearningHub.Domain.Entities;
-using TekyLearningHub.Domain.Enums;
 
 namespace TekyLearningHub.Infrastructure.Security;
 
-/// <summary>Rejects tokens whose authorization no longer matches the live account.</summary>
 public static class SessionAuthorization
 {
-    public static bool MatchesCurrentUser(ClaimsPrincipal? principal, User? user)
+    public static bool MatchesCurrentUser(ClaimsPrincipal? principal, User? user) =>
+     TryRead(principal, out var identity) && SessionValidationService.Matches(identity!, user);
+    public static bool TryRead(ClaimsPrincipal? principal, out SessionIdentity? identity)
     {
-        if (principal is null || user is null || user.Status != "Active" ||
-            !UserAuthorization.HasValidPrimaryRole(user)) return false;
-
-        var roles = principal.FindAll(ClaimTypes.Role).ToArray();
-        return int.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId) && userId == user.UserId &&
-            int.TryParse(principal.FindFirst("security_version")?.Value, out var version) && version == user.SecurityVersion &&
-            byte.TryParse(principal.FindFirst("role_id")?.Value, out var roleId) && roleId == user.PrimaryRoleId &&
-            roles.Length == roles.Select(x => x.Value).Distinct().Count() &&
-            roles.Select(x => x.Value).Order().SequenceEqual(UserAuthorization.Roles(user));
+        identity = null;
+        if (principal is null || !int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+         || !int.TryParse(principal.FindFirstValue("security_version"), out var version)
+         || !byte.TryParse(principal.FindFirstValue("role_id"), out var roleId)) return false;
+        identity = new(userId, version, roleId, principal.FindAll(ClaimTypes.Role).Select(x => x.Value).ToArray()); return true;
     }
 }

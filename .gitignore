@@ -45,8 +45,12 @@ Thumbs.db
 # Local docs
 PROJECT_STRUCTURE.md
 
-# Generated documentation (local-only, không commit)
-docs/
+# Keep architecture and conventions versioned; other local research stays ignored.
+/docs/*
+!/docs/architecture/
+/docs/architecture/*
+!/docs/architecture/README.md
+!/docs/architecture/conventions.md
 
 # Tooling artifacts
 .ua/

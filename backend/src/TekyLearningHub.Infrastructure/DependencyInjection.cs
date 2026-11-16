@@ -1,11 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TekyLearningHub.Application.Interfaces.Admin;
+using TekyLearningHub.Application.Interfaces.Auth;
+using TekyLearningHub.Application.Interfaces.Backoffice;
+using TekyLearningHub.Application.Interfaces.Portal;
 using TekyLearningHub.Application.Interfaces;
-using TekyLearningHub.Domain.Entities;
 using TekyLearningHub.Infrastructure.Data;
+using TekyLearningHub.Infrastructure.Repositories.Admin;
+using TekyLearningHub.Infrastructure.Repositories.Auth;
+using TekyLearningHub.Infrastructure.Repositories.Backoffice;
+using TekyLearningHub.Infrastructure.Repositories.Portal;
 using TekyLearningHub.Infrastructure.Security;
-using TekyLearningHub.Infrastructure.Services;
+using TekyLearningHub.Infrastructure.Services.Auth;
+using TekyLearningHub.Infrastructure.Storage;
 
 namespace TekyLearningHub.Infrastructure;
 
@@ -27,25 +35,39 @@ public static class DependencyInjection
             });
         });
 
-        services.AddScoped<IApplicationDbContext>(provider =>
-            provider.GetRequiredService<ApplicationDbContext>());
+
 
         services.AddScoped<TekyLearningHubContext>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
 
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-        services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<AcademicPermissionService>();
-        services.AddScoped<UserAdministrationService>();
-        services.AddScoped<IStudentClassesService, StudentClassesService>();
-        services.AddScoped<StudentLearningService>();
-        services.AddScoped<StudentOverviewService>();
-        services.AddScoped<StudentAssessmentsService>();
-        services.AddScoped<ICourseService, CourseService>();
+
+        services.AddScoped<IAcademicPermissionReader, AcademicPermissionReader>();
+
+
+
+
+
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IAccountEmailOutbox, AccountEmailOutbox>();
+        services.AddScoped<IAuthRepository, AuthRepository>();
+        services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<IShellSessionRepository, ShellSessionRepository>();
+        services.AddScoped<ICourseRepository, CourseRepository>();
+        services.AddScoped<IUserAdministrationRepository, UserAdministrationRepository>();
+        services.AddScoped<IStudentClassesRepository, StudentClassesRepository>();
+        services.AddScoped<IStudentLearningRepository, StudentLearningRepository>();
+        services.AddScoped<IProjectReviewRepository, ProjectReviewRepository>();
+        services.AddSingleton<IAvatarStorage, AvatarStorage>();
+        services.AddSingleton<ITransferTicketStore, TransferTicketStore>();
+        services.AddSingleton(new AccountOptions { InvitationBaseUrl = configuration["Account:InvitationBaseUrl"] });
+        services.AddSingleton(new ShellOptions { PortalOrigin = configuration["Shells:PortalOrigin"] ?? "http://localhost:3000", BackofficeOrigin = configuration["Shells:BackofficeOrigin"] ?? "http://localhost:3001" });
         services.AddDataProtection();
         services.AddHostedService<AccountEmailWorker>();
 
+        services.AddScoped<IStudentAssessmentsRepository, StudentAssessmentsRepository>();
+        services.AddScoped<IStudentOverviewRepository, StudentOverviewRepository>();
         return services;
     }
 }

@@ -2,10 +2,10 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using TekyLearningHub.Application.Services.Auth;
 using TekyLearningHub.Domain.Entities;
 using TekyLearningHub.Infrastructure.Data;
 using TekyLearningHub.Infrastructure.Security;
-using TekyLearningHub.Infrastructure.Services;
 using Xunit;
 
 namespace TekyLearningHub.Application.Tests;
@@ -44,16 +44,16 @@ public class LogoutTests
         var jwtGenerator = new JwtTokenGenerator(configuration);
         var passwordHasher = new PasswordHasher();
 
-        return new AuthService(context, passwordHasher, jwtGenerator);
+        return TestServices.Auth(context, passwordHasher, jwtGenerator);
     }
 
     [Theory]
-    [InlineData(1,"Student")]
-    [InlineData(2,"Teacher")]
-    [InlineData(3,"SystemAdmin")]
-    [InlineData(4,"Parent")]
-    [InlineData(5,"AcademicStaff")]
-    [InlineData(6,"AcademicManager")]
+    [InlineData(1, "Student")]
+    [InlineData(2, "Teacher")]
+    [InlineData(3, "SystemAdmin")]
+    [InlineData(4, "Parent")]
+    [InlineData(5, "AcademicStaff")]
+    [InlineData(6, "AcademicManager")]
     public async Task LogoutAsync_WithValidRefreshToken_RevokesSessionAndCreatesAuditLog(byte roleId, string roleName)
     {
         // Arrange
@@ -69,7 +69,7 @@ public class LogoutTests
             PasswordHash = "hash",
             PrimaryRoleId = roleId,
             PrimaryRole = role,
-            RoleAssignments = [new() {RoleId=roleId}],
+            RoleAssignments = [new() { RoleId = roleId }],
             Status = "Active",
             ThemeMode = "light"
         };
@@ -123,7 +123,7 @@ public class LogoutTests
             PasswordHash = "hash",
             PrimaryRoleId = 3,
             PrimaryRole = role,
-            RoleAssignments = [new() {RoleId=3}],
+            RoleAssignments = [new() { RoleId = 3 }],
             Status = "Active",
             ThemeMode = "dark"
         };

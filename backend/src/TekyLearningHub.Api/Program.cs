@@ -1,13 +1,13 @@
+using TekyLearningHub.Application.Common;
 using System.Text;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using TekyLearningHub.Application;
+using TekyLearningHub.Application.Interfaces.Auth;
 using TekyLearningHub.Application.Interfaces;
+using TekyLearningHub.Application;
 using TekyLearningHub.Infrastructure;
-using TekyLearningHub.Infrastructure.Data;
-using TekyLearningHub.Infrastructure.Data.Migrations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,14 +52,19 @@ builder.Services.AddAuthentication(options =>
 {
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
-    options.Events = new JwtBearerEvents { OnTokenValidated = async context => {
-        var id=context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var version=context.Principal?.FindFirst("security_version")?.Value;
-        var db=context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
-        if(!int.TryParse(id,out var userId) || !int.TryParse(version,out var tokenVersion)) {context.Fail("Invalid session");return;}
-        var user=await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.Include(db.Users, x=>x.RoleAssignments), x=>x.UserId==userId);
-        if (!TekyLearningHub.Infrastructure.Security.SessionAuthorization.MatchesCurrentUser(context.Principal, user)) context.Fail("Session revoked or role changed");
-    }};
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var principal = context.Principal;
+            if (principal is null || !int.TryParse(principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)
+                || !int.TryParse(principal.FindFirst("security_version")?.Value, out var version)
+                || !byte.TryParse(principal.FindFirst("role_id")?.Value, out var roleId)) { context.Fail("Invalid session"); return; }
+            var identity = new SessionIdentity(userId, version, roleId, principal.FindAll(System.Security.Claims.ClaimTypes.Role).Select(x => x.Value).ToArray());
+            var validator = context.HttpContext.RequestServices.GetRequiredService<ISessionValidationService>();
+            if (!await validator.IsValid(identity)) context.Fail("Session revoked or role changed");
+        }
+    };
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
@@ -74,10 +79,11 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
-builder.Services.AddRateLimiter(options => {
- options.RejectionStatusCode=429;
- options.AddPolicy("account", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
- context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions {PermitLimit=10,Window=TimeSpan.FromMinutes(1),QueueLimit=0}));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.AddPolicy("account", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+    context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 // 5. OpenAPI & Scalar API Documentation
@@ -87,25 +93,7 @@ var app = builder.Build();
 
 // 6. Automatic Data Seeding on Startup (Roles & Demo Accounts)
 // Development updates the schema before querying entities. Production performs no automatic migration or demo seeding.
-if (app.Environment.IsDevelopment())
-using (var scope = app.Services.CreateScope())
-{
-    try
-    {
-        var connectionString = app.Configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
-        await DevelopmentDatabaseMigrator.ApplyAsync(connectionString, app.Logger);
-        if (app.Configuration.GetValue<bool>("migrate-only")) return;
-        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
-        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        await DbInitializer.SeedAsync(context, passwordHasher);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogCritical(ex, "Không thể cập nhật database Development. Backend dừng để tránh chạy với schema không tương thích.");
-        throw;
-    }
-}
+if (await ApplicationStartup.InitializeAsync(app.Services, app.Configuration, app.Environment, app.Logger)) return;
 
 // 7. Configure Middleware Pipeline
 if (app.Environment.IsDevelopment())
@@ -115,11 +103,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
-app.Use(async (context, next) => {
+app.Use(async (context, next) =>
+{
     try { await next(); }
-    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException) {
-        context.Response.StatusCode=409;
-        await context.Response.WriteAsJsonAsync(new {message="Dữ liệu vừa thay đổi. Vui lòng tải lại hoặc thử lại."});
+    catch (UseCaseException error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { message = error.Message });
+    }
+    catch (PersistenceConflictException)
+    {
+        context.Response.StatusCode = 409;
+        await context.Response.WriteAsJsonAsync(new { message = "Dữ liệu vừa thay đổi. Vui lòng tải lại hoặc thử lại." });
     }
 });
 

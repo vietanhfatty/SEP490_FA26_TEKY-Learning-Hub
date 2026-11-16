@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Infrastructure.Data;
-using TekyLearningHub.Infrastructure.Services;
+using TekyLearningHub.Application.Services.Portal;
 using Xunit;
 
 namespace TekyLearningHub.Application.Tests;
@@ -38,7 +38,7 @@ public class StudentAssessmentsTests
         var locked = await fixture.Scalar("SELECT AssessmentId FROM dbo.Assessments WHERE Code='LOCKED'");
         var expired = await fixture.Scalar("SELECT AssessmentId FROM dbo.Assessments WHERE Code='EXPIRED'");
         using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(fixture.ConnectionString).Options);
-        var service = new StudentAssessmentsService(db);
+        var service = TestServices.Assessments(db);
         Assert.Empty(await service.List(other, default));
         Assert.Null((await service.Start(other, id, default)).Detail);
         Assert.Null((await service.Submit(other, id, [1], default)).Detail);

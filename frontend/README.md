@@ -17,6 +17,10 @@ Mở `http://localhost:5173` để bắt đầu. Sau khi đăng nhập, ứng d�
 
 Phiên đăng nhập được chuyển bằng mã dùng một lần và PKCE; access token và refresh token không xuất hiện trong URL. Lựa chọn **Ghi nhớ đăng nhập** được giữ khi đổi cổng. API của mỗi ứng dụng được proxy từ `/api` tới `http://localhost:5268`.
 
+Đăng xuất ở mọi role và trang tài khoản đều dùng `AuthProvider.logout()` trong `frontend/shared/auth`. Luồng dùng chung thu hồi phiên qua API, xóa token ở ứng dụng hiện tại rồi dùng `window.location.replace` để về `http://localhost:5173/login`. Dấu `?loggedOut=1` được xử lý và gỡ khỏi URL trước khi khôi phục phiên tại trang công khai, vì các cổng có storage riêng. Nếu API mất kết nối, phiên cục bộ vẫn được xóa và người dùng vẫn về trang đăng nhập. Khi đổi domain/cổng, đích đăng xuất lấy từ `VITE_PUBLIC_ORIGIN`.
+
+Kiến trúc và quy ước chung: [kiến trúc](../docs/architecture/README.md), [quy ước phát triển](../docs/architecture/conventions.md).
+
 Nếu dùng domain hoặc cổng khác, đặt cùng các giá trị `VITE_PUBLIC_ORIGIN`, `VITE_PORTAL_ORIGIN` và `VITE_BACKOFFICE_ORIGIN` trong môi trường chạy/build của cả ba ứng dụng. Khi dùng file `.env.local`, đặt file trong từng thư mục ứng dụng (`frontend/`, `frontend/portal/`, `frontend/backoffice/`). Backend cũng cần `Shells__PortalOrigin`, `Shells__BackofficeOrigin` và cấu hình CORS tương ứng.
 
 Kiểm tra từ thư mục gốc:
