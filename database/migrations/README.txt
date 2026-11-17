@@ -15,6 +15,11 @@ TEAM PULL CHECKLIST (current schema)
     20261114_student_project_submissions.sql
     20261115_academic_governance.sql
     20261116_account_administration.sql
+    20261117_student_learning_feedback.sql
+    20261118_student_assessments.sql
+    20261119_parent_portal.sql
+    20261120_parent_teacher_messages.sql
+    20261121_seed_demo_student_parent.sql
   Governance preserves existing role IDs and accounts, changes Users.RoleId to PrimaryRoleId,
   and adds scoped grants/content approval tables. Administration adds invitations, normalized
   email uniqueness, activation state, and administration concurrency version. Existing users
@@ -33,8 +38,16 @@ The http/https launch profiles select Development. Before listening for requests
   3. Creates the initial schema ONLY if the database is empty.
   4. For an existing schema, checks all baseline tables and records a baseline without recreating them.
   5. Runs pending SQL scripts in filename order and records checksums in dbo.__TekySchemaMigrations.
-  6. Seeds only missing demo roles/accounts using the existing DbInitializer. Existing users,
-     password hashes, account status, role assignments, sessions and learning data are not overwritten.
+  6. Seeds missing demo roles/accounts using DbInitializer, then adds the demo family link,
+     two published courses, lessons, classes, timetables and enrollments. Existing records are
+     preserved, including revoked links and changed passwords.
+
+To apply migrations and demo seed without starting a second HTTP server:
+  dotnet run --project backend/src/TekyLearningHub.Api --launch-profile seed-demo
+
+Sign in at http://localhost:5173/login with student@teky.edu.vn or parent@teky.edu.vn.
+New demo accounts use the existing Development demo password. The two course codes are
+DEMO-SEED-PY and DEMO-SEED-3D. The migrate profile applies schema without demo data.
 
 An already manually applied 20261113_account_security.sql is safe to adopt: it adds only missing
 columns/table. Subsequent startups skip it. No legacy full-data MERGE seed script is replayed.
