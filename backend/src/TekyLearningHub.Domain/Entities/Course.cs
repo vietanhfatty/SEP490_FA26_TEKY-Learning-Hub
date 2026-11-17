@@ -14,6 +14,8 @@ public partial class Course
     public string? Description { get; set; }
 
     public string? LevelCode { get; set; }
+    public string? LearningObjectives { get; set; }
+    public int? TuitionVnd { get; set; }
 
     public string Status { get; set; } = null!;
 
