@@ -18,7 +18,7 @@ public sealed class CheckoutGateway(HttpClient http, IConfiguration configuratio
     private string? ApiKey => configuration["PaymentGateway:ApiKey"];
     private string? ChecksumKey => configuration["PaymentGateway:ChecksumKey"];
     private string? PortalOrigin => configuration["Shells:PortalOrigin"];
-    private static readonly Uri PayOsBase = new("https://api-merchant.payos.vn/v2/payment-requests/");
+    private static readonly Uri PayOsBase = new("https://api-merchant.payos.vn/v2/payment-requests");
 
     public string? Provider => configuration["PaymentGateway:Mode"] switch
     {
@@ -69,7 +69,7 @@ public sealed class CheckoutGateway(HttpClient http, IConfiguration configuratio
         try
         {
             var result = await Send(HttpMethod.Get,
-                new Uri(PayOsBase, orderCode.ToString(CultureInfo.InvariantCulture)), null, ct);
+                new Uri(FormattableString.Invariant($"{PayOsBase}/{orderCode}")), null, ct);
             if (result is not { } data) return null;
             return new(data.GetProperty("orderCode").GetInt64(), LinkId(data.GetProperty("id")),
                 data.GetProperty("amount").GetInt32(), data.GetProperty("amountPaid").GetInt32(),

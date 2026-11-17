@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { API_BASE_URL } from '../api-client/auth';
@@ -165,7 +165,13 @@ function CheckoutCard({ checkout }: { checkout: Checkout }) {
   const demoUrl = checkout.demoReference ? new URL(`${API_BASE_URL}/payments/demo/${checkout.demoReference}`, window.location.origin).href : null;
   const qr = demoUrl ?? checkout.qrCode;
   const paymentUrl = demoUrl ?? checkout.checkoutUrl;
-  const expired = Date.parse(checkout.expiresAt) <= Date.now();
+  const deadline = Date.parse(checkout.expiresAt);
+  const [expired, setExpired] = useState(() => deadline <= Date.now());
+  useEffect(() => {
+    if (checkout.status !== 'Pending' || expired) return;
+    const timer = window.setTimeout(() => setExpired(true), Math.max(0, deadline - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [checkout.status, deadline, expired]);
   return <article className="sc-panel pp-checkout pp-stack">
     <div className="pp-stack">
       <p className="sc-kicker">{checkout.classCode}{checkout.provider === 'Demo' && ' · Mô phỏng'}</p>

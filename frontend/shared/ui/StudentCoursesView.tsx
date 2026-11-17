@@ -13,36 +13,37 @@ const fold=(s:string)=>s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/g
 export function StudentCoursesView() {
  const {courseId,lessonId}=useParams(); const navigate=useNavigate();
  const [courses,setCourses]=useState<Course[]>(); const [detail,setDetail]=useState<Detail>();
- const [error,setError]=useState(''); const [loading,setLoading]=useState(true); const [revision,setRevision]=useState(0);
+ const [error,setError]=useState(''); const [revision,setRevision]=useState(0);
+ const [fetched,setFetched]=useState<{ courseId: string | undefined; revision: number }>();
+ const loading = !fetched || fetched.courseId !== courseId || fetched.revision !== revision;
  const [query,setQuery]=useState(''); const [filter,setFilter]=useState('all'); const [saving,setSaving]=useState(false);
- useEffect(()=>{
-  const c=new AbortController(); setLoading(true); setError('');
-  const load=async()=>{try {
-   if(courseId) setDetail(await getStudentData<Detail>(`courses/${courseId}`,c.signal));
-   else setCourses(await getStudentData<Course[]>('courses',c.signal));
-  } catch(e){if(!c.signal.aborted)setError(e instanceof Error?e.message:'Không tải được khoá học.');}
-  finally{if(!c.signal.aborted)setLoading(false);}};
-  void load(); return()=>c.abort();
- },[courseId,revision]);
  useEffect(() => {
-  if (courseId) return;
   const controller = new AbortController();
   let timer: number | undefined;
-  async function refresh() {
+  async function load(background = false) {
    try {
-    if (!document.hidden) {
+    if (background && document.hidden) return;
+    if (courseId) {
+     const next = await getStudentData<Detail>(`courses/${courseId}`, controller.signal);
+     if (!controller.signal.aborted) setDetail(next);
+    } else {
      const rows = await getStudentData<Course[]>('courses', controller.signal);
-     if (!controller.signal.aborted) { setCourses(rows); setError(''); }
+     if (!controller.signal.aborted) setCourses(rows);
     }
-   } catch {
-    // A background refresh leaves the current list available.
+    if (!controller.signal.aborted) setError('');
+   } catch (failure) {
+    if (!background && !controller.signal.aborted)
+     setError(failure instanceof Error ? failure.message : 'Không tải được khoá học.');
    } finally {
-    if (!controller.signal.aborted) timer = window.setTimeout(refresh, 3500);
+    if (!controller.signal.aborted) {
+     if (!background) setFetched({ courseId, revision });
+     if (!courseId) timer = window.setTimeout(() => void load(true), 3500);
+    }
    }
   }
-  timer = window.setTimeout(refresh, 3500);
+  void load();
   return () => { controller.abort(); window.clearTimeout(timer); };
- }, [courseId]);
+ }, [courseId, revision]);
  const lesson=detail?.lessons.find(l=>l.lessonId===Number(lessonId)) ?? (!lessonId?detail?.lessons[0]:undefined);
  async function reviewed(){if(!lesson||saving)return;setSaving(true);setError('');try{
   await requestStudent(`courses/${courseId}/lessons/${lesson.lessonId}/reviewed`,{method:'POST'});
