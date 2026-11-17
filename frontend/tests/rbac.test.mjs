@@ -39,12 +39,18 @@ globalThis.sessionStorage = storage();
 afterEach(() => { mock.restoreAll(); localStorage.clear(); sessionStorage.clear(); delete globalThis.window; });
 const token = (claims = {}) => ['header', Buffer.from(JSON.stringify({ nameid: '42', role_id: 1, role: 'student',
   exp: Math.floor(Date.now() / 1000) + 3600, ...claims })).toString('base64url'), 'signature'].join('.');
-const user = (roleId = 1, role = 'student') => ({ userId: 42, roleId, role, roles: [role], status: 'Active', fullName: 'Student' });
+const user = (roleId = 1, role = 'student', roles = [role]) => ({
+  userId: 42, roleId, role, roles, status: 'Active', fullName: 'Student',
+  access: { grants: roles.map((name, index) => ({
+    grantId: index + 1, roleId: ['student','teacher','system_admin','parent','academic_staff','academic_manager'].indexOf(name) + 1,
+    role: name, scopeType: 'GLOBAL', departmentId: null, departmentName: null, permissions: [],
+  })), permissions: [] },
+});
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 test('verifies all role memberships while retaining the primary dashboard role', async () => {
   const accessToken = token({ role_id: 2, role_name: 'teacher', role: ['teacher', 'academic_staff'] });
-  mock.method(globalThis, 'fetch', async () => reply({ success: true, data: { ...user(2, 'teacher'), roles: ['academic_staff', 'teacher'] } }));
+  mock.method(globalThis, 'fetch', async () => reply({ success: true, data: user(2, 'teacher', ['academic_staff', 'teacher']) }));
   const verified = await verifySession(accessToken, null);
   assert.equal(verified.role, 'teacher');
   assert.deepEqual(verified.user.roles, ['academic_staff', 'teacher']);

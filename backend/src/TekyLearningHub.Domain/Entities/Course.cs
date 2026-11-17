@@ -10,6 +10,7 @@ public partial class Course
     public string CourseCode { get; set; } = null!;
 
     public string Name { get; set; } = null!;
+    public int? DepartmentId { get; set; }
 
     public string? Description { get; set; }
 

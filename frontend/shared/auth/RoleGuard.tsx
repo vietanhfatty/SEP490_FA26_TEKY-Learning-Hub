@@ -4,9 +4,12 @@ import { useAuth } from './authContext';
 import type { UserRole } from '../types';
 import { detectCurrentShell, resolveShellForRole, shellOrigin } from './shellConfig';
 import { buildCrossAppUrl } from './shellTransfer';
+import { allowsPermission, hasPermission } from './accountAccess';
 
 interface RoleGuardProps {
-  allowedRoles: UserRole[];
+  allowedRoles?: UserRole[];
+  requiredPermission?: string;
+  globalOnly?: boolean;
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }
@@ -19,7 +22,9 @@ interface RoleGuardProps {
  *   Khi Shell đích nằm ở ứng dụng khác, thực hiện full-page redirect kèm phiên đăng nhập.
  */
 export const RoleGuard: React.FC<RoleGuardProps> = ({
-  allowedRoles,
+  allowedRoles = [],
+  requiredPermission,
+  globalOnly = false,
   children,
   fallback = (
     <div className="p-8 text-center text-rose-500 font-semibold">Bạn không có quyền truy cập trang này.</div>
@@ -27,7 +32,9 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
 }) => {
   const { role, isLoggedIn, isInitializing, accessToken, refreshToken, user } = useAuth();
   const target = resolveShellForRole(role);
-  const hasAllowedRole = allowedRoles.some(allowed => user?.roles.includes(allowed));
+  const hasAllowedRole = requiredPermission
+    ? globalOnly ? allowsPermission(user?.access, requiredPermission) : hasPermission(user?.access, requiredPermission)
+    : allowedRoles.some(allowed => user?.roles.includes(allowed));
   const shouldTransfer = isLoggedIn && !!role && !hasAllowedRole && detectCurrentShell() !== target.app;
   useEffect(() => {
     if (!shouldTransfer || !accessToken) return;

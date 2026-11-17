@@ -9,6 +9,7 @@ import {
   deleteAdminMaterial,
   getAdminCourse,
   getAdminCourses,
+  getCourseDepartments,
   updateAdminCourse,
   upsertAdminLesson,
 } from '../api-client/courses';
@@ -21,6 +22,8 @@ import type {
   LessonUpsertPayload,
 } from '../api-client/courses';
 import { Badge } from './Badge';
+import { useAuth } from '../auth/authContext';
+import { allowsPermission } from '../auth/accountAccess';
 import type { BadgeVariant } from './Badge';
 import { IconBookOpen, IconPlus, IconSearch, IconX } from './Icons';
 import './AdminCoursesView.css';
@@ -60,12 +63,16 @@ const emptyLesson = (orderNo: number): LessonDraft => ({
 });
 
 export function AdminCoursesView() {
+  const { user } = useAuth();
+  const isGlobal = allowsPermission(user?.access, 'course.manage');
+  const [departments, setDepartments] = useState<{id: number; name: string}[]>([]);
   const [courses, setCourses] = useState<AdminCourse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<CourseStatus | 'All'>('All');
+  const [departmentFilter, setDepartmentFilter] = useState('All');
 
   const [courseDialog, setCourseDialog] = useState<{ mode: 'create' | 'edit'; course?: AdminCourse } | null>(null);
   const [courseForm, setCourseForm] = useState<CourseUpsertPayload>({ courseCode: '', name: '', description: '', levelCode: '', status: 'Draft' });
@@ -83,8 +90,9 @@ export function AdminCoursesView() {
     setLoading(true);
     setError('');
     try {
-      const page = await getAdminCourses({ take: 200 });
+      const [page, availableDepartments] = await Promise.all([getAdminCourses({ take: 200 }), getCourseDepartments()]);
       setCourses(page.items);
+      setDepartments(availableDepartments);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Không thể tải danh sách khóa học.');
     } finally {
@@ -93,8 +101,13 @@ export function AdminCoursesView() {
   }, []);
 
   useEffect(() => {
-    void loadCourses();
-  }, [loadCourses]);
+    let active = true;
+    Promise.all([getAdminCourses({ take: 200 }), getCourseDepartments()])
+      .then(([page, departments]) => { if (active) { setCourses(page.items); setDepartments(departments); } })
+      .catch(error => { if (active) setError(error instanceof Error ? error.message : 'Không thể tải danh sách khóa học.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase('vi');
@@ -103,15 +116,17 @@ export function AdminCoursesView() {
       const matchesTerm = !term
         || course.name.toLocaleLowerCase('vi').includes(term)
         || course.courseCode.toLocaleLowerCase('vi').includes(term);
-      return matchesStatus && matchesTerm;
+      const matchesDepartment = departmentFilter === 'All' || (departmentFilter === 'Shared'
+        ? course.departmentId == null : course.departmentId === Number(departmentFilter));
+      return matchesStatus && matchesTerm && matchesDepartment;
     });
-  }, [courses, query, statusFilter]);
+  }, [courses, query, statusFilter, departmentFilter]);
 
   const openCourseDialog = (mode: 'create' | 'edit', course?: AdminCourse) => {
     setNotice('');
     setCourseForm(mode === 'edit' && course
-      ? { courseCode: course.courseCode, name: course.name, description: '', levelCode: course.levelCode ?? '', status: course.status }
-      : { courseCode: '', name: '', description: '', levelCode: '', status: 'Draft' });
+      ? { departmentId: course.departmentId, courseCode: course.courseCode, name: course.name, description: '', levelCode: course.levelCode ?? '', status: course.status }
+      : { departmentId: isGlobal ? null : departments[0]?.id, courseCode: '', name: '', description: '', levelCode: '', status: 'Draft' });
     setCourseDialog({ mode, course });
     courseDialogRef.current?.showModal();
 
@@ -120,6 +135,7 @@ export function AdminCoursesView() {
       void getAdminCourse(course.courseId).then(
         (loaded) => setCourseForm((form) => ({
           ...form,
+          departmentId: loaded.departmentId,
           description: loaded.description ?? '',
           levelCode: loaded.levelCode ?? '',
           status: loaded.status,
@@ -136,6 +152,7 @@ export function AdminCoursesView() {
     setNotice('');
     try {
       const payload: CourseUpsertPayload = {
+        departmentId: courseForm.departmentId ?? null,
         courseCode: courseForm.courseCode.trim(),
         name: courseForm.name.trim(),
         description: courseForm.description?.trim() || null,
@@ -270,7 +287,7 @@ export function AdminCoursesView() {
     <div className="admin-home">
       <div className="admin-page-heading">
         <h1>Courses</h1>
-        <button className="admin-primary-button" onClick={() => openCourseDialog('create')}>
+        <button className="admin-primary-button" disabled={loading || (!isGlobal && !departments.length)} onClick={() => openCourseDialog('create')}>
           <IconPlus size={18} />Add course
         </button>
       </div>
@@ -279,6 +296,14 @@ export function AdminCoursesView() {
       {error && <p role="alert" className="admin-error">{error}</p>}
 
       <div className="ac-toolbar">
+        <label className="ac-filter">
+          <span className="lms-sr-only">Phòng ban quản lý khóa học</span>
+          <select value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}>
+            <option value="All">Tất cả phạm vi được cấp</option>
+            {isGlobal && <option value="Shared">Danh mục chung</option>}
+            {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+          </select>
+        </label>
         <label className="admin-catalog-search">
           <IconSearch size={20} />
           <input
@@ -309,10 +334,10 @@ export function AdminCoursesView() {
         <div className="admin-no-stats">
           <IconBookOpen size={42} />
           <h2>No courses found</h2>
-          <p>{courses.length === 0 ? 'Chưa có khóa học nào trong hệ thống.' : 'Không có khóa học khớp bộ lọc.'}</p>
+          <p>{courses.length === 0 ? 'Chưa có khóa học nào trong phạm vi được cấp.' : 'Không có khóa học khớp bộ lọc.'}</p>
           {courses.length === 0
             ? <button className="admin-primary-button" onClick={() => openCourseDialog('create')}>Tạo khóa học đầu tiên</button>
-            : <button className="admin-text-button" onClick={() => { setQuery(''); setStatusFilter('All'); }}>Xoá bộ lọc</button>}
+            : <button className="admin-text-button" onClick={() => { setQuery(''); setStatusFilter('All'); setDepartmentFilter('All'); }}>Xoá bộ lọc</button>}
         </div>
       )}
 
@@ -325,7 +350,7 @@ export function AdminCoursesView() {
                 <span>{course.levelCode || 'STEAM'}</span>
               </div>
               <h2>{course.name}</h2>
-              <p>{course.courseCode}</p>
+              <p>{course.courseCode}</p><small>{course.departmentId == null ? 'Danh mục dùng chung' : departments.find(department => department.id === course.departmentId)?.name || 'Phòng ban phụ trách'}</small>
               <div className="ac-card-meta">
                 <Badge variant={statusVariant[course.status]}>{courseStatusLabels[course.status]}</Badge>
                 <span>{course.lessonCount} bài học</span>
@@ -367,6 +392,14 @@ export function AdminCoursesView() {
             </button>
           </div>
           <p>Trạng thái vòng đời: Bản nháp → Đã xuất bản → Đã lưu trữ.</p>
+          <label>
+            Phòng ban phụ trách
+            <select required={!isGlobal} value={courseForm.departmentId ?? ''} disabled={saving}
+              onChange={event => setCourseForm(form => ({...form, departmentId: event.target.value ? Number(event.target.value) : null}))}>
+              {isGlobal ? <option value="">Danh mục dùng chung</option> : <option value="" disabled>Chọn phòng ban</option>}
+              {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+            </select>
+          </label>
           <label>
             Course code
             <input

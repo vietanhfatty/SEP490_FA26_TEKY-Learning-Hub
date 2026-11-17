@@ -1,5 +1,7 @@
 using TekyLearningHub.Application.DTOs.Admin;
 using TekyLearningHub.Application.Interfaces.Admin;
+using TekyLearningHub.Application.Interfaces.Auth;
+using TekyLearningHub.Application.Common;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Constants;
 using TekyLearningHub.Domain.Entities;
@@ -10,25 +12,40 @@ namespace TekyLearningHub.Application.Services.Admin;
 /// Quản lý khóa học, bài học và học liệu dành cho role admin.
 /// Mọi thao tác xoá đều là soft delete để giữ lịch sử lớp học, bài tập và điểm số.
 /// </summary>
-public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseService
+public class CourseService(ICourseRepository db, IUnitOfWork unit, IAccountAccessReader access) : ICourseService
 {
     private static readonly string[] MaterialTypes = ["Slide", "Document", "AssemblyGuide", "Video"];
 
-    public async Task<CoursePageDto> ListAsync(string? status, string? keyword, int skip, int take,
-        CancellationToken cancellationToken)
+    public async Task<CourseDepartmentDto[]> DepartmentsAsync(int actorUserId, CancellationToken ct)
     {
-        return await db.List(CourseStatuses.Normalize(status), keyword, skip, take, cancellationToken);
+        var permission = (await access.Read(actorUserId, ct)).Permissions.SingleOrDefault(item => item.Code == "course.manage");
+        if (permission is null) throw new UseCaseException(403, "Bạn chưa được cấp quyền quản lý khóa học.");
+        return await db.Departments(permission.IsGlobal, permission.DepartmentIds, ct);
     }
 
-    public async Task<CourseDetailDto?> GetAsync(int courseId, CancellationToken cancellationToken)
+    public async Task<CoursePageDto> ListAsync(int actorUserId, string? status, string? keyword, int skip, int take,
+        CancellationToken cancellationToken)
+    {
+        var permissions = (await access.Read(actorUserId, cancellationToken)).Permissions;
+        var permission = permissions.SingleOrDefault(item => item.Code == "course.manage");
+        if (permission is null) throw new UseCaseException(403, "Bạn chưa được cấp quyền quản lý khóa học.");
+        return await db.List(CourseStatuses.Normalize(status), keyword, skip, take, permission.IsGlobal, permission.DepartmentIds, cancellationToken);
+    }
+
+    public async Task<CourseDetailDto?> GetAsync(int courseId, int actorUserId, CancellationToken cancellationToken)
     {
         var course = await db.FindCourse(courseId, cancellationToken);
-        return course is null ? null : MapDetail(course, course.Classes.Count);
+        if (course is null) return null;
+        await Demand(actorUserId, course.DepartmentId, cancellationToken);
+        return MapDetail(course, course.Classes.Count);
     }
 
     public async Task<CourseOperationResult<CourseDetailDto>> CreateAsync(CourseUpsertRequest request, int actorUserId,
         string? ipAddress, CancellationToken cancellationToken)
     {
+        await Demand(actorUserId, request.DepartmentId, cancellationToken);
+        if (request.DepartmentId.HasValue && !await db.DepartmentExists(request.DepartmentId.Value, cancellationToken))
+            throw new UseCaseException(400, "Phòng ban không tồn tại hoặc đã ngừng hoạt động.");
         var code = request.CourseCode.Trim();
         var name = request.Name.Trim();
         if (code.Length is < 3 or > 20) return CourseOperationResult<CourseDetailDto>.Fail("Mã khóa học phải có từ 3 đến 20 ký tự.");
@@ -42,6 +59,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
         {
             CourseCode = code,
             Name = name,
+            DepartmentId = request.DepartmentId,
             Description = request.Description?.Trim(),
             LevelCode = request.LevelCode?.Trim(),
             Status = status,
@@ -58,7 +76,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
         AddAudit(actorUserId, "COURSE_CREATED", "Course", course.CourseId.ToString(), null, Describe(course), ipAddress);
         await CommitAuditAsync(cancellationToken);
 
-        var detail = await GetAsync(course.CourseId, cancellationToken);
+        var detail = await GetAsync(course.CourseId, actorUserId, cancellationToken);
         return detail is null
             ? CourseOperationResult<CourseDetailDto>.Fail("Không thể tải khóa học vừa tạo.", 503)
             : CourseOperationResult<CourseDetailDto>.Success(detail);
@@ -69,7 +87,11 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
     {
         var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404);
+        await Demand(actorUserId, course.DepartmentId, cancellationToken);
 
+        await Demand(actorUserId, request.DepartmentId, cancellationToken);
+        if (request.DepartmentId.HasValue && !await db.DepartmentExists(request.DepartmentId.Value, cancellationToken))
+            throw new UseCaseException(400, "Phòng ban không tồn tại hoặc đã ngừng hoạt động.");
         var code = request.CourseCode.Trim();
         var name = request.Name.Trim();
         if (code.Length is < 3 or > 20) return CourseOperationResult<CourseDetailDto>.Fail("Mã khóa học phải có từ 3 đến 20 ký tự.");
@@ -79,6 +101,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
 
         course.CourseCode = code;
         course.Name = name;
+        course.DepartmentId = request.DepartmentId;
         course.Description = request.Description?.Trim();
         course.LevelCode = request.LevelCode?.Trim();
 
@@ -106,7 +129,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
         var saved = await SaveAsync(cancellationToken);
         if (!saved.Succeeded) return CourseOperationResult<CourseDetailDto>.Fail(saved.Error ?? "Không lưu được thay đổi.", saved.StatusCode);
 
-        var detail = await GetAsync(courseId, cancellationToken);
+        var detail = await GetAsync(courseId, actorUserId, cancellationToken);
         return detail is null
             ? CourseOperationResult<CourseDetailDto>.Fail("Không thể tải khóa học vừa cập nhật.", 503)
             : CourseOperationResult<CourseDetailDto>.Success(detail);
@@ -121,6 +144,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
 
         var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404);
+        await Demand(actorUserId, course.DepartmentId, cancellationToken);
 
         if (normalized == CourseStatuses.Published)
         {
@@ -132,7 +156,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
         var oldStatus = course.Status;
         if (oldStatus == normalized)
         {
-            var unchanged = await GetAsync(courseId, cancellationToken);
+            var unchanged = await GetAsync(courseId, actorUserId, cancellationToken);
             return unchanged is null
                 ? CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404)
                 : CourseOperationResult<CourseDetailDto>.Success(unchanged);
@@ -144,7 +168,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
         var saved = await SaveAsync(cancellationToken);
         if (!saved.Succeeded) return CourseOperationResult<CourseDetailDto>.Fail(saved.Error ?? "Không lưu được thay đổi.", saved.StatusCode);
 
-        var detail = await GetAsync(courseId, cancellationToken);
+        var detail = await GetAsync(courseId, actorUserId, cancellationToken);
         return detail is null
             ? CourseOperationResult<CourseDetailDto>.Fail("Không thể tải khóa học vừa cập nhật.", 503)
             : CourseOperationResult<CourseDetailDto>.Success(detail);
@@ -155,6 +179,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
     {
         var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404);
+        await Demand(actorUserId, course.DepartmentId, cancellationToken);
 
         var oldStatus = course.Status;
         course.Status = CourseStatuses.Archived;
@@ -167,7 +192,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
         var saved = await SaveAsync(cancellationToken);
         if (!saved.Succeeded) return CourseOperationResult<CourseDetailDto>.Fail(saved.Error ?? "Không lưu được thay đổi.", saved.StatusCode);
 
-        var detail = await GetAsync(courseId, cancellationToken);
+        var detail = await GetAsync(courseId, actorUserId, cancellationToken);
         return detail is null
             ? CourseOperationResult<CourseDetailDto>.Fail("Không thể tải khóa học vừa lưu trữ.", 503)
             : CourseOperationResult<CourseDetailDto>.Success(detail);
@@ -178,6 +203,7 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
     {
         var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<LessonDto>.Fail("Không tìm thấy khóa học.", 404);
+        await Demand(actorUserId, course.DepartmentId, cancellationToken);
 
         var title = request.Title.Trim();
         if (title.Length is 0 or > 200)
@@ -240,6 +266,9 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
     public async Task<CourseOperationResult<bool>> DeleteLessonAsync(int courseId, int lessonId, int actorUserId,
         string? ipAddress, CancellationToken cancellationToken)
     {
+        var course = await db.FindCourse(courseId, cancellationToken);
+        if (course is null) return CourseOperationResult<bool>.Fail("Không tìm thấy khóa học.", 404);
+        await Demand(actorUserId, course.DepartmentId, cancellationToken);
         var lesson = await db.FindLesson(courseId, lessonId, cancellationToken);
         if (lesson is null) return CourseOperationResult<bool>.Fail("Không tìm thấy bài học.", 404);
         if (lesson.IsDeleted) return CourseOperationResult<bool>.Success(true);
@@ -256,6 +285,9 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
     public async Task<CourseOperationResult<bool>> DeleteMaterialAsync(int courseId, int lessonId, int materialId,
         int actorUserId, string? ipAddress, CancellationToken cancellationToken)
     {
+        var course = await db.FindCourse(courseId, cancellationToken);
+        if (course is null) return CourseOperationResult<bool>.Fail("Không tìm thấy khóa học.", 404);
+        await Demand(actorUserId, course.DepartmentId, cancellationToken);
         var material = await db.FindMaterial(courseId, lessonId, materialId, cancellationToken);
         if (material is null) return CourseOperationResult<bool>.Fail("Không tìm thấy học liệu.", 404);
 
@@ -354,11 +386,17 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
         });
     }
 
+    private async Task Demand(int actorUserId, int? departmentId, CancellationToken ct)
+    {
+        if (!(await access.Read(actorUserId, ct)).Allows("course.manage", departmentId))
+            throw new UseCaseException(403, "Bạn chưa được cấp quyền quản lý khóa học trong phạm vi này.");
+    }
+
     private static string? Truncate(string? value) =>
         value is not null && value.Length > 400 ? value[..400] : value;
 
     private static string Describe(Course course) =>
-        $"{course.CourseCode}|{course.Name}|{course.Status}";
+        $"{course.CourseCode}|{course.Name}|{course.Status}|{course.DepartmentId}";
 
     private static LessonDto MapLesson(Lesson lesson) => new(
         lesson.LessonId,
@@ -383,5 +421,5 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit) : ICourseServ
             .Where(l => !l.IsDeleted)
             .OrderBy(l => l.OrderNo)
             .Select(MapLesson)
-            .ToList());
+            .ToList(), course.DepartmentId);
 }

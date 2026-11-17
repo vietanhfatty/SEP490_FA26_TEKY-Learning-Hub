@@ -31,7 +31,7 @@ public record ManagedUserDto(int UserId, string Email, string FullName, string? 
 public record ManagedUserPage(int Total, ManagedUserDto[] Items);
 public record InvitationView(DateTime CreatedAt, DateTime ExpiresAt, DateTime? UsedAt, DateTime? RevokedAt);
 public record DeliveryView(DateTime? SentAt, int Attempts, DateTime NextAttemptAt);
-public record ManagedUserDetail(ManagedUserDto User, List<StaffAppointmentView> Appointments, InvitationView? Invitation, DeliveryView? Delivery);
+public record ManagedUserDetail(ManagedUserDto User, List<StaffAppointmentView> Appointments, InvitationView? Invitation, DeliveryView? Delivery, TekyLearningHub.Application.DTOs.Auth.AccountAccessDto Access);
 public record RoleCatalogDto(byte RoleId, string RoleName);
 public record RolePermissionDto(byte RoleId, string Code, string? Description);
 public record AdministrationCatalog(List<RoleCatalogDto> Roles, List<RolePermissionDto> Permissions, List<DirectoryEntry> Departments, List<DirectoryEntry> Positions);

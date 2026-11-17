@@ -1,5 +1,8 @@
 import type React from 'react';
 import type { UserRole } from '../types';
+import type { AccountAccess } from '../auth/accountAccess';
+import { getAccessibleFeatures, getRoleFeatures } from './navigationFeatures';
+import type { FeatureIcon, NavigationFeature } from './navigationFeatures';
 import {
   IconHome,
   IconBookOpen,
@@ -7,7 +10,6 @@ import {
   IconCheckCircle,
   IconSparkles,
   IconUsers,
-  IconShieldCheck,
   IconActivity,
   IconCreditCard,
   IconFileText,
@@ -18,6 +20,10 @@ import {
 
 export interface LmsNavItem {
   id: string;
+  navId?: string;
+  role?: UserRole;
+  group?: string;
+  href?: string;
   label: string;
   icon: React.FC<{ size?: number; className?: string }>;
   badge?: string;
@@ -78,64 +84,16 @@ export const ROLE_DISPLAY_CONFIG: Record<
   },
 };
 
-export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
-  switch (role) {
-    case 'student':
-      return [
-        { id: 'overview', label: 'Dashboard', icon: IconHome },
-        { id: 'classes', label: 'My Classes', icon: IconCalendar },
-        { id: 'courses', label: 'My Courses', icon: IconBookOpen },
-        { id: 'assignments', label: 'Assignments', icon: IconFileText },
-        { id: 'assessments', label: 'Assessments', icon: IconCheckCircle },
-      ];
-    case 'teacher':
-      return [
-        { id: 'overview', label: 'Home', icon: IconHome },
-        { id: 'schedule', label: 'Lịch dạy trong tuần', icon: IconCalendar, badge: '4 Ca học', badgeVariant: 'info' },
-        { id: 'attendance', label: 'Điểm danh lớp học', icon: IconCheckCircle, badge: 'Hôm nay', badgeVariant: 'accent' },
-        { id: 'materials', label: 'Kho giáo án chuẩn', icon: IconBookOpen },
-        { id: 'grading', label: 'Đánh giá & Nhận xét', icon: IconSparkles },
-        { id: 'swap', label: 'Đổi ca & Dạy bù', icon: IconActivity },
-        { id: 'communication', label: 'Trao đổi với phụ huynh', icon: IconBell },
-      ];
-    case 'parent':
-      return [
-        { id: 'overview', label: 'Dashboard', icon: IconHome },
-        { id: 'courses', label: 'Course Management', icon: IconBookOpen },
-        { id: 'monitoring', label: 'Learning Monitoring', icon: IconCalendar },
-        { id: 'performance', label: 'Academic Performance', icon: IconCheckCircle },
-        { id: 'communication', label: 'Communication', icon: IconBell },
-        { id: 'payments', label: 'Payment Management', icon: IconCreditCard },
-      ];
-    case 'academic_manager':
-      return [
-        { id: 'kpi', label: 'Home', icon: IconHome },
-        { id: 'timetable', label: 'Xếp lịch & Xung đột', icon: IconCalendar, badge: '2 Cảnh báo', badgeVariant: 'danger' },
-        { id: 'courses', label: 'Quản lý Khóa học', icon: IconBookOpen },
-        { id: 'teachers', label: 'Điều phối Giảng viên', icon: IconUsers },
-        { id: 'surveys', label: 'Khảo sát chất lượng', icon: IconSparkles },
-      ];
-    case 'system_admin':
-      return [
-        { id: 'overview', label: 'Home', icon: IconHome },
-        { id: 'users', label: 'Users', icon: IconUsers },
-        { id: 'directory', label: 'Phòng ban & chức danh', icon: IconLayers },
-        { id: 'courses', label: 'Courses', icon: IconBookOpen },
-        { id: 'groups', label: 'Groups', icon: IconUsers },
-        { id: 'branches', label: 'Branches', icon: IconLayers },
-        { id: 'notifications', label: 'Notifications', icon: IconBell },
-        { id: 'audit', label: 'Reports', icon: IconActivity },
-        { id: 'settings', label: 'Account & Settings', icon: IconSettings },
-      ];
-    case 'academic_staff':
-      return [
-        { id: 'overview', label: 'Home', icon: IconHome },
-        { id: 'users', label: 'Users', icon: IconUsers },
-        { id: 'branches', label: 'Branches', icon: IconLayers },
-        { id: 'audit', label: 'Reports', icon: IconShieldCheck },
-      ];
-    default:
-      return [{ id: 'overview', label: 'Tổng quan', icon: IconHome }];
-  }
+const featureIcons: Record<FeatureIcon, LmsNavItem['icon']> = {
+  home: IconHome, book: IconBookOpen, calendar: IconCalendar, check: IconCheckCircle,
+  sparkles: IconSparkles, users: IconUsers, activity: IconActivity, credit: IconCreditCard,
+  file: IconFileText, layers: IconLayers, bell: IconBell, settings: IconSettings,
 };
 
+export function getNavItemsForRole(role: UserRole): LmsNavItem[] {
+  return getRoleFeatures(role).map(item => ({ ...item, id: item.navId, icon: featureIcons[item.iconName] }));
+}
+
+export function getNavigationForAccount(account: { roles: string[]; access: AccountAccess } | null | undefined): (NavigationFeature & LmsNavItem)[] {
+  return getAccessibleFeatures(account).map(item => ({ ...item, icon: featureIcons[item.iconName] }));
+}

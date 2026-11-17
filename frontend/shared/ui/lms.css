@@ -250,3 +250,12 @@ body:has(.lms-app) { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .lms-app *, .lms-app *::before, .lms-app *::after { animation: none !important; transition: none !important; } }
 
 .lms-app.talent-dark .admin-outline-button { color: var(--talent-blue); border-color: var(--talent-blue); }
+
+
+.lms-nav-group { margin: 20px 12px 6px; color: #d8e8ff; font-size: 11px; font-weight: 600; letter-spacing: .03em; }
+.lms-sidebar nav { min-height: 0; flex: 1; scrollbar-width: thin; scrollbar-color: #a6c6f8 transparent; }
+.lms-sidebar-bottom { flex-shrink: 0; padding-top: 16px; }
+.lms-nav-empty { color: #d8e8ff; padding: 12px; font-size: 13px; }
+.lms-sidebar-item:active { background: #002a67; }
+.lms-access-empty { padding: 24px; color: #17365f; }
+.lms-access-empty button { margin-top: 16px; min-height: 44px; padding: 8px 16px; border: 1px solid #b8c8da; border-radius: 8px; background: #fff; color: #17365f; }

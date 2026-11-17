@@ -1,10 +1,11 @@
 import type React from 'react';
 import type { UserRole } from '../types';
 import { IconLayers, IconLogOut, IconX } from './Icons';
-import { getNavItemsForRole } from './lmsNavigation';
+import type { LmsNavItem } from './lmsNavigation';
 
 interface LmsSidebarProps {
   currentRole: UserRole;
+  items: LmsNavItem[];
   activeNavId: string;
   onSelectNav: (id: string) => void;
   isCollapsed: boolean;
@@ -18,12 +19,15 @@ interface LmsSidebarProps {
   mobileHidden?: boolean;
 }
 
-export const LmsSidebar: React.FC<LmsSidebarProps> = ({ currentRole, activeNavId, onSelectNav, isCollapsed, onToggleCollapse, onLogoutClick, mobileOpen = false, mobileHidden = false }) => {
-  const navItems = getNavItemsForRole(currentRole);
+export const LmsSidebar: React.FC<LmsSidebarProps> = ({ items, activeNavId, onSelectNav, isCollapsed, onToggleCollapse, onLogoutClick, mobileOpen = false, mobileHidden = false }) => {
+  const grouped = [...new Set(items.map(item => item.group))].length > 1;
   return (
     <aside inert={mobileHidden || undefined} aria-hidden={mobileHidden || undefined} id="lms-navigation" className={`lms-sidebar${isCollapsed ? ' is-collapsed' : ''}${mobileOpen ? ' is-mobile-open' : ''}`} role={mobileOpen ? 'dialog' : undefined} aria-modal={mobileOpen || undefined} aria-label="Main navigation">
       <nav aria-label="Main navigation">
-        {navItems.map((item) => <button className="lms-sidebar-item" key={item.id} aria-label={item.label} aria-current={activeNavId === item.id || (activeNavId === 'overview' && item.id === 'kpi') ? 'page' : undefined} title={isCollapsed ? item.label : undefined} onClick={() => onSelectNav(item.id)}><item.icon size={23} /><span>{item.label}</span></button>)}
+        {items.length === 0 && <p className="lms-nav-empty">Chưa có chức năng được cấp.</p>}
+        {items.map((item, index) => <div key={item.id}>
+          {grouped && (index === 0 || item.group !== items[index - 1].group) && <p className="lms-nav-group">{isCollapsed && !mobileOpen ? <span aria-hidden="true">—</span> : item.group}</p>}
+          <button className="lms-sidebar-item" key={item.id} aria-label={item.label} aria-current={activeNavId === item.id ? 'page' : undefined} title={isCollapsed ? item.label : undefined} onClick={() => onSelectNav(item.id)}><item.icon size={23} /><span>{item.label}</span></button></div>)}
       </nav>
       <div className="lms-sidebar-bottom">
         <button className="lms-sidebar-item" title={mobileOpen ? 'Close navigation' : isCollapsed ? 'Expand navigation' : 'Collapse navigation'} aria-label={mobileOpen ? 'Close navigation' : isCollapsed ? 'Expand navigation' : 'Collapse navigation'} onClick={onToggleCollapse}>{mobileOpen ? <IconX size={22} /> : <IconLayers size={22} />}<span>{mobileOpen ? 'Close navigation' : 'Collapse navigation'}</span></button>

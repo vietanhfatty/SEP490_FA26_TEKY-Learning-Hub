@@ -20,10 +20,10 @@ namespace TekyLearningHub.Application.Tests;
 internal static class TestServices
 {
     public static AuthService Auth(ApplicationDbContext db, IPasswordHasher hasher, IJwtTokenGenerator tokens, IDataProtectionProvider? protection = null) =>
-        new(new AuthRepository(db), hasher, tokens, new UnitOfWork(db), new AccountEmailOutbox(db, protection ?? new EphemeralDataProtectionProvider()));
+        new(new AuthRepository(db), hasher, tokens, new UnitOfWork(db), new AccountEmailOutbox(db, protection ?? new EphemeralDataProtectionProvider()), new AccountAccessReader(db));
 
     public static UserAdministrationService Administration(ApplicationDbContext db, IPasswordHasher hasher, IDataProtectionProvider protection, IConfiguration configuration) =>
-        new(new UserAdministrationRepository(db), new UnitOfWork(db), hasher, new AccountEmailOutbox(db, protection), new AccountOptions { InvitationBaseUrl = configuration["Account:InvitationBaseUrl"] });
+        new(new UserAdministrationRepository(db), new UnitOfWork(db), hasher, new AccountEmailOutbox(db, protection), new AccountOptions { InvitationBaseUrl = configuration["Account:InvitationBaseUrl"] }, new AccountAccessReader(db));
 
     public static StudentAssessmentsService Assessments(ApplicationDbContext db) => new(new StudentAssessmentsRepository(db),new UnitOfWork(db));
     public static StudentOverviewService Overview(ApplicationDbContext db,StudentClassesService classes) => new(new StudentOverviewRepository(db),classes);

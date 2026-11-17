@@ -4,9 +4,10 @@ import { IconCheckCircle, IconAlertCircle, IconClock, IconGraduationCap } from '
 
 interface StaffDashboardProps {
   activeNavId?: string;
+  onSelectNav?: (id: string) => void;
 }
 
-export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeNavId = 'attendance' }) => {
+export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeNavId = 'attendance', onSelectNav }) => {
   const [activeTab, setActiveTab] = useState<'attendance' | 'makeup' | 'kits' | 'schedule'>('attendance');
 
   useEffect(() => {
@@ -119,7 +120,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeNavId = 'a
       {/* Tabs Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-700 space-x-8">
         <button
-          onClick={() => setActiveTab('attendance')}
+          onClick={() => onSelectNav ? onSelectNav('attendance') : setActiveTab('attendance')}
           className={`pb-4 text-sm font-semibold transition-colors relative flex items-center gap-2 ${
             activeTab === 'attendance'
               ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
@@ -134,7 +135,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeNavId = 'a
         </button>
 
         <button
-          onClick={() => setActiveTab('makeup')}
+          onClick={() => onSelectNav ? onSelectNav('makeup') : setActiveTab('makeup')}
           className={`pb-4 text-sm font-semibold transition-colors relative flex items-center gap-2 ${
             activeTab === 'makeup'
               ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
@@ -149,7 +150,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeNavId = 'a
         </button>
 
         <button
-          onClick={() => setActiveTab('kits')}
+          onClick={() => onSelectNav ? onSelectNav('kits') : setActiveTab('kits')}
           className={`pb-4 text-sm font-semibold transition-colors relative flex items-center gap-2 ${
             activeTab === 'kits'
               ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'

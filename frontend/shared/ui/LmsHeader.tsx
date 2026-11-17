@@ -2,10 +2,12 @@ import { LearningMessageNotifications, useLearningMessageNotifications } from '.
 import React, { useEffect, useRef, useState } from 'react';
 import type { UserRole } from '../types';
 import { IconMenu, IconSearch, IconBell, IconUser, IconGraduationCap, IconSun, IconMoon, IconLogOut } from './Icons';
-import { getNavItemsForRole, ROLE_DISPLAY_CONFIG } from './lmsNavigation';
+import { ROLE_DISPLAY_CONFIG } from './lmsNavigation';
+import type { LmsNavItem } from './lmsNavigation';
 
 interface LmsHeaderProps {
   currentRole: UserRole;
+  items: LmsNavItem[];
   activeNavTitle: string;
   onToggleSidebarMobile: () => void;
   onLogoutClick: () => void;
@@ -20,14 +22,14 @@ interface LmsHeaderProps {
 const normalize = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 const roleNames: Record<UserRole, string> = { student: 'Learner', parent: 'Parent', teacher: 'Instructor', academic_staff: 'Academic staff', academic_manager: 'Academic manager', system_admin: 'Administrator' };
 
-export const LmsHeader: React.FC<LmsHeaderProps> = ({ currentRole, activeNavTitle, activeNavId = 'overview', onToggleSidebarMobile, onLogoutClick, isDarkMode, onToggleTheme, userName, userEmail, onSelectNav, navigationExpanded }) => {
+export const LmsHeader: React.FC<LmsHeaderProps> = ({ items, currentRole, activeNavTitle, activeNavId = 'overview', onToggleSidebarMobile, onLogoutClick, isDarkMode, onToggleTheme, userName, userEmail, onSelectNav, navigationExpanded }) => {
   const [query, setQuery] = useState('');
   const [openMenu, setOpenMenu] = useState<'profile' | 'notifications' | null>(null);
-  const hasInbox = currentRole === 'parent' || currentRole === 'teacher';
+  const inbox = items.find(item => item.navId === 'communication');
+  const hasInbox = !!inbox;
   const notifications = useLearningMessageNotifications(hasInbox);
   const header = useRef<HTMLElement>(null);
   const name = userName || ROLE_DISPLAY_CONFIG[currentRole].defaultName;
-  const items = getNavItemsForRole(currentRole);
   const matches = items.filter((item) => normalize(item.label).includes(normalize(query.trim())));
   useEffect(() => {
     const previous = document.title;
@@ -64,7 +66,7 @@ export const LmsHeader: React.FC<LmsHeaderProps> = ({ currentRole, activeNavTitl
             {notifications.count > 0 && <span className="lms-inbox-count" aria-hidden="true">{notifications.count > 99 ? '99+' : notifications.count}</span>}
           </button>
           {openMenu === 'notifications' && (hasInbox
-            ? <LearningMessageNotifications {...notifications} openInbox={() => select('communication')} />
+            ? <LearningMessageNotifications {...notifications} openInbox={() => inbox && select(inbox.id)} />
             : <section className="lms-menu lms-notification-menu"><h2>Notifications</h2><IconBell size={28} /><p>Chưa có dữ liệu thông báo.</p><small>Các cập nhật học tập sẽ xuất hiện khi dịch vụ thông báo được kết nối.</small></section>)}
         </div>
         <div className="lms-header-dropdown">
@@ -72,7 +74,7 @@ export const LmsHeader: React.FC<LmsHeaderProps> = ({ currentRole, activeNavTitl
           {openMenu === 'profile' && <section className="lms-menu lms-account-menu"><h2>{name}</h2>{userEmail && <p>{userEmail}</p>}
             <a href="/account"><IconUser size={18} />Tài khoản</a>
             <button onClick={onToggleTheme}>{isDarkMode ? <IconSun size={18} /> : <IconMoon size={18} />}Appearance</button>
-            {currentRole === 'system_admin' && <button onClick={() => select('settings')}><IconUser size={18} />Account &amp; Settings</button>}
+            {items.some(item => item.navId === 'settings') && <button onClick={() => select(items.find(item => item.navId === 'settings')!.id)}><IconUser size={18} />Account &amp; Settings</button>}
             <button onClick={() => { setOpenMenu(null); onLogoutClick(); }}><IconLogOut size={18} />Log out</button>
             <span className="lms-sr-only">Current page: {activeNavId}</span>
           </section>}

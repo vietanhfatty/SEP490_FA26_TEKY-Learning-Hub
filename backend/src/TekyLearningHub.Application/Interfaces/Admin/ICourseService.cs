@@ -7,10 +7,11 @@ namespace TekyLearningHub.Application.Interfaces.Admin;
 /// </summary>
 public interface ICourseService
 {
-    Task<CoursePageDto> ListAsync(string? status, string? keyword, int skip, int take,
+    Task<CourseDepartmentDto[]> DepartmentsAsync(int actorUserId, CancellationToken ct);
+    Task<CoursePageDto> ListAsync(int actorUserId, string? status, string? keyword, int skip, int take,
         CancellationToken cancellationToken);
 
-    Task<CourseDetailDto?> GetAsync(int courseId, CancellationToken cancellationToken);
+    Task<CourseDetailDto?> GetAsync(int courseId, int actorUserId, CancellationToken cancellationToken);
 
     Task<CourseOperationResult<CourseDetailDto>> CreateAsync(CourseUpsertRequest request, int actorUserId,
         string? ipAddress, CancellationToken cancellationToken);
