@@ -13,6 +13,7 @@ public interface ICourseRepository
     Task<Lesson> LoadLesson(int id, CancellationToken ct);
     Task<List<Lesson>> Lessons(int courseId, CancellationToken ct);
     Task<bool> HasLessons(int courseId, CancellationToken ct);
+    Task<bool> IsApproved(int courseId, CancellationToken ct);
     Task<LessonMaterial?> FindMaterial(int courseId, int lessonId, int materialId, CancellationToken ct);
     Task<List<LessonMaterial>> Materials(int lessonId, CancellationToken ct);
     void AddCourse(Course entity); void AddLesson(Lesson entity); void AddMaterial(LessonMaterial entity);

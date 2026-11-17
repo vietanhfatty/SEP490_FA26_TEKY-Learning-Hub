@@ -93,3 +93,10 @@ PARENT QR CHECKOUT
   recording the payment. The reconciliation worker also checks pending payOS orders.
   Apply migrations before enabling this mode outside Development, and use a database and
   merchant channel dedicated to that environment.
+
+ACADEMIC MANAGER
+  20261126_academic_operations.sql adds the approval workflow, availability, operation versions,
+  makeup-session assignments and STEM equipment. Academic grants remain scoped to existing
+  active role grants. GLOBAL academic.manage controls shared room/availability/equipment edits.
+  Development seeds DEMO-AM-STEM and two classes with registration and makeup examples.
+  See docs/architecture/academic-operations.md for lifecycle and payment integration.

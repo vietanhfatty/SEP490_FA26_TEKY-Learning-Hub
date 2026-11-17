@@ -36,7 +36,7 @@ export function ParentCourses({ child, learning, onCheckout }: {
     {catalogue.error && <PortalError message={catalogue.error} retry={catalogue.retry} />}
     {registrations.error && <PortalError message={registrations.error} retry={registrations.retry} />}
     {selected ? <CourseDetails key={`${selected}-${child?.studentId}`} id={selected} child={child} learning={learning}
-      onCheckout={onCheckout} onBack={() => setSelected(undefined)} /> : <>
+      onCheckout={onCheckout} registrations={registrations.data} refreshRegistrations={registrations.retry} onBack={() => setSelected(undefined)} /> : <>
       <div className="sc-panel pp-tools">
         <label>Tìm khóa học<input type="search" value={query} placeholder="Tên hoặc mã khóa học" onChange={e => setQuery(e.target.value)} /></label>
         <label>Cấp độ<select value={level} onChange={e => setLevel(e.target.value)}>
@@ -53,17 +53,19 @@ export function ParentCourses({ child, learning, onCheckout }: {
           <button className="sc-button" type="button" onClick={() => setSelected(course.courseId)}>Xem chi tiết</button></div>
       </article>)}</div> : <p className="sc-panel">Không có khóa học phù hợp.</p>)}
     </>}
-    {!!registrations.data?.length && <section className="sc-panel pp-stack"><h2>Yêu cầu đăng ký trước đây của {child?.fullName}</h2>
+    {!!registrations.data?.length && <section className="sc-panel pp-stack"><h2>Yêu cầu đăng ký của {child?.fullName}</h2>
       <ul className="pp-list">{registrations.data.map(row => <li key={row.requestId}>
         <div className="pp-row"><h3>{row.courseName}</h3><span className="pp-chip">{statusLabels[row.status] ?? row.status}</span></div>
         <p className="sc-muted">{row.classCode} · {dateTime(row.requestedAt)}</p>
+        {row.managerNote && <p>Phản hồi học vụ · {row.managerNote}</p>}
       </li>)}</ul>
     </section>}
   </>;
 }
 
-function CourseDetails({ id, child, learning, onCheckout, onBack }: {
+function CourseDetails({ id, child, learning, onCheckout, onBack, registrations, refreshRegistrations }: {
   id: number; child?: Child; learning?: Learning; onCheckout: (studentId: number, paymentId: number) => void; onBack: () => void;
+  registrations?: Registration[]; refreshRegistrations: () => void;
 }) {
   const resource = usePortalResource<CourseDetail>(`parent/courses/${id}`);
   const [busy, setBusy] = useState<number>();
@@ -75,6 +77,21 @@ function CourseDetails({ id, child, learning, onCheckout, onBack }: {
     try {
       const checkout = await buyCourse(child.studentId, classId);
       onCheckout(child.studentId, checkout.paymentId);
+    } catch (failure) {
+      setError(describeError(failure));
+    } finally {
+      setBusy(undefined);
+    }
+  }
+  const [requested, setRequested] = useState<number[]>([]);
+  async function requestPlacement(classId: number) {
+    if (!child || busy !== undefined) return;
+    setBusy(classId);
+    setError('');
+    try {
+      await portalPost(`parent/children/${child.studentId}/registrations`, { classId });
+      setRequested(rows => [...rows, classId]);
+      refreshRegistrations();
     } catch (failure) {
       setError(describeError(failure));
     } finally {
@@ -102,6 +119,7 @@ function CourseDetails({ id, child, learning, onCheckout, onBack }: {
         {detail.classes.length ? <ul className="pp-list">{detail.classes.map(row => {
           const enrolled = learning?.enrollments.some(item => item.courseId === id && ['Active', 'Completed'].includes(item.status));
           const canBuy = row.status === 'Open' && child && (detail.course.tuitionVnd ?? 0) > 0;
+          const hasRequest = requested.includes(row.classId) || registrations?.some(item => item.classId === row.classId);
           return <li key={row.classId} className="pp-row">
             <div><h3>{row.name}</h3><p>{row.classCode} · {row.teacherName ?? 'Chưa phân công giáo viên'}</p>
               <p className="sc-muted">{localDay(row.startDate)} – {localDay(row.endDate)}</p>
@@ -111,10 +129,16 @@ function CourseDetails({ id, child, learning, onCheckout, onBack }: {
                   {localDay(session.date)} · {session.startsAt.slice(0, 5)}–{session.endsAt.slice(0, 5)} · {session.title}
                 </li>)}</ul>
               </details>}</div>
+            <div className="pp-stack">
             {enrolled ? <span className="pp-chip">Đã ghi danh</span>
               : canBuy ? <button type="button" className="sc-button sc-primary" disabled={busy !== undefined}
                 onClick={() => void purchase(row.classId)}>{busy === row.classId ? 'Đang tạo mã QR…' : 'Mua khóa học'}</button>
               : <span className="pp-chip">{row.status === 'Open' ? 'Đang mở' : 'Dự kiến'}</span>}
+            {!enrolled && row.status === 'Open' && child && (hasRequest
+              ? <span className="pp-chip">Đã gửi yêu cầu xếp lớp</span>
+              : <button type="button" className="sc-button" disabled={busy !== undefined}
+                onClick={() => void requestPlacement(row.classId)}>Gửi yêu cầu xếp lớp</button>)}
+            </div>
           </li>;
         })}</ul> : <p>Chưa có lớp hoặc lịch trình được công bố.</p>}
       </section>

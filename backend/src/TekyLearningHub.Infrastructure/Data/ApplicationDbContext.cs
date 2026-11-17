@@ -94,6 +94,10 @@ public class ApplicationDbContext : TekyLearningHubContext
             entity.HasKey(submission => new { submission.AssignmentId, submission.StudentId });
             entity.Property(submission => submission.FileName).HasMaxLength(180);
         });
+        modelBuilder.Entity<Course>().ToTable(table => table.UseSqlOutputClause(false));
+        modelBuilder.Entity<Lesson>().ToTable(table => table.UseSqlOutputClause(false));
+        modelBuilder.Entity<LessonMaterial>().ToTable(table => table.UseSqlOutputClause(false));
+        modelBuilder.Entity<ParentCourseRequest>().Property(x => x.ManagerNote).HasMaxLength(2000);
         modelBuilder.Entity<User>().Property(x => x.Bio).HasMaxLength(1000);
         modelBuilder.Entity<User>().Property(x => x.SecurityVersion).IsConcurrencyToken();
         modelBuilder.Entity<User>().Property(x => x.AdministrationVersion).IsConcurrencyToken();

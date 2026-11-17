@@ -51,6 +51,7 @@ PROJECT_STRUCTURE.md
 /docs/architecture/*
 !/docs/architecture/README.md
 !/docs/architecture/conventions.md
+!/docs/architecture/academic-operations.md
 
 # Tooling artifacts
 .ua/

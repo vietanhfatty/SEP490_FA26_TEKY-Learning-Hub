@@ -9,7 +9,7 @@ public record ParentClassOfferDto(int ClassId, string ClassCode, string Name, st
 public record ParentCourseDetailDto(ParentCourseDto Course, string? LearningObjectives,
     IReadOnlyList<ParentCourseLessonDto> Lessons, IReadOnlyList<ParentClassOfferDto> Classes);
 public record ParentCourseRequestDto(long RequestId, int ClassId, string ClassCode, string CourseName, string Status,
-    DateTime RequestedAt);
+    DateTime RequestedAt, string? ManagerNote = null);
 public record ParentPaymentDto(int PaymentId, string Reference, string? InvoiceNumber, string CourseName,
     int AmountVnd, string Status, DateTime CreatedAt, DateTime? PaidAt, string? RefundStatus, string? RefundReason, DateTime? RefundRequestedAt);
 public record ParentRegistration(int ClassId);

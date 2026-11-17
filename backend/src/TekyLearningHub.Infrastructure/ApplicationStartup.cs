@@ -22,6 +22,7 @@ public static class ApplicationStartup
             await DbInitializer.SeedAsync(db, scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
             if (configuration["PaymentGateway:Mode"] == "Demo")
                 await db.Database.ExecuteSqlRawAsync("EXEC dbo.SeedDemoParentCheckout;");
+            await db.Database.ExecuteSqlRawAsync("EXEC dbo.SeedDemoAcademicOperations;");
             return configuration.GetValue<bool>("seed-demo-only");
         }
         catch (Exception e) { logger.LogCritical(e, "Không thể cập nhật database Development. Backend dừng để tránh chạy với schema không tương thích."); throw; }

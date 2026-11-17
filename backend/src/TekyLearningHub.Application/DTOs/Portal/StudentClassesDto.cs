@@ -1,6 +1,9 @@
 namespace TekyLearningHub.Application.DTOs.Portal;
 
-public record StudentClassesDto(int StudentId, string StudentCode, string FullName, IReadOnlyList<StudentClassDto> Classes);
+public record StudentClassesDto(int StudentId, string StudentCode, string FullName, IReadOnlyList<StudentClassDto> Classes)
+{
+    public IReadOnlyList<StudentSessionDto> MakeupSessions { get; init; } = [];
+}
 public record StudentClassDto(int ClassId, string ClassCode, string Name, string Status,
     string EnrollmentStatus, decimal ProgressPercent, int CourseId, string CourseCode,
     string CourseName, string? TeacherName, string? TeacherEmail, IReadOnlyList<StudentSessionDto> Sessions);

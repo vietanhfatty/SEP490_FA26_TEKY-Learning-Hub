@@ -22,6 +22,8 @@ public record CheckoutStatus(long OrderCode, string LinkId, int Amount, int Amou
 
 public sealed class CheckoutGatewayException(string message, Exception? inner = null) : Exception(message, inner);
 
+public sealed class CheckoutConflictException(string message) : Exception(message);
+
 public interface ICheckoutGateway
 {
     string? Provider { get; }

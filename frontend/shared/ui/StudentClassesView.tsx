@@ -170,6 +170,14 @@ export function StudentClassesView({ sessionParam, onNavigate }: StudentClassesV
           <a className="sc-button sc-primary" href={sessionPath(next)} onClick={event => navigate(event, sessionPath(next))}>Vào lớp <IconArrowRight size={18} aria-hidden="true" /></a>
         </div>}
       </header>
+      {!!classes.data?.makeupSessions?.length && <section className="sc-panel">
+        <h2>Buổi học bù được xếp</h2>
+        <ul className="sc-materials">{classes.data.makeupSessions.map(session => <li key={session.sessionId}>
+          <div><strong>{session.title}</strong><p>{session.classCode} · {shortDate.format(Date.parse(session.startsAt))} · {when(session)}</p>
+            <Status session={session} now={now} /></div>
+          <a className="sc-button" href={sessionPath(session)} onClick={event => navigate(event, sessionPath(session))}>Mở buổi học bù</a>
+        </li>)}</ul>
+      </section>}
       {classes.loading && <div className="sc-panel sc-loading" role="status">Đang tải danh sách lớp…</div>}
       {error && <div className="sc-panel sc-error" role="alert"><h2>Chưa thể tải lớp học</h2><p>{error}</p>
         <button type="button" className="sc-button" onClick={classes.retry}>Thử lại</button>

@@ -46,6 +46,9 @@ public sealed class ParentCheckoutTests
 
         Assert.Empty(await studentCourses.Courses(student, default));
         Assert.Null(await service.Buy(other, student, classId, default));
+        await fixture.Execute($"INSERT dbo.ParentCourseRequests(ParentId,StudentId,ClassId,Status,ProcessedBy) VALUES({parent},{student},{classId},'Declined',{parent})");
+        Assert.Null(await service.Buy(parent, student, classId, default));
+        await fixture.Execute("UPDATE dbo.ParentCourseRequests SET Status='Accepted',UpdatedAt=SYSUTCDATETIME()");
         var orders = await Task.WhenAll(service.Buy(parent, student, classId, default),
             parallelService.Buy(parent, student, classId, default));
         var order = Assert.IsType<ParentCheckoutDto>(orders[0]);

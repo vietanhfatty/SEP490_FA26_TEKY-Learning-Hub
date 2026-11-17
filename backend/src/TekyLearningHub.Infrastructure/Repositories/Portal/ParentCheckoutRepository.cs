@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using TekyLearningHub.Application.Interfaces.Portal;
 using TekyLearningHub.Infrastructure.Data;
@@ -12,10 +13,17 @@ public sealed class ParentCheckoutRepository(ApplicationDbContext db) : IParentC
     public async Task<ParentCheckout?> Reserve(int parentId, int studentId, int classId, string provider,
         long orderCode, DateTime expiresAt, CancellationToken ct)
     {
-        var rows = await db.Database.SqlQuery<ParentCheckout>($"""
-            EXEC dbo.ReserveParentCourseCheckout {parentId}, {studentId}, {classId}, {orderCode}, {provider}, {expiresAt}
-            """).ToListAsync(ct);
-        return rows.SingleOrDefault();
+        try
+        {
+            var rows = await db.Database.SqlQuery<ParentCheckout>($"""
+                EXEC dbo.ReserveParentCourseCheckout {parentId}, {studentId}, {classId}, {orderCode}, {provider}, {expiresAt}
+                """).ToListAsync(ct);
+            return rows.SingleOrDefault();
+        }
+        catch (SqlException error) when (error.Number >= 51000)
+        {
+            throw new CheckoutConflictException(error.Message);
+        }
     }
 
     public async Task<IReadOnlyList<ParentCheckout>> ForParent(int parentId, int studentId, CancellationToken ct) =>

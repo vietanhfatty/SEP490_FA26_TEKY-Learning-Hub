@@ -55,12 +55,17 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit, IAccountAcces
         if (request.Status is not null && CourseStatuses.Normalize(request.Status) is null)
             return CourseOperationResult<CourseDetailDto>.Fail("Trạng thái khóa học không hợp lệ.");
 
+        if (status is CourseStatuses.Published or CourseStatuses.Active)
+            return CourseOperationResult<CourseDetailDto>.Fail("Tạo bản nháp, hoàn thiện chương trình rồi gửi duyệt trước khi xuất bản.", 409);
+
         var course = new Course
         {
             CourseCode = code,
             Name = name,
             DepartmentId = request.DepartmentId,
             Description = request.Description?.Trim(),
+            LearningObjectives = request.LearningObjectives?.Trim(),
+            TuitionVnd = request.TuitionVnd,
             LevelCode = request.LevelCode?.Trim(),
             Status = status,
             CreatedBy = actorUserId,
@@ -103,12 +108,18 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit, IAccountAcces
         course.Name = name;
         course.DepartmentId = request.DepartmentId;
         course.Description = request.Description?.Trim();
+        course.LearningObjectives = request.LearningObjectives?.Trim() ?? course.LearningObjectives;
+        course.TuitionVnd = request.TuitionVnd ?? course.TuitionVnd;
         course.LevelCode = request.LevelCode?.Trim();
 
         // Trạng thái có thể được đổi kèm trong lúc sửa, nhưng vẫn phải đi qua quy tắc nghiệp vụ.
         var requestedStatus = CourseStatuses.Normalize(request.Status);
         if (request.Status is not null && requestedStatus is null)
             return CourseOperationResult<CourseDetailDto>.Fail("Trạng thái khóa học không hợp lệ.");
+
+        if (requestedStatus is CourseStatuses.Published or CourseStatuses.Active && requestedStatus != course.Status &&
+            !await db.IsApproved(courseId, cancellationToken))
+            return CourseOperationResult<CourseDetailDto>.Fail("Khóa học cần được duyệt trong Course Approval trước khi xuất bản.", 409);
 
         if (requestedStatus is not null && requestedStatus != course.Status)
         {
@@ -145,6 +156,10 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit, IAccountAcces
         var course = await db.FindCourse(courseId, cancellationToken);
         if (course is null) return CourseOperationResult<CourseDetailDto>.Fail("Không tìm thấy khóa học.", 404);
         await Demand(actorUserId, course.DepartmentId, cancellationToken);
+
+        if (normalized is CourseStatuses.Published or CourseStatuses.Active && normalized != course.Status &&
+            !await db.IsApproved(courseId, cancellationToken))
+            return CourseOperationResult<CourseDetailDto>.Fail("Khóa học cần được duyệt trong Course Approval trước khi xuất bản.", 409);
 
         if (normalized == CourseStatuses.Published)
         {
@@ -184,8 +199,6 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit, IAccountAcces
         var oldStatus = course.Status;
         course.Status = CourseStatuses.Archived;
 
-        var lessons = await db.Lessons(courseId, cancellationToken);
-        foreach (var lesson in lessons) lesson.IsDeleted = true;
 
         AddAudit(actorUserId, "COURSE_ARCHIVED", "Course", courseId.ToString(), oldStatus, CourseStatuses.Archived, ipAddress);
 
@@ -361,11 +374,12 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit, IAccountAcces
         try
         {
             await unit.SaveChangesAsync(cancellationToken);
+            unit.Reset();
             return CourseOperationResult<bool>.Success(true);
         }
-        catch (PersistenceConflictException ex) when (ex.Duplicate)
+        catch (PersistenceConflictException ex)
         {
-            return CourseOperationResult<bool>.Fail("Mã khóa học đã tồn tại.", 409);
+            return CourseOperationResult<bool>.Fail(ex.Duplicate ? "Mã khóa học đã tồn tại." : ex.Message, 409);
         }
     }
 
@@ -421,5 +435,5 @@ public class CourseService(ICourseRepository db, IUnitOfWork unit, IAccountAcces
             .Where(l => !l.IsDeleted)
             .OrderBy(l => l.OrderNo)
             .Select(MapLesson)
-            .ToList(), course.DepartmentId);
+            .ToList(), course.DepartmentId, course.LearningObjectives, course.TuitionVnd);
 }

@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<IShellTransferService, ShellTransferService>();
         services.AddScoped<ISessionValidationService, SessionValidationService>();
         services.AddScoped<ICourseService, CourseService>();
+        services.AddScoped<IAcademicService, AcademicService>();
         services.AddScoped<IUserAdministrationService, UserAdministrationService>();
         services.AddScoped<IStudentClassesService, StudentClassesService>();
         services.AddScoped<IStudentLearningService, StudentLearningService>();
