@@ -15,6 +15,8 @@ import { buildCrossAppUrl } from '@teky/shared/auth/shellTransfer';
 import { Forbidden } from '@teky/shared/ui/Forbidden';
 import { useAdminNavigation } from '@teky/shared/ui/useAdminNavigation';
 import { LmsShell } from '@teky/shared/ui/LmsShell';
+import { AdminCoursesView } from '@teky/shared/ui/AdminCoursesView';
+import { LearningMessagesView } from '@teky/shared/ui/LearningMessagesView';
 import type { UserRole } from '@teky/shared/types';
 
 /**
@@ -128,7 +130,7 @@ export function App() {
                 onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
               >
-                {(activeNavId) => <TeacherDashboard activeNavId={activeNavId} />}
+                {(activeNavId) => activeNavId === 'communication' ? <LearningMessagesView teacher /> : <TeacherDashboard activeNavId={activeNavId} />}
               </LmsShell>
             </RoleGuard>
           }
@@ -147,7 +149,7 @@ export function App() {
                 onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
               >
-                {(activeNavId) => <StaffDashboard activeNavId={activeNavId} />}
+                {(activeNavId, onSelectNav) => <StaffDashboard activeNavId={activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>
             </RoleGuard>
           }
@@ -166,18 +168,26 @@ export function App() {
                 onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
               >
-                {(activeNavId) => <AcademicManagerDashboard activeNavId={activeNavId} />}
+                {(activeNavId, onSelectNav) => <AcademicManagerDashboard activeNavId={activeNavId} onSelectNav={onSelectNav} />}
               </LmsShell>
             </RoleGuard>
           }
         />
 
+        <Route path="/manage/courses" element={
+          <RoleGuard requiredPermission="course.manage" fallback={forbidden('Quản lý khóa học')}>
+            <LmsShell currentRole={role ?? 'academic_manager'} userName={user?.fullName} userEmail={user?.email}
+              isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(value => !value)} onLogout={logout}>
+              {() => <AdminCoursesView />}
+            </LmsShell>
+          </RoleGuard>
+        } />
         {/* Dashboard Quản trị hệ thống - chỉ dành cho role admin */}
         {['/admin', '/admin/directory'].map(path => (
         <Route key={path}
           path={path}
           element={
-            <RoleGuard allowedRoles={['system_admin']} fallback={forbidden('Quản trị hệ thống')}>
+            <RoleGuard requiredPermission="identity.manage" globalOnly fallback={forbidden('Quản trị hệ thống')}>
               <LmsShell
                 currentRole="system_admin"
                 {...adminNavigation}

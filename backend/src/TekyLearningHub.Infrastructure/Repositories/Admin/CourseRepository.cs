@@ -9,9 +9,10 @@ namespace TekyLearningHub.Infrastructure.Repositories.Admin;
 
 public sealed class CourseRepository(ApplicationDbContext db) : ICourseRepository
 {
-    public async Task<CoursePageDto> List(string? status, string? keyword, int skip, int take, CancellationToken cancellationToken)
+    public async Task<CoursePageDto> List(string? status, string? keyword, int skip, int take, bool isGlobal, int[] departmentIds, CancellationToken cancellationToken)
     {
         var query = db.Courses.AsNoTracking();
+        if (!isGlobal) query = query.Where(course => course.DepartmentId.HasValue && departmentIds.Contains(course.DepartmentId.Value));
 
         var normalizedStatus = CourseStatuses.Normalize(status);
         if (normalizedStatus is not null) query = query.Where(c => c.Status == normalizedStatus);
@@ -31,12 +32,16 @@ public sealed class CourseRepository(ApplicationDbContext db) : ICourseRepositor
                 c.CourseId, c.CourseCode, c.Name, c.LevelCode, c.Status,
                 c.Lessons.Count(l => !l.IsDeleted),
                 c.Classes.Count,
-                c.CreatedAt))
+                c.CreatedAt, c.DepartmentId))
             .ToListAsync(cancellationToken);
 
         return new CoursePageDto(total, items);
     }
     public Task<Course?> FindCourse(int id, CancellationToken ct) => db.Courses.Include(c => c.Classes).Include(c => c.Lessons.Where(l => !l.IsDeleted)).ThenInclude(l => l.LessonMaterials).AsSplitQuery().SingleOrDefaultAsync(c => c.CourseId == id, ct);
+    public Task<bool> DepartmentExists(int id, CancellationToken ct) => db.Departments.AnyAsync(department => department.DepartmentId == id && department.IsActive, ct);
+    public Task<CourseDepartmentDto[]> Departments(bool isGlobal, int[] departmentIds, CancellationToken ct) => db.Departments.AsNoTracking()
+        .Where(department => department.IsActive && (isGlobal || departmentIds.Contains(department.DepartmentId)))
+        .OrderBy(department => department.Name).Select(department => new CourseDepartmentDto(department.DepartmentId, department.Name)).ToArrayAsync(ct);
     public Task<Lesson?> FindLesson(int courseId, int lessonId, CancellationToken ct) => db.Lessons.SingleOrDefaultAsync(l => l.CourseId == courseId && l.LessonId == lessonId, ct);
     public Task<Lesson> LoadLesson(int id, CancellationToken ct) => db.Lessons.Include(l => l.LessonMaterials).SingleAsync(l => l.LessonId == id, ct);
     public Task<List<Lesson>> Lessons(int id, CancellationToken ct) => db.Lessons.Where(l => l.CourseId == id && !l.IsDeleted).ToListAsync(ct);

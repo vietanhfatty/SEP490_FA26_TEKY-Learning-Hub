@@ -7,6 +7,7 @@ using System.Text;
 using TekyLearningHub.Application.DTOs.Admin;
 using TekyLearningHub.Application.DTOs.Auth;
 using TekyLearningHub.Application.Interfaces.Admin;
+using TekyLearningHub.Application.Interfaces.Auth;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Domain.Entities;
 
@@ -16,7 +17,7 @@ public sealed class UserAdministrationException(int status, string message) : Us
 
 /// <summary>Identity administration checks live grants and serializes changes, including
 /// invitation consumption, so concurrent administrators cannot remove the last admin.</summary>
-public sealed class UserAdministrationService(IUserAdministrationRepository db, IUnitOfWork unit, IPasswordHasher hasher, IAccountEmailOutbox emailOutbox, AccountOptions options) : IUserAdministrationService
+public sealed class UserAdministrationService(IUserAdministrationRepository db, IUnitOfWork unit, IPasswordHasher hasher, IAccountEmailOutbox emailOutbox, AccountOptions options, IAccountAccessReader access) : IUserAdministrationService
 {
     [DoesNotReturn]
     private static void Fail(int status, string message) => throw new UserAdministrationException(status, message);
@@ -77,7 +78,8 @@ public sealed class UserAdministrationService(IUserAdministrationRepository db, 
         var delivery = await db.LatestDelivery(user.Email, ct);
         return new ManagedUserDetail(View(user), appointments,
             invitation is null ? null : new InvitationView(invitation.CreatedAt, invitation.ExpiresAt, invitation.UsedAt, invitation.RevokedAt),
-            delivery is null ? null : new DeliveryView(delivery.SentAt, delivery.Attempts, delivery.NextAttemptAt));
+            delivery is null ? null : new DeliveryView(delivery.SentAt, delivery.Attempts, delivery.NextAttemptAt),
+            await access.Read(id, ct, includeInactive: true));
     }
 
     private async Task ValidateGrant(RoleGrantRequest g, CancellationToken ct)

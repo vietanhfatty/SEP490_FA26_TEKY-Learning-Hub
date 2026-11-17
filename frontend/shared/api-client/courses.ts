@@ -13,6 +13,7 @@ export const courseStatusLabels: Record<CourseStatus, string> = {
 
 export interface AdminCourse {
   courseId: number;
+  departmentId: number | null;
   courseCode: string;
   name: string;
   levelCode: string | null;
@@ -50,6 +51,7 @@ export interface AdminCoursePage {
 }
 
 export interface CourseUpsertPayload {
+  departmentId?: number | null;
   courseCode: string;
   name: string;
   description?: string | null;
@@ -108,6 +110,10 @@ async function requestAdmin<T>(path: string, init: RequestInit = {}): Promise<T>
 
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+export async function getCourseDepartments(): Promise<{id: number; name: string}[]> {
+  return requestAdmin('/departments');
 }
 
 export async function getAdminCourses(params: { status?: string; q?: string; skip?: number; take?: number } = {}): Promise<AdminCoursePage> {

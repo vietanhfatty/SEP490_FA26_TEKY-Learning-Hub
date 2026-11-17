@@ -8,6 +8,7 @@ public class UserDto
     public string Role { get; set; } = string.Empty;
     public byte RoleId { get; set; }
     public string[] Roles { get; set; } = [];
+    public AccountAccessDto Access { get; set; } = AccountAccessDto.Empty;
     public string? AvatarUrl { get; set; }
     public string? Phone { get; set; }
     public string? Bio { get; set; }

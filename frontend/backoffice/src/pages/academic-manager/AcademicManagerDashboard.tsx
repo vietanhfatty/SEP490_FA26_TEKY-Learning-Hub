@@ -4,9 +4,10 @@ import { Badge } from '../common/Badge';
 
 interface AcademicManagerDashboardProps {
   activeNavId?: string;
+  onSelectNav?: (id: string) => void;
 }
 
-export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> = ({ activeNavId = 'kpi' }) => {
+export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> = ({ activeNavId = 'kpi', onSelectNav }) => {
   const [activeTab, setActiveTab] = useState<'kpi' | 'courses' | 'timetable' | 'teachers' | 'surveys'>('timetable');
 
   useEffect(() => {
@@ -91,7 +92,7 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
       {/* Tabs Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 text-xs font-semibold overflow-x-auto">
         <button
-          onClick={() => setActiveTab('kpi')}
+          onClick={() => onSelectNav ? onSelectNav('kpi') : setActiveTab('kpi')}
           className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'kpi'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
@@ -101,7 +102,7 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
           Tổng quan KPI & Tiến độ học thuật
         </button>
         <button
-          onClick={() => setActiveTab('timetable')}
+          onClick={() => onSelectNav ? onSelectNav('timetable') : setActiveTab('timetable')}
           className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'timetable'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
@@ -111,7 +112,7 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
           Xếp lịch & Xung đột thời khóa biểu
         </button>
         <button
-          onClick={() => setActiveTab('courses')}
+          onClick={() => onSelectNav ? onSelectNav('courses') : setActiveTab('courses')}
           className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'courses'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
@@ -121,7 +122,7 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
           Quản lý Khóa học & Giáo trình
         </button>
         <button
-          onClick={() => setActiveTab('teachers')}
+          onClick={() => onSelectNav ? onSelectNav('teachers') : setActiveTab('teachers')}
           className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'teachers'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
@@ -131,7 +132,7 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
           Điều phối & Tìm GV rảnh
         </button>
         <button
-          onClick={() => setActiveTab('surveys')}
+          onClick={() => onSelectNav ? onSelectNav('surveys') : setActiveTab('surveys')}
           className={`pb-3 whitespace-nowrap transition-colors ${
             activeTab === 'surveys'
               ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
@@ -197,7 +198,7 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
                     <Badge variant="danger">Gấp</Badge>
                   </div>
                   <p className="text-slate-600 dark:text-slate-300 mt-1">Thầy Hoàng Văn Nam trùng 2 lớp song song</p>
-                  <button onClick={() => setActiveTab('timetable')} className="text-rose-600 font-semibold underline text-[11px] mt-2 block">
+                  <button onClick={() => onSelectNav ? onSelectNav('timetable') : setActiveTab('timetable')} className="text-rose-600 font-semibold underline text-[11px] mt-2 block">
                     Đi tới ma trận xử lý →
                   </button>
                 </div>
@@ -208,7 +209,7 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
                     <Badge variant="warning">Chờ ký</Badge>
                   </div>
                   <p className="text-slate-600 dark:text-slate-300 mt-1">Đề cương 16 buổi cần hội đồng chuyên môn duyệt</p>
-                  <button onClick={() => setActiveTab('courses')} className="text-amber-600 font-semibold underline text-[11px] mt-2 block">
+                  <button onClick={() => onSelectNav ? onSelectNav('courses') : setActiveTab('courses')} className="text-amber-600 font-semibold underline text-[11px] mt-2 block">
                     Xem bản thảo giáo án →
                   </button>
                 </div>

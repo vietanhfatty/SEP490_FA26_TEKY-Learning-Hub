@@ -4,12 +4,14 @@ namespace TekyLearningHub.Application.DTOs.Admin;
 
 /// <summary>Tóm tắt khóa học cho danh sách quản trị.</summary>
 public record CourseSummaryDto(int CourseId, string CourseCode, string Name, string? LevelCode,
-    string Status, int LessonCount, int ClassCount, DateTime CreatedAt);
+    string Status, int LessonCount, int ClassCount, DateTime CreatedAt, int? DepartmentId = null);
+
+public record CourseDepartmentDto(int Id, string Name);
 
 /// <summary>Chi tiết khóa học kèm bài học và học liệu.</summary>
 public record CourseDetailDto(int CourseId, string CourseCode, string Name, string? Description,
     string? LevelCode, string Status, int ClassCount, DateTime CreatedAt,
-    IReadOnlyList<LessonDto> Lessons);
+    IReadOnlyList<LessonDto> Lessons, int? DepartmentId = null);
 
 public record LessonDto(int LessonId, int OrderNo, string Title, string? Content,
     IReadOnlyList<LessonMaterialDto> Materials);
@@ -20,6 +22,7 @@ public record LessonMaterialDto(int MaterialId, string MaterialType, string Titl
 /// <summary>Tạo mới hoặc cập nhật thông tin khóa học.</summary>
 public record CourseUpsertRequest
 {
+    public int? DepartmentId { get; init; }
     [Required, StringLength(20, MinimumLength = 3)]
     public string CourseCode { get; init; } = null!;
 

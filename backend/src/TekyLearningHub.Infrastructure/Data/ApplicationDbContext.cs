@@ -5,6 +5,7 @@ namespace TekyLearningHub.Infrastructure.Data;
 
 public class ApplicationDbContext : TekyLearningHubContext
 {
+    public DbSet<Department> Departments => Set<Department>();
     public DbSet<UserRoleAssignment> UserRoles => Set<UserRoleAssignment>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
@@ -41,6 +42,12 @@ public class ApplicationDbContext : TekyLearningHubContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<Department>(entity =>
+        {
+            entity.ToTable("Departments").HasKey(department => department.DepartmentId);
+            entity.Property(department => department.Code).HasMaxLength(40).IsUnicode(false);
+            entity.Property(department => department.Name).HasMaxLength(160);
+        });
         modelBuilder.Entity<ParentTeacherMessage>().HasKey(m => m.MessageId);
         modelBuilder.Entity<ParentCourseRequest>().HasKey(x => x.RequestId);
         modelBuilder.Entity<ParentPayment>().HasKey(x => x.PaymentId);

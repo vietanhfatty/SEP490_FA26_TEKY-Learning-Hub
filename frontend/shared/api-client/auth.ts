@@ -1,6 +1,8 @@
 import type { UserRole } from '../types';
 import { decodeJwtClaims, isTokenExpired, normalizeRoleString, roleFromClaims } from '../auth/jwt';
 import type { JwtClaims } from '../auth/jwt';
+import type { AccountAccess } from '../auth/accountAccess';
+import { isAccountAccess } from '../auth/accountAccess';
 
 export interface AuthUserData {
   userId: number;
@@ -9,6 +11,7 @@ export interface AuthUserData {
   role: string;
   roleId: number;
   roles: string[];
+  access: AccountAccess;
   avatarUrl?: string;
   phone?: string;
   status: string;
@@ -74,6 +77,8 @@ export async function verifySession(accessToken: string, refreshToken: string | 
       !tokenRoles?.length || tokenRoles.includes(null) || serverRoles.includes(null) ||
       new Set(tokenRoles).size !== tokenRoles.length || new Set(serverRoles).size !== serverRoles.length ||
       JSON.stringify(tokenRoles) !== JSON.stringify(serverRoles) || !serverRoles.includes(role) ||
+      !isAccountAccess(user.access) ||
+      JSON.stringify([...new Set(user.access.grants.map(grant => normalizeRole(grant.role)))].sort()) !== JSON.stringify(serverRoles) ||
       roleFromClaims({ roleId: user.roleId }) !== role || normalizeRole(user.role) !== role || isTokenExpired(accessToken)) {
     throw new Error('Quyền tài khoản đã thay đổi hoặc không hợp lệ. Vui lòng đăng nhập lại.');
   }

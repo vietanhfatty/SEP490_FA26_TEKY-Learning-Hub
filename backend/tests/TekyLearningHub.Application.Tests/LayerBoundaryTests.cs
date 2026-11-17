@@ -96,7 +96,7 @@ public class LayerBoundaryTests
         var repository = new AuthMemoryRepository(user);
         var unit = new MemoryUnitOfWork();
         var email = new MemoryEmail();
-        var service = new AuthService(repository, new TestPasswords(), new TestTokens(), unit, email);
+        var service = new AuthService(repository, new TestPasswords(), new TestTokens(), unit, email, new MemoryAccess());
 
         var failure = await service.LoginAsync(new() { EmailOrUsername = user.Email, Password = "wrong" }, null, null);
         Assert.False(failure.Success);
@@ -112,6 +112,12 @@ public class LayerBoundaryTests
         Assert.Equal(0, user.FailedLoginCount);
         Assert.Single(repository.Sessions);
         Assert.Equal(2, unit.Saves);
+    }
+
+    private sealed class MemoryAccess : IAccountAccessReader
+    {
+        public Task<TekyLearningHub.Application.DTOs.Auth.AccountAccessDto> Read(int userId, CancellationToken ct = default, bool includeInactive = false) =>
+            Task.FromResult(TekyLearningHub.Application.DTOs.Auth.AccountAccessDto.Empty);
     }
 
     private sealed class AuthMemoryRepository(User user) : IAuthRepository

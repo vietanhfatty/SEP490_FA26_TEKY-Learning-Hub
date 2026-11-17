@@ -1,10 +1,11 @@
-﻿import { API_BASE_URL } from './auth';
+import type { AccountAccess } from '../auth/accountAccess';
+import { API_BASE_URL } from './auth';
 export type Grant = {roleId:number;scopeType:string;departmentId:number|null;grantId?:number;role?:string;revokedAt?:string|null};
 export type AdminUser = {userId:number;email:string;fullName:string;phone:string|null;status:string;activationPending:boolean;primaryRoleId:number;primaryRole:string;version:number;roles:Grant[]};
 export type DirectoryEntry={id:number;code:string;name:string;isActive:boolean;departmentId:number|null;departmentName:string};
 export type Catalog={roles:{roleId:number;roleName:string}[];permissions:{roleId:number;code:string;description:string}[];departments:DirectoryEntry[];positions:DirectoryEntry[]};
-export type Detail={user:AdminUser;appointments:{appointmentId:number;department:string;position:string;employmentType:string;validFrom:string;validTo:string|null}[];invitation:{expiresAt:string;usedAt:string|null;revokedAt:string|null}|null;delivery:{sentAt:string|null;attempts:number;nextAttemptAt:string}|null};
-export type AuditEvent={actorUserId:number;action:string;oldValue:string|null;newValue:string|null;createdAt:string};
+export type Detail={access:AccountAccess;user:AdminUser;appointments:{appointmentId:number;department:string;position:string;employmentType:string;validFrom:string;validTo:string|null}[];invitation:{expiresAt:string;usedAt:string|null;revokedAt:string|null}|null;delivery:{sentAt:string|null;attempts:number;nextAttemptAt:string}|null};
+export type AuditEvent={actorUserId:number|null;action:string;oldValue:string|null;newValue:string|null;createdAt:string};
 export async function adminRequest<T>(path:string,body?:unknown,method=body===undefined?'GET':'POST'):Promise<T>{
  const token=localStorage.getItem('teky_access_token')||sessionStorage.getItem('teky_access_token')||'';
  const r=await fetch(`${API_BASE_URL}/admin${path}`,{method,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:body===undefined?undefined:JSON.stringify(body)});

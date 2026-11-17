@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { UserRole } from '../types';
 import type { JwtClaims } from './jwt';
+import type { AccountAccess } from './accountAccess';
 
 export interface AuthUser {
   userId: number;
@@ -9,6 +10,7 @@ export interface AuthUser {
   role: string;
   roleId: number;
   roles: string[];
+  access: AccountAccess;
   avatarUrl?: string;
   phone?: string;
   status: string;

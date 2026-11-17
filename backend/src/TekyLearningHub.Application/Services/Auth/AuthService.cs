@@ -16,16 +16,18 @@ public class AuthService : IAuthService
     private readonly IAccountEmailOutbox _email;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly IAccountAccessReader _access;
 
     public AuthService(
         IAuthRepository context,
         IPasswordHasher passwordHasher,
-        IJwtTokenGenerator jwtTokenGenerator, IUnitOfWork unit, IAccountEmailOutbox email)
+        IJwtTokenGenerator jwtTokenGenerator, IUnitOfWork unit, IAccountEmailOutbox email, IAccountAccessReader access)
     {
         _context = context;
         _unit = unit; _email = email;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _access = access;
     }
 
     public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginRequestDto request, string? ipAddress, string? userAgent)
@@ -104,7 +106,7 @@ public class AuthService : IAuthService
             RefreshToken = refreshToken,
             TokenType = "Bearer",
             ExpiresIn = _jwtTokenGenerator.GetAccessTokenExpiryMinutes() * 60,
-            User = MapToUserDto(user)
+            User = await MapToUserDto(user)
         };
 
         return ApiResponse<AuthResponseDto>.SuccessResult(authResponse, "Đăng nhập thành công.");
@@ -167,7 +169,7 @@ public class AuthService : IAuthService
             RefreshToken = newRefreshToken,
             TokenType = "Bearer",
             ExpiresIn = _jwtTokenGenerator.GetAccessTokenExpiryMinutes() * 60,
-            User = MapToUserDto(user)
+            User = await MapToUserDto(user)
         };
 
         return ApiResponse<AuthResponseDto>.SuccessResult(response, "Cấp lại token thành công.");
@@ -251,10 +253,10 @@ public class AuthService : IAuthService
             return ApiResponse<UserDto>.FailureResult("Không tìm thấy thông tin người dùng.");
         }
 
-        return ApiResponse<UserDto>.SuccessResult(MapToUserDto(user));
+        return ApiResponse<UserDto>.SuccessResult(await MapToUserDto(user));
     }
 
-    private static UserDto MapToUserDto(User user)
+    private async Task<UserDto> MapToUserDto(User user)
     {
         var roleName = RoleNameNormalizer.Normalize(user.PrimaryRole?.RoleName) ?? RoleNameNormalizer.FromRoleId(user.PrimaryRoleId);
 
@@ -266,6 +268,7 @@ public class AuthService : IAuthService
             Role = roleName,
             RoleId = user.PrimaryRoleId,
             Roles = UserAuthorization.Roles(user),
+            Access = await _access.Read(user.UserId),
             AvatarUrl = user.AvatarUrl,
             Phone = user.Phone,
             Bio = user.Bio,

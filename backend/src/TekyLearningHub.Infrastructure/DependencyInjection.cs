@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
         services.AddScoped<IAcademicPermissionReader, AcademicPermissionReader>();
+        services.AddScoped<IAccountAccessReader, AccountAccessReader>();
 
 
 

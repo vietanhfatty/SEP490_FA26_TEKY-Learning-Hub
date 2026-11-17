@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using TekyLearningHub.Application.DTOs.Admin;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Application.Interfaces.Admin;
+using TekyLearningHub.Application.Common;
 
 namespace TekyLearningHub.Api.Controllers.Admin;
 
@@ -12,19 +13,23 @@ namespace TekyLearningHub.Api.Controllers.Admin;
 /// </summary>
 [ApiController]
 [Route("api/admin/courses")]
-[Authorize(Roles = "system_admin")]
+[Authorize]
 public class AdminCoursesController(ICourseService service, ILogger<AdminCoursesController> logger) : ControllerBase
 {
+    [HttpGet("departments")]
+    public async Task<IActionResult> Departments(CancellationToken ct) =>
+        Ok(await service.DepartmentsAsync(int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!), ct));
+
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? status, [FromQuery] string? q,
         [FromQuery] int skip = 0, [FromQuery] int take = 50, CancellationToken cancellationToken = default)
     {
         try
         {
-            var result = await service.ListAsync(status, q, skip, take, cancellationToken);
+            var result = await service.ListAsync(int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!), status, q, skip, take, cancellationToken);
             return Ok(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to load admin courses");
             return Problem(statusCode: 503, title: "Không thể tải danh sách khóa học. Vui lòng thử lại sau.");
@@ -36,10 +41,10 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
     {
         try
         {
-            var result = await service.GetAsync(courseId, cancellationToken);
+            var result = await service.GetAsync(courseId, int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!), cancellationToken);
             return result is null ? NotFound() : Ok(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to load admin course {CourseId}", courseId);
             return Problem(statusCode: 503, title: "Không thể tải khóa học. Vui lòng thử lại sau.");
@@ -55,7 +60,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
             var result = await service.CreateAsync(request, actorUserId, IpAddress(), cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to create course");
             return Problem(statusCode: 503, title: "Không thể tạo khóa học. Vui lòng thử lại sau.");
@@ -72,7 +77,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
             var result = await service.UpdateAsync(courseId, request, actorUserId, IpAddress(), cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to update course {CourseId}", courseId);
             return Problem(statusCode: 503, title: "Không thể cập nhật khóa học. Vui lòng thử lại sau.");
@@ -89,7 +94,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
             var result = await service.ChangeStatusAsync(courseId, request.Status, actorUserId, IpAddress(), cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to change status of course {CourseId}", courseId);
             return Problem(statusCode: 503, title: "Không thể đổi trạng thái khóa học. Vui lòng thử lại sau.");
@@ -105,7 +110,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
             var result = await service.ArchiveAsync(courseId, actorUserId, IpAddress(), cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to archive course {CourseId}", courseId);
             return Problem(statusCode: 503, title: "Không thể lưu trữ khóa học. Vui lòng thử lại sau.");
@@ -122,7 +127,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
             var result = await service.UpsertLessonAsync(courseId, null, request, actorUserId, IpAddress(), cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to create lesson for course {CourseId}", courseId);
             return Problem(statusCode: 503, title: "Không thể tạo bài học. Vui lòng thử lại sau.");
@@ -139,7 +144,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
             var result = await service.UpsertLessonAsync(courseId, lessonId, request, actorUserId, IpAddress(), cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to update lesson {LessonId} of course {CourseId}", lessonId, courseId);
             return Problem(statusCode: 503, title: "Không thể cập nhật bài học. Vui lòng thử lại sau.");
@@ -155,7 +160,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
             var result = await service.DeleteLessonAsync(courseId, lessonId, actorUserId, IpAddress(), cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to delete lesson {LessonId} of course {CourseId}", lessonId, courseId);
             return Problem(statusCode: 503, title: "Không thể xoá bài học. Vui lòng thử lại sau.");
@@ -173,7 +178,7 @@ public class AdminCoursesController(ICourseService service, ILogger<AdminCourses
                 cancellationToken);
             return Respond(result);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not UseCaseException)
         {
             logger.LogError(ex, "Unable to delete material {MaterialId} of lesson {LessonId}", materialId, lessonId);
             return Problem(statusCode: 503, title: "Không thể xoá học liệu. Vui lòng thử lại sau.");
