@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "turbo dev",
+    "backend": "dotnet run --project backend/src/TekyLearningHub.Api/TekyLearningHub.Api.csproj --launch-profile http",
+    "frontend": "npm --prefix frontend run dev",
     "build": "turbo build",
     "lint": "turbo lint"
   },

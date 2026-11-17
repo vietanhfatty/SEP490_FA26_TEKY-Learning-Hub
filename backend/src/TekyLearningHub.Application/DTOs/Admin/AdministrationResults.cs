@@ -8,6 +8,10 @@ public sealed class DirectoryEntry
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     public bool IsActive { get; set; }
+    /// <summary>Owning department. Always set for positions; null for departments themselves.</summary>
+    public int? DepartmentId { get; set; }
+    /// <summary>Display name of the owning department, resolved for positions.</summary>
+    public string DepartmentName { get; set; } = "";
 }
 public sealed class StaffAppointmentView
 {

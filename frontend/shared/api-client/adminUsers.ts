@@ -1,7 +1,7 @@
 ﻿import { API_BASE_URL } from './auth';
 export type Grant = {roleId:number;scopeType:string;departmentId:number|null;grantId?:number;role?:string;revokedAt?:string|null};
 export type AdminUser = {userId:number;email:string;fullName:string;phone:string|null;status:string;activationPending:boolean;primaryRoleId:number;primaryRole:string;version:number;roles:Grant[]};
-export type DirectoryEntry={id:number;code:string;name:string;isActive:boolean};
+export type DirectoryEntry={id:number;code:string;name:string;isActive:boolean;departmentId:number|null;departmentName:string};
 export type Catalog={roles:{roleId:number;roleName:string}[];permissions:{roleId:number;code:string;description:string}[];departments:DirectoryEntry[];positions:DirectoryEntry[]};
 export type Detail={user:AdminUser;appointments:{appointmentId:number;department:string;position:string;employmentType:string;validFrom:string;validTo:string|null}[];invitation:{expiresAt:string;usedAt:string|null;revokedAt:string|null}|null;delivery:{sentAt:string|null;attempts:number;nextAttemptAt:string}|null};
 export type AuditEvent={actorUserId:number;action:string;oldValue:string|null;newValue:string|null;createdAt:string};

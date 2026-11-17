@@ -8,6 +8,7 @@ using TekyLearningHub.Application.Interfaces.Auth;
 using TekyLearningHub.Application.Interfaces;
 using TekyLearningHub.Application;
 using TekyLearningHub.Infrastructure;
+using TekyLearningHub.Infrastructure.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +90,8 @@ builder.Services.AddRateLimiter(options =>
 // 5. OpenAPI & Scalar API Documentation
 builder.Services.AddOpenApi();
 
+// 5b. SignalR hubs và job nền Quartz đã đăng ký trong AddInfrastructure.
+
 var app = builder.Build();
 
 // 6. Automatic Data Seeding on Startup (Roles & Demo Accounts)
@@ -123,5 +126,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// SignalR hub endpoints cho phòng Lab, cheer box và thông báo thời gian thực
+app.MapHub<ClassroomHub>("/hubs/classroom");
+app.MapHub<CheerHub>("/hubs/cheer");
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();

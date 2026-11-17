@@ -1,4 +1,6 @@
 using TekyLearningHub.Application.Common;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text;
@@ -16,6 +18,7 @@ public sealed class UserAdministrationException(int status, string message) : Us
 /// invitation consumption, so concurrent administrators cannot remove the last admin.</summary>
 public sealed class UserAdministrationService(IUserAdministrationRepository db, IUnitOfWork unit, IPasswordHasher hasher, IAccountEmailOutbox emailOutbox, AccountOptions options) : IUserAdministrationService
 {
+    [DoesNotReturn]
     private static void Fail(int status, string message) => throw new UserAdministrationException(status, message);
     public async Task DemandManage(int actor, CancellationToken ct = default)
     {
@@ -250,6 +253,9 @@ public sealed class UserAdministrationService(IUserAdministrationRepository db, 
             if (r.EmploymentType is not ("FULL_TIME" or "PART_TIME" or "CONTRACTOR")) Fail(400, "Loại hình làm việc không hợp lệ.");
             if (!await db.DepartmentExists(r.DepartmentId, ct) ||
                !await db.PositionExists(r.PositionId, ct)) Fail(400, "Phòng ban hoặc chức danh không hợp lệ.");
+            // A position is scoped to one department, so the appointment must match.
+            if (!await db.PositionBelongsToDepartment(r.PositionId, r.DepartmentId, ct))
+                Fail(400, "Chức danh không thuộc phòng ban đã chọn.");
             await db.AddAppointment(id, r, ct);
         }
         user.AdministrationVersion++; Audit(actor, id, endId.HasValue ? "APPOINTMENT_ENDED" : "APPOINTMENT_CREATED", after: new { endId, r.DepartmentId, r.PositionId, r.EmploymentType }); return new AdministrationSuccess(true);
@@ -262,10 +268,32 @@ public sealed class UserAdministrationService(IUserAdministrationRepository db, 
         var duplicateMessage = kind == "departments"
             ? "Mã phòng ban đã tồn tại. Hãy dùng mã khác hoặc cập nhật phòng ban hiện có."
             : "Mã chức danh đã tồn tại. Hãy dùng mã khác hoặc cập nhật chức danh hiện có.";
+        var code = r.Code?.Trim() ?? "";
+
+        if (kind == "departments")
+        {
+            if (code.Length == 0) Fail(400, "Mã phòng ban không được để trống.");
+        }
+        else
+        {
+            // A position always belongs to one department so accounts can be grouped by it.
+            var departmentId = r.DepartmentId ?? 0;
+            if (departmentId == 0) Fail(400, "Vui lòng chọn phòng ban cho chức danh.");
+            if (!await db.DepartmentExists(departmentId, ct)) Fail(400, "Phòng ban không hợp lệ.");
+            // The code is generated from the department code unless the admin supplied one.
+            if (code.Length == 0)
+            {
+                var departmentCode = await db.DepartmentCode(departmentId, ct);
+                if (string.IsNullOrWhiteSpace(departmentCode)) Fail(400, "Phòng ban không hợp lệ.");
+                code = BuildPositionCode(departmentCode!, r.Name);
+            }
+        }
+
+        r.Code = code;
         if (!id.HasValue)
         {
             // Include inactive entries: deactivation does not release a directory code.
-            var exists = await db.DirectoryCodeExists(kind, r.Code, ct);
+            var exists = await db.DirectoryCodeExists(kind, r.Code, r.DepartmentId, ct);
             if (exists) Fail(409, duplicateMessage);
         }
         int changed;
@@ -280,4 +308,43 @@ public sealed class UserAdministrationService(IUserAdministrationRepository db, 
         db.AddAudit(new AuditLog { ActorUserId = actor, ActorType = "User", Action = "DIRECTORY_UPDATED", EntityType = kind, EntityId = id?.ToString(), NewValue = JsonSerializer.Serialize(r) });
         return new AdministrationSuccess(true);
     }, ct);
+
+    /// <summary>Builds a position code as DEPT_NAME, for example ACADEMIC_GIAO_VIEN.</summary>
+    internal static string BuildPositionCode(string departmentCode, string name)
+    {
+        var normalized = RemoveDiacritics(name).ToUpperInvariant();
+        var builder = new StringBuilder(normalized.Length);
+        var lastWasSeparator = false;
+        foreach (var character in normalized)
+        {
+            if (char.IsAsciiLetterOrDigit(character))
+            {
+                builder.Append(character);
+                lastWasSeparator = false;
+            }
+            else if (!lastWasSeparator && builder.Length > 0)
+            {
+                builder.Append('_');
+                lastWasSeparator = true;
+            }
+        }
+        var suffix = builder.ToString().Trim('_');
+        if (suffix.Length == 0) suffix = "POSITION";
+        // The directory code is limited to 40 characters, so the budget depends on the prefix.
+        var budget = Math.Max(4, 40 - departmentCode.Length - 1);
+        if (suffix.Length > budget) suffix = suffix[..budget].TrimEnd('_');
+        if (suffix.Length == 0) suffix = "POSITION";
+        return $"{departmentCode.ToUpperInvariant()}_{suffix}";
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark) builder.Append(character);
+        }
+        return builder.ToString().Normalize(NormalizationForm.FormC);
+    }
 }

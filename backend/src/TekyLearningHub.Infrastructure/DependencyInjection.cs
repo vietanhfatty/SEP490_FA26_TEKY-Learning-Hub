@@ -12,18 +12,20 @@ using TekyLearningHub.Infrastructure.Repositories.Auth;
 using TekyLearningHub.Infrastructure.Repositories.Backoffice;
 using TekyLearningHub.Infrastructure.Repositories.Portal;
 using TekyLearningHub.Infrastructure.Security;
+using TekyLearningHub.Infrastructure.Services;
 using TekyLearningHub.Infrastructure.Services.Auth;
 using TekyLearningHub.Infrastructure.Services.Portal;
 using TekyLearningHub.Infrastructure.Storage;
-
 namespace TekyLearningHub.Infrastructure;
 
 public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSignalR();
+
         var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? "Server=VIETANHFATTY\\SQLEXPRESS;uid=sa;password=123456;database=Teky_Learning_Hub;Encrypt=True;TrustServerCertificate=True;";
+            ?? "Server=localhost\\SQLEXPRESS02;Database=Teky_Learning_Hub;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {
@@ -76,6 +78,14 @@ public static class DependencyInjection
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHostedService<ParentCheckoutWorker>();
         services.AddScoped<ILearningMessageRepository, LearningMessageRepository>();
+        services.AddScoped<IParentRepository, ParentRepository>();
+        services.AddScoped<ITeacherRepository, TeacherRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<ILeaderboardRepository, LeaderboardRepository>();
+        services.AddScoped<IAiAssistantService, AiAssistantService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IClassroomRealtimeService, ClassroomRealtimeService>();
+        services.AddScoped<IExcelExportService, ExcelExportService>();
         return services;
     }
 }

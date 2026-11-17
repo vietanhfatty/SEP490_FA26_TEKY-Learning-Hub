@@ -150,3 +150,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   if (isInitializing) return <main className="p-8" role="status">Đang xác thực phiên đăng nhập…</main>;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
