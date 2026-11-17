@@ -35,6 +35,7 @@ export function App() {
   }, [isDarkMode]);
   const navigate = useNavigate();
   const location = useLocation();
+  const parentSearch = new URLSearchParams(location.search);
   const isPublicRoute = ['/', '/landing', '/login', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/courses');
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -176,6 +177,8 @@ export function App() {
             >
               <LmsShell
                 currentRole="parent"
+                activeNavId={parentSearch.get('tab') ?? 'overview'}
+                onSelectNav={tab => navigate(tab === 'overview' ? '/parent' : `/parent?tab=${tab}`)}
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}

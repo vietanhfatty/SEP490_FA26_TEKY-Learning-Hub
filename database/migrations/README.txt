@@ -79,3 +79,17 @@ SQL SERVER INTEGRATION TESTS (temporary databases created and removed by tests o
 
 The test SQL login needs permission to create/drop disposable Teky_MigrationTests_<guid> databases.
 Without the environment variable, integration tests are explicitly skipped; catalog tests still run.
+
+PARENT QR CHECKOUT
+  Development defaults to Demo mode. Use Course Management to buy DEMO-QR-STEM for a linked
+  student, then open the simulated payment page from Payment and confirm. The course appears in
+  My Courses. The demo course is seeded without an enrollment and this mode only runs in Development.
+
+  For live VietQR, use a dedicated payOS merchant channel. Set PaymentGateway__Mode=PayOS,
+  PaymentGateway__ClientId, PaymentGateway__ApiKey and PaymentGateway__ChecksumKey through the
+  API environment or secret store. Set Shells__PortalOrigin to the portal HTTPS origin.
+  In payOS, register the public HTTPS API URL ending in /api/payments/payos/webhook.
+  The API verifies callbacks and reads payOS status over an authenticated connection before
+  recording the payment. The reconciliation worker also checks pending payOS orders.
+  Apply migrations before enabling this mode outside Development, and use a database and
+  merchant channel dedicated to that environment.

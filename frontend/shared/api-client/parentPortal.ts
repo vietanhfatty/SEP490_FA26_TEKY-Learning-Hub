@@ -23,6 +23,10 @@ export type Payment = {
   paymentId: number; reference: string; invoiceNumber: string | null; courseName: string; amountVnd: number; status: string;
   createdAt: string; paidAt: string | null; refundStatus: string | null; refundReason: string | null; refundRequestedAt: string | null;
 };
+export type Checkout = {
+  paymentId: number; courseName: string; classCode: string; amountVnd: number; status: string;
+  provider: 'PayOS' | 'Demo'; expiresAt: string; checkoutUrl: string | null; qrCode: string | null; demoReference: string | null;
+};
 export type Contact = { parentId: number; studentId: number; teacherId: number; parentName: string; studentName: string; teacherName: string; specialty: string | null; bio: string | null; unread: number };
 export type Message = { messageId: number; mine: boolean; body: string | null; attachmentName: string | null; sentAt: string };
 export type MessagePage = { messages: Message[]; olderThan: number | null };
@@ -50,6 +54,13 @@ export async function portalPost(path: string, data: object) {
   await portalRequest(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
 
+export async function buyCourse(studentId: number, classId: number): Promise<Checkout> {
+  const response = await portalRequest(`parent/children/${studentId}/checkouts`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ classId }),
+  });
+  return response.json();
+}
+
 export async function portalDownload(path: string, name: string) {
   const response = await portalRequest(path);
   const url = URL.createObjectURL(await response.blob());
@@ -60,18 +71,41 @@ export async function portalDownload(path: string, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function usePortalResource<T>(path: string | null) {
+export function usePortalResource<T>(path: string | null, refreshMs?: number) {
   const [revision, setRevision] = useState(0);
   const [response, setResponse] = useState<{ path: string; revision: number; data?: T; error?: string }>();
   const retry = useCallback(() => setRevision(value => value + 1), []);
   useEffect(() => {
     if (!path) return;
+    const requestPath = path;
     const controller = new AbortController();
-    portalRead<T>(path, controller.signal)
-      .then(data => { if (!controller.signal.aborted) setResponse({ path, revision, data }); })
-      .catch(error => { if (!controller.signal.aborted) setResponse({ path, revision, error: describeError(error) }); });
-    return () => controller.abort();
-  }, [path, revision]);
+    let timer: number | undefined;
+    let first = true;
+    async function load() {
+      try {
+        const data = await portalRead<T>(requestPath, controller.signal);
+        if (!controller.signal.aborted) setResponse({ path: requestPath, revision, data });
+      } catch (error) {
+        if (!controller.signal.aborted) setResponse(previous => ({
+          path: requestPath, revision, data: previous?.path === requestPath ? previous.data : undefined,
+          error: first || previous?.path !== requestPath || !previous.data ? describeError(error) : undefined,
+        }));
+      } finally {
+        first = false;
+        schedule();
+      }
+    }
+    function schedule() {
+      if (refreshMs && !controller.signal.aborted) {
+        timer = window.setTimeout(() => {
+          if (document.hidden) schedule();
+          else void load();
+        }, refreshMs);
+      }
+    }
+    void load();
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [path, revision, refreshMs]);
   const current = response?.path === path ? response : undefined;
   return { data: current?.data, error: current?.error, loading: !!path && current?.revision !== revision, retry };
 }
