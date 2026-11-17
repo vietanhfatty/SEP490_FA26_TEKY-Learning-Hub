@@ -29,7 +29,11 @@ public interface IUserAdministrationRepository
     Task<int> EndAppointment(int id, long endId, CancellationToken ct);
     Task<bool> PositionExists(int id, CancellationToken ct);
     Task<int> AddAppointment(int id, AppointmentRequest r, CancellationToken ct);
-    Task<bool> DirectoryCodeExists(string kind, string code, CancellationToken ct);
+    /// <summary>Resolves the code of a department, used to build position codes.</summary>
+    Task<string?> DepartmentCode(int id, CancellationToken ct);
+    /// <summary>Checks that a position belongs to the given department.</summary>
+    Task<bool> PositionBelongsToDepartment(int positionId, int departmentId, CancellationToken ct);
+    Task<bool> DirectoryCodeExists(string kind, string? code, int? departmentId, CancellationToken ct);
     Task<int> WriteDirectory(string kind, int? id, DirectoryRequest r, CancellationToken ct);
     void AddUser(User entity);
     void AddAudit(AuditLog entity);

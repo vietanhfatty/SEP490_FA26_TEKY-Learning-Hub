@@ -54,8 +54,8 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
     {
         var roles = await db.Roles.AsNoTracking().OrderBy(x => x.RoleId).Select(x => new RoleCatalogDto(x.RoleId, x.RoleName)).ToListAsync(ct);
         var permissions = await (from rp in db.RolePermissions join p in db.Permissions on rp.PermissionId equals p.PermissionId select new RolePermissionDto(rp.RoleId, p.Code, p.Description)).ToListAsync(ct);
-        var departments = await db.Database.SqlQuery<DirectoryEntry>($"SELECT DepartmentId AS Id,Code,Name,IsActive FROM dbo.Departments ORDER BY Name").ToListAsync(ct);
-        var positions = await db.Database.SqlQuery<DirectoryEntry>($"SELECT PositionId AS Id,Code,Name,IsActive FROM dbo.Positions ORDER BY Name").ToListAsync(ct);
+        var departments = await db.Database.SqlQuery<DirectoryEntry>($"SELECT DepartmentId AS Id,Code,Name,IsActive,CAST(NULL AS int) AS DepartmentId,CAST('' AS nvarchar(160)) AS DepartmentName FROM dbo.Departments ORDER BY Name").ToListAsync(ct);
+        var positions = await db.Database.SqlQuery<DirectoryEntry>($"SELECT p.PositionId AS Id,p.Code,p.Name,p.IsActive,p.DepartmentId,d.Name AS DepartmentName FROM dbo.Positions p JOIN dbo.Departments d ON d.DepartmentId=p.DepartmentId ORDER BY d.Name,p.Name").ToListAsync(ct);
         return new AdministrationCatalog(roles, permissions, departments, positions);
     }
     public async Task<AuditPage> AuditEvents(int id, int skip, int take, CancellationToken ct)
@@ -65,10 +65,12 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
     }
     public async Task<int> EndAppointment(int id, long endId, CancellationToken ct) => await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.StaffAppointments SET ValidTo=SYSUTCDATETIME() WHERE AppointmentId={endId} AND UserId={id} AND ValidTo IS NULL", ct);
     public async Task<bool> PositionExists(int id, CancellationToken ct) => await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE PositionId={id} AND IsActive=1").AnyAsync(ct);
+    public async Task<string?> DepartmentCode(int id, CancellationToken ct) => await db.Database.SqlQuery<string>($"SELECT Code AS Value FROM dbo.Departments WHERE DepartmentId={id}").SingleOrDefaultAsync(ct);
+    public async Task<bool> PositionBelongsToDepartment(int positionId, int departmentId, CancellationToken ct) => await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE PositionId={positionId} AND DepartmentId={departmentId}").AnyAsync(ct);
     public async Task<int> AddAppointment(int id, AppointmentRequest r, CancellationToken ct) => await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.StaffAppointments(UserId,DepartmentId,PositionId,EmploymentType) VALUES({id},{r.DepartmentId},{r.PositionId},{r.EmploymentType})", ct);
-    public async Task<bool> DirectoryCodeExists(string kind, string code, CancellationToken ct) => kind == "departments"
+    public async Task<bool> DirectoryCodeExists(string kind, string? code, int? departmentId, CancellationToken ct) => kind == "departments"
                    ? await db.Database.SqlQuery<int>($"SELECT DepartmentId AS Value FROM dbo.Departments WHERE Code={code}").AnyAsync(ct)
-                   : await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE Code={code}").AnyAsync(ct);
+                   : await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE Code={code} AND DepartmentId={departmentId}").AnyAsync(ct);
     public async Task<int> WriteDirectory(string kind, int? id, DirectoryRequest r, CancellationToken ct)
     {
         int changed; try
@@ -77,8 +79,8 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
                    ? await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Departments SET Name={r.Name.Trim()},IsActive={r.IsActive} WHERE DepartmentId={id.Value}", ct)
                    : await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Departments(Code,Name,IsActive) VALUES({r.Code},{r.Name.Trim()},{r.IsActive})", ct);
             else changed = id.HasValue
-                ? await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Positions SET Name={r.Name.Trim()},IsActive={r.IsActive} WHERE PositionId={id.Value}", ct)
-                : await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Positions(Code,Name,IsActive) VALUES({r.Code},{r.Name.Trim()},{r.IsActive})", ct); return changed;
+                ? await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Positions SET Name={r.Name.Trim()},IsActive={r.IsActive},DepartmentId={r.DepartmentId} WHERE PositionId={id.Value}", ct)
+                : await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Positions(Code,Name,IsActive,DepartmentId) VALUES({r.Code},{r.Name.Trim()},{r.IsActive},{r.DepartmentId})", ct); return changed;
         }
         catch (SqlException e) when (e.Number is 2601 or 2627) { throw new PersistenceConflictException("Duplicate directory code", true, e); }
     }

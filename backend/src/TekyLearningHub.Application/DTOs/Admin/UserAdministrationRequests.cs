@@ -39,7 +39,13 @@ public sealed class AppointmentRequest
 }
 public sealed class DirectoryRequest
 {
-    [Required,RegularExpression("^[A-Z0-9_]{1,40}$")] public string Code { get; set; } = "";
+    /// <summary>
+    /// Optional for positions: the service generates a code from the owning department code
+    /// when this is blank. Departments always require an explicit code.
+    /// </summary>
+    [RegularExpression("^[A-Z0-9_]{1,40}$")] public string? Code { get; set; }
     [Required,StringLength(160)] public string Name { get; set; } = "";
     public bool IsActive { get; set; } = true;
+    /// <summary>Owning department. Required when creating or moving a position.</summary>
+    public int? DepartmentId { get; set; }
 }

@@ -190,6 +190,7 @@ public class DatabaseMigrationTests
         private SqlConnection Master() => new(new SqlConnectionStringBuilder(settings.ConnectionString) { InitialCatalog = "master", Pooling = false }.ConnectionString);
         public async Task Execute(string sql) { await using var connection = new SqlConnection(ConnectionString); await connection.OpenAsync(); await using var command = connection.CreateCommand(); command.CommandText = sql; await command.ExecuteNonQueryAsync(); }
         public async Task<int> Scalar(string sql) { await using var connection = new SqlConnection(ConnectionString); await connection.OpenAsync(); await using var command = connection.CreateCommand(); command.CommandText = sql; return Convert.ToInt32(await command.ExecuteScalarAsync()); }
+        public async Task<string?> Text(string sql) { await using var connection = new SqlConnection(ConnectionString); await connection.OpenAsync(); await using var command = connection.CreateCommand(); command.CommandText = sql; return await command.ExecuteScalarAsync() as string; }
         public async ValueTask DisposeAsync()
         {
             // Only drop the uniquely generated database belonging to this test, never a configured app DB.
