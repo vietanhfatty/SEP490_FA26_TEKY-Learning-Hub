@@ -22,6 +22,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSignalR();
+
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? "Server=VIETANHFATTY\\SQLEXPRESS;uid=sa;password=123456;database=Teky_Learning_Hub;Encrypt=True;TrustServerCertificate=True;";
 

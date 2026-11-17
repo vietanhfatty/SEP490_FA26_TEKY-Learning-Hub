@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,7 +59,7 @@ public class LayerBoundaryTests
     {
         var controllers = typeof(AuthController).Assembly.GetTypes()
             .Where(type => !type.IsAbstract && typeof(ControllerBase).IsAssignableFrom(type)).ToArray();
-        var services = new ServiceCollection();
+        var services = WebApplication.CreateBuilder().Services;
         services.AddLogging();
         services.AddApplication();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
