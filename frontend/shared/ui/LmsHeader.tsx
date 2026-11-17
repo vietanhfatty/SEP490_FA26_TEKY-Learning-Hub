@@ -1,3 +1,4 @@
+import { LearningMessageNotifications, useLearningMessageNotifications } from './LearningMessagesView';
 import React, { useEffect, useRef, useState } from 'react';
 import type { UserRole } from '../types';
 import { IconMenu, IconSearch, IconBell, IconUser, IconGraduationCap, IconSun, IconMoon, IconLogOut } from './Icons';
@@ -22,6 +23,8 @@ const roleNames: Record<UserRole, string> = { student: 'Learner', parent: 'Paren
 export const LmsHeader: React.FC<LmsHeaderProps> = ({ currentRole, activeNavTitle, activeNavId = 'overview', onToggleSidebarMobile, onLogoutClick, isDarkMode, onToggleTheme, userName, userEmail, onSelectNav, navigationExpanded }) => {
   const [query, setQuery] = useState('');
   const [openMenu, setOpenMenu] = useState<'profile' | 'notifications' | null>(null);
+  const hasInbox = currentRole === 'parent' || currentRole === 'teacher';
+  const notifications = useLearningMessageNotifications(hasInbox);
   const header = useRef<HTMLElement>(null);
   const name = userName || ROLE_DISPLAY_CONFIG[currentRole].defaultName;
   const items = getNavItemsForRole(currentRole);
@@ -53,8 +56,16 @@ export const LmsHeader: React.FC<LmsHeaderProps> = ({ currentRole, activeNavTitl
         <span className="lms-academy-label">STEAM Academy</span>
         <button className="lms-icon-button lms-theme-button" aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'} onClick={onToggleTheme}>{isDarkMode ? <IconSun size={21} /> : <IconMoon size={21} />}</button>
         <div className="lms-header-dropdown">
-          <button className="lms-icon-button" aria-label="Notifications" aria-expanded={openMenu === 'notifications'} onClick={() => { setQuery(''); setOpenMenu(openMenu === 'notifications' ? null : 'notifications'); }}><IconBell size={22} /></button>
-          {openMenu === 'notifications' && <section className="lms-menu lms-notification-menu"><h2>Notifications</h2><IconBell size={28} /><p>Chưa có dữ liệu thông báo.</p><small>Các cập nhật học tập sẽ xuất hiện khi dịch vụ thông báo được kết nối.</small></section>}
+          <button className="lms-icon-button lms-inbox-bell"
+            aria-label={notifications.count ? `Notifications: ${notifications.count} tin nhắn chưa đọc` : 'Notifications'}
+            aria-expanded={openMenu === 'notifications'}
+            onClick={() => { setQuery(''); setOpenMenu(openMenu === 'notifications' ? null : 'notifications'); }}>
+            <IconBell size={22} />
+            {notifications.count > 0 && <span className="lms-inbox-count" aria-hidden="true">{notifications.count > 99 ? '99+' : notifications.count}</span>}
+          </button>
+          {openMenu === 'notifications' && (hasInbox
+            ? <LearningMessageNotifications {...notifications} openInbox={() => select('communication')} />
+            : <section className="lms-menu lms-notification-menu"><h2>Notifications</h2><IconBell size={28} /><p>Chưa có dữ liệu thông báo.</p><small>Các cập nhật học tập sẽ xuất hiện khi dịch vụ thông báo được kết nối.</small></section>)}
         </div>
         <div className="lms-header-dropdown">
           <button className="lms-profile" aria-label={`Account: ${name}`} aria-expanded={openMenu === 'profile'} onClick={() => { setQuery(''); setOpenMenu(openMenu === 'profile' ? null : 'profile'); }}><span><strong>{name}</strong><small>{roleNames[currentRole]}</small></span><span className="lms-profile-avatar"><IconUser size={31} /></span></button>
