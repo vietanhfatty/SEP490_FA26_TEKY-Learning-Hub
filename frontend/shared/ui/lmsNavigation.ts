@@ -96,14 +96,16 @@ export const getNavItemsForRole = (role: UserRole): LmsNavItem[] => {
         { id: 'materials', label: 'Kho giáo án chuẩn', icon: IconBookOpen },
         { id: 'grading', label: 'Đánh giá & Nhận xét', icon: IconSparkles },
         { id: 'swap', label: 'Đổi ca & Dạy bù', icon: IconActivity },
+        { id: 'communication', label: 'Trao đổi với phụ huynh', icon: IconBell },
       ];
     case 'parent':
       return [
-        { id: 'overview', label: 'Home', icon: IconHome },
-        { id: 'attendance', label: 'Lịch học & Chuyên cần', icon: IconCalendar },
-        { id: 'feedback', label: 'Nhận xét từ Thầy cô', icon: IconFileText, badge: 'Mới', badgeVariant: 'success' },
-        { id: 'competency', label: 'Báo cáo năng lực 5D', icon: IconSparkles },
-        { id: 'tuition', label: 'Học phí & Hóa đơn', icon: IconCreditCard },
+        { id: 'overview', label: 'Dashboard', icon: IconHome },
+        { id: 'courses', label: 'Course Management', icon: IconBookOpen },
+        { id: 'monitoring', label: 'Learning Monitoring', icon: IconCalendar },
+        { id: 'performance', label: 'Academic Performance', icon: IconCheckCircle },
+        { id: 'communication', label: 'Communication', icon: IconBell },
+        { id: 'payments', label: 'Payment Management', icon: IconCreditCard },
       ];
     case 'academic_manager':
       return [

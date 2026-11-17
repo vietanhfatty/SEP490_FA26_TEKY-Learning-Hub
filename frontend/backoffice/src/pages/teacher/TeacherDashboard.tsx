@@ -1,3 +1,4 @@
+import { LearningMessagesView } from '@teky/shared/ui/LearningMessagesView';
 import { ProjectReviewsView } from '@teky/shared/ui/ProjectReviewsView';
 import React, { useState } from 'react';
 import { IconCalendar, IconCheckCircle, IconClock, IconBookOpen, IconDownload, IconPlus } from '../common/Icons';
@@ -365,4 +366,8 @@ const LegacyTeacherDashboard: React.FC<TeacherDashboardProps> = ({ activeNavId =
   );
 };
 
-export function TeacherDashboard(props:TeacherDashboardProps){return props.activeNavId==='grading'?<ProjectReviewsView/>:<LegacyTeacherDashboard {...props}/>;}
+export function TeacherDashboard(props: TeacherDashboardProps) {
+  if (props.activeNavId === 'communication') return <LearningMessagesView teacher />;
+  if (props.activeNavId === 'grading') return <ProjectReviewsView />;
+  return <LegacyTeacherDashboard {...props} />;
+}

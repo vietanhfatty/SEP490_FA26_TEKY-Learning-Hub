@@ -15,6 +15,11 @@ public class ApplicationDbContext : TekyLearningHubContext
     public DbSet<Assessment> Assessments => Set<Assessment>();
     public DbSet<AssessmentAttempt> AssessmentAttempts => Set<AssessmentAttempt>();
 
+    public DbSet<ParentCourseRequest> ParentCourseRequests => Set<ParentCourseRequest>();
+    public DbSet<ParentPayment> ParentPayments => Set<ParentPayment>();
+
+    public DbSet<ParentTeacherMessage> ParentTeacherMessages => Set<ParentTeacherMessage>();
+
     private void ValidateAuditActors()
     {
         foreach (var entry in ChangeTracker.Entries<AuditLog>()
@@ -36,6 +41,11 @@ public class ApplicationDbContext : TekyLearningHubContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<ParentTeacherMessage>().HasKey(m => m.MessageId);
+        modelBuilder.Entity<ParentCourseRequest>().HasKey(x => x.RequestId);
+        modelBuilder.Entity<ParentPayment>().HasKey(x => x.PaymentId);
+        modelBuilder.Entity<ParentRefundRequest>().ToTable("ParentRefundRequests").HasKey(x => x.PaymentId);
+        modelBuilder.Entity<ParentPayment>().HasOne(x => x.Refund).WithOne().HasForeignKey<ParentRefundRequest>(x => x.PaymentId);
         modelBuilder.Entity<AssessmentAttempt>(entity =>
         {
             entity.HasKey(a => a.AttemptId);
