@@ -10,10 +10,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeNavId = 'a
   const [activeTab, setActiveTab] = useState<'attendance' | 'makeup' | 'kits' | 'schedule'>('attendance');
 
   useEffect(() => {
-    if (activeNavId === 'makeup') setActiveTab('makeup');
-    else if (activeNavId === 'kits') setActiveTab('kits');
-    else if (activeNavId === 'schedule') setActiveTab('schedule');
-    else setActiveTab('attendance');
+    const timer = window.setTimeout(() => {
+      if (activeNavId === 'makeup') setActiveTab('makeup');
+      else if (activeNavId === 'kits') setActiveTab('kits');
+      else if (activeNavId === 'schedule') setActiveTab('schedule');
+      else setActiveTab('attendance');
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [activeNavId]);
 
   // Daily Operational Metrics

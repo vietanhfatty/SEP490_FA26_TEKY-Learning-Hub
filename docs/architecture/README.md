@@ -24,13 +24,14 @@ backend/src/
     Services/
       Auth/                     Auth, account, shell transfer, session validation
       Admin/                    UserAdministrationService, CourseService
-      Portal/                   Classes, learning, assignments/projects, overview, assessments
-      Backoffice/               ProjectReviewService
+      Portal/                   Classes, learning, assignments/projects, overview, assessments,
+                                ParentService
+      Backoffice/               ProjectReviewService, TeacherService, AstAnalysisService
     Interfaces/
       Auth/                     Service/repository tài khoản, avatar, chuyển phiên
       Admin/                    Service/repository quản trị và khóa học
-      Portal/                   Service/repository học tập và bài nộp
-      Backoffice/               Service/repository duyệt bài
+      Portal/                   Service/repository học tập, bài nộp, phụ huynh, notification
+      Backoffice/               Service/repository duyệt bài, giáo viên, leaderboard, realtime
       Persistence.cs            Unit of work, transaction, lỗi persistence, email outbox
       IAcademicPermissionReader.cs
       IPasswordHasher.cs
@@ -44,9 +45,12 @@ backend/src/
     Repositories/               Auth, Admin, Portal, Backoffice
     Security/                   JWT, BCrypt, claim adapter, permission reader, ticket store
     Storage/                    AvatarStorage
+    Hubs/                       SignalR: ClassroomHub, CheerHub, NotificationHub
+    Jobs/                       WeeklyLeaderboardJob (Quartz)
+    Services/                   Realtime, AI assistant, notification, Excel export
     Services/Auth/              Email outbox và SMTP background worker
     ApplicationStartup.cs       Khởi tạo database Development
-    DependencyInjection.cs      AddInfrastructure đăng ký adapter
+    DependencyInjection.cs      AddInfrastructure đăng ký adapter, SignalR, Quartz
   TekyLearningHub.Api/
     Controllers/                Auth, Admin, Portal, Backoffice
     Program.cs                  Composition root, xác thực và HTTP pipeline
@@ -65,6 +69,10 @@ Application yêu cầu enqueue email qua outbox; Infrastructure mã hóa và ghi
 Controller không còn truy cập database, filesystem hoặc worker. `AccountController` và `ShellTransferController` gọi use case tương ứng. Xác thực JWT trích claim tại API rồi gọi `ISessionValidationService` với dữ liệu danh tính thuần; Application kiểm tra với tài khoản hiện tại. `SessionAuthorization` trong Infrastructure chỉ là adapter claim phục vụ kiểm tra tương thích.
 
 Các chức năng Portal được tích hợp từ Dev gồm danh sách/chi tiết bài tập, thư viện dự án, tổng quan/lớp học và bài kiểm tra. Controller nằm trong `Controllers/Portal`, gọi interface Application; service nghiệp vụ ở `Application/Services/Portal`, repository EF ở `Infrastructure/Repositories/Portal`. Bài kiểm tra giữ snapshot đề, chống nộp lại và chỉ trả đáp án khi cấu hình cho phép. Dữ liệu bài tập/điểm/notification vẫn lọc theo quyền của học sinh.
+
+Use case giáo viên và phụ huynh (`TeacherService`, `ParentService`) dùng cùng mô hình: service ở Application chỉ gọi `ITeacherRepository`/`IParentRepository` và `IUnitOfWork`; truy vấn EF nằm trong `Infrastructure/Repositories/{Backoffice,Portal}`. `TeacherService` và `ParentService` không tham chiếu EF Core, `DbSet` hay `IQueryable`.
+
+Tín hiệu thời gian thực đi qua cổng `IClassroomRealtimeService` (adapter SignalR trong Infrastructure). Hub được map tại Api: `/hubs/classroom`, `/hubs/cheer`, `/hubs/notifications`. Job nền Quartz (`WeeklyLeaderboardJob`) đọc/ghi qua `ILeaderboardRepository`, chạy 03:00 thứ Hai hằng tuần. `AddInfrastructure` đăng ký SignalR và Quartz; `AddApplication` chỉ đăng ký use case.
 
 HTTP route, JSON response, mã lỗi, rate limit và điều kiện phân quyền được giữ nguyên. Không thay schema hoặc thêm SQL migration cho lần tách tầng này.
 

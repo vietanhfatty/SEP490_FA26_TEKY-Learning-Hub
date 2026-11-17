@@ -10,11 +10,14 @@ export const AcademicManagerDashboard: React.FC<AcademicManagerDashboardProps> =
   const [activeTab, setActiveTab] = useState<'kpi' | 'courses' | 'timetable' | 'teachers' | 'surveys'>('timetable');
 
   useEffect(() => {
-    if (activeNavId === 'timetable') setActiveTab('timetable');
-    else if (activeNavId === 'courses') setActiveTab('courses');
-    else if (activeNavId === 'teachers') setActiveTab('teachers');
-    else if (activeNavId === 'surveys') setActiveTab('surveys');
-    else if (activeNavId === 'kpi' || activeNavId === 'overview') setActiveTab('kpi');
+    const timer = window.setTimeout(() => {
+      if (activeNavId === 'timetable') setActiveTab('timetable');
+      else if (activeNavId === 'courses') setActiveTab('courses');
+      else if (activeNavId === 'teachers') setActiveTab('teachers');
+      else if (activeNavId === 'surveys') setActiveTab('surveys');
+      else if (activeNavId === 'kpi' || activeNavId === 'overview') setActiveTab('kpi');
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [activeNavId]);
 
   const coursesList = [
