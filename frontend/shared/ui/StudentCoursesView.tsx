@@ -24,6 +24,25 @@ export function StudentCoursesView() {
   finally{if(!c.signal.aborted)setLoading(false);}};
   void load(); return()=>c.abort();
  },[courseId,revision]);
+ useEffect(() => {
+  if (courseId) return;
+  const controller = new AbortController();
+  let timer: number | undefined;
+  async function refresh() {
+   try {
+    if (!document.hidden) {
+     const rows = await getStudentData<Course[]>('courses', controller.signal);
+     if (!controller.signal.aborted) { setCourses(rows); setError(''); }
+    }
+   } catch {
+    // A background refresh leaves the current list available.
+   } finally {
+    if (!controller.signal.aborted) timer = window.setTimeout(refresh, 3500);
+   }
+  }
+  timer = window.setTimeout(refresh, 3500);
+  return () => { controller.abort(); window.clearTimeout(timer); };
+ }, [courseId]);
  const lesson=detail?.lessons.find(l=>l.lessonId===Number(lessonId)) ?? (!lessonId?detail?.lessons[0]:undefined);
  async function reviewed(){if(!lesson||saving)return;setSaving(true);setError('');try{
   await requestStudent(`courses/${courseId}/lessons/${lesson.lessonId}/reviewed`,{method:'POST'});

@@ -30,3 +30,21 @@
 @media (max-width: 760px) {
   .pp-grid, .pp-stats, .pp-message-grid { grid-template-columns: 1fr; }
 }
+
+.pp-checkout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+}
+.pp-qr {
+  background: #fff;
+  border: 1px solid #dbe4ef;
+  border-radius: 12px;
+  padding: 8px;
+  width: fit-content;
+}
+.pp-qr svg { display: block; max-width: 100%; height: auto; }
+@media (max-width: 620px) {
+  .pp-checkout { grid-template-columns: minmax(0, 1fr); }
+}

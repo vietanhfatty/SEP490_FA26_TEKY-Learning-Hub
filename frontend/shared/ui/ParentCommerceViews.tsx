@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { currency, dateTime, describeError, localDay, portalDownload, portalPost, usePortalResource } from '../api-client/parentPortal';
-import type { Child, Course, CourseDetail, Learning, Payment, Registration } from '../api-client/parentPortal';
+import { QRCodeSVG } from 'qrcode.react';
+import { API_BASE_URL } from '../api-client/auth';
+import { buyCourse, currency, dateTime, describeError, localDay, portalDownload, portalPost, usePortalResource } from '../api-client/parentPortal';
+import type { Checkout, Child, Course, CourseDetail, Learning, Payment, Registration } from '../api-client/parentPortal';
 
 const statusLabels: Record<string, string> = {
   Pending: 'Chờ xử lý', Accepted: 'Đã tiếp nhận', Declined: 'Đã từ chối', Approved: 'Đã duyệt',
@@ -17,7 +19,9 @@ export function PortalError({ message, retry }: { message: string; retry?: () =>
   </div>;
 }
 
-export function ParentCourses({ child, learning }: { child?: Child; learning?: Learning }) {
+export function ParentCourses({ child, learning, onCheckout }: {
+  child?: Child; learning?: Learning; onCheckout: (studentId: number, paymentId: number) => void;
+}) {
   const catalogue = usePortalResource<Course[]>('parent/courses');
   const registrations = usePortalResource<Registration[]>(child ? `parent/children/${child.studentId}/registrations` : null);
   const [query, setQuery] = useState('');
@@ -32,7 +36,7 @@ export function ParentCourses({ child, learning }: { child?: Child; learning?: L
     {catalogue.error && <PortalError message={catalogue.error} retry={catalogue.retry} />}
     {registrations.error && <PortalError message={registrations.error} retry={registrations.retry} />}
     {selected ? <CourseDetails key={`${selected}-${child?.studentId}`} id={selected} child={child} learning={learning}
-      registrations={registrations.data} refresh={registrations.retry} onBack={() => setSelected(undefined)} /> : <>
+      onCheckout={onCheckout} onBack={() => setSelected(undefined)} /> : <>
       <div className="sc-panel pp-tools">
         <label>Tìm khóa học<input type="search" value={query} placeholder="Tên hoặc mã khóa học" onChange={e => setQuery(e.target.value)} /></label>
         <label>Cấp độ<select value={level} onChange={e => setLevel(e.target.value)}>
@@ -49,32 +53,33 @@ export function ParentCourses({ child, learning }: { child?: Child; learning?: L
           <button className="sc-button" type="button" onClick={() => setSelected(course.courseId)}>Xem chi tiết</button></div>
       </article>)}</div> : <p className="sc-panel">Không có khóa học phù hợp.</p>)}
     </>}
-    {registrations.data && <section className="sc-panel pp-stack"><h2>Yêu cầu đăng ký của {child?.fullName}</h2>
-      {registrations.data.length ? <ul className="pp-list">{registrations.data.map(row => <li key={row.requestId}>
+    {!!registrations.data?.length && <section className="sc-panel pp-stack"><h2>Yêu cầu đăng ký trước đây của {child?.fullName}</h2>
+      <ul className="pp-list">{registrations.data.map(row => <li key={row.requestId}>
         <div className="pp-row"><h3>{row.courseName}</h3><span className="pp-chip">{statusLabels[row.status] ?? row.status}</span></div>
         <p className="sc-muted">{row.classCode} · {dateTime(row.requestedAt)}</p>
-      </li>)}</ul> : <p>Chưa có yêu cầu đăng ký.</p>}
+      </li>)}</ul>
     </section>}
   </>;
 }
 
-function CourseDetails({ id, child, learning, registrations, refresh, onBack }: {
-  id: number; child?: Child; learning?: Learning; registrations?: Registration[]; refresh: () => void; onBack: () => void;
+function CourseDetails({ id, child, learning, onCheckout, onBack }: {
+  id: number; child?: Child; learning?: Learning; onCheckout: (studentId: number, paymentId: number) => void; onBack: () => void;
 }) {
   const resource = usePortalResource<CourseDetail>(`parent/courses/${id}`);
   const [busy, setBusy] = useState<number>();
-  const [saved, setSaved] = useState<number>();
-  const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
-  async function register(classId: number) {
+  const [error, setError] = useState('');
+  async function purchase(classId: number) {
     if (!child || busy !== undefined) return;
-    setBusy(classId); setNotice(undefined);
+    setBusy(classId);
+    setError('');
     try {
-      await portalPost(`parent/children/${child.studentId}/registrations`, { classId });
-      setSaved(classId);
-      setNotice({ text: 'Đã gửi yêu cầu đăng ký. Học vụ sẽ xác nhận trước khi ghi danh.' });
-      refresh();
-    } catch (error) { setNotice({ text: describeError(error), error: true }); }
-    finally { setBusy(undefined); }
+      const checkout = await buyCourse(child.studentId, classId);
+      onCheckout(child.studentId, checkout.paymentId);
+    } catch (failure) {
+      setError(describeError(failure));
+    } finally {
+      setBusy(undefined);
+    }
   }
   const detail = resource.data;
   return <>
@@ -92,11 +97,11 @@ function CourseDetails({ id, child, learning, registrations, refresh, onBack }: 
           : <p>Chương trình chưa có bài học được công bố.</p>}
       </article>
       <section className="sc-panel pp-stack"><h2>Lịch trình và đăng ký lớp</h2>
-        {notice && <p role={notice.error ? 'alert' : 'status'} className={notice.error ? 'pp-error' : undefined}>{notice.text}</p>}
-        {!child && <p className="sc-muted">Cần liên kết hồ sơ học sinh để gửi yêu cầu đăng ký.</p>}
+        {error && <p role="alert" className="pp-error">{error}</p>}
+        {!child && <p className="sc-muted">Cần liên kết hồ sơ học sinh để mua khóa học.</p>}
         {detail.classes.length ? <ul className="pp-list">{detail.classes.map(row => {
-          const registered = registrations?.some(item => item.classId === row.classId) || saved === row.classId;
-          const enrolled = learning?.enrollments.some(item => item.classId === row.classId);
+          const enrolled = learning?.enrollments.some(item => item.courseId === id && ['Active', 'Completed'].includes(item.status));
+          const canBuy = row.status === 'Open' && child && (detail.course.tuitionVnd ?? 0) > 0;
           return <li key={row.classId} className="pp-row">
             <div><h3>{row.name}</h3><p>{row.classCode} · {row.teacherName ?? 'Chưa phân công giáo viên'}</p>
               <p className="sc-muted">{localDay(row.startDate)} – {localDay(row.endDate)}</p>
@@ -106,9 +111,9 @@ function CourseDetails({ id, child, learning, registrations, refresh, onBack }: 
                   {localDay(session.date)} · {session.startsAt.slice(0, 5)}–{session.endsAt.slice(0, 5)} · {session.title}
                 </li>)}</ul>
               </details>}</div>
-            {enrolled ? <span className="pp-chip">Đã ghi danh</span> : registered ? <span className="pp-chip">Đã gửi yêu cầu</span>
-              : row.status === 'Open' && child ? <button type="button" className="sc-button sc-primary" disabled={busy !== undefined}
-                onClick={() => void register(row.classId)}>{busy === row.classId ? 'Đang gửi…' : 'Gửi yêu cầu đăng ký'}</button>
+            {enrolled ? <span className="pp-chip">Đã ghi danh</span>
+              : canBuy ? <button type="button" className="sc-button sc-primary" disabled={busy !== undefined}
+                onClick={() => void purchase(row.classId)}>{busy === row.classId ? 'Đang tạo mã QR…' : 'Mua khóa học'}</button>
               : <span className="pp-chip">{row.status === 'Open' ? 'Đang mở' : 'Dự kiến'}</span>}
           </li>;
         })}</ul> : <p>Chưa có lớp hoặc lịch trình được công bố.</p>}
@@ -117,7 +122,7 @@ function CourseDetails({ id, child, learning, registrations, refresh, onBack }: 
   </>;
 }
 
-function PaymentCard({ payment, base, refresh }: { payment: Payment; base: string; refresh: () => void }) {
+function PaymentCard({ payment, base, refresh, demo }: { payment: Payment; base: string; refresh: () => void; demo: boolean }) {
   const [reason, setReason] = useState('');
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -137,8 +142,8 @@ function PaymentCard({ payment, base, refresh }: { payment: Payment; base: strin
     } catch (failure) { setError(describeError(failure)); } finally { setBusy(false); }
   }
   return <li className="sc-panel pp-stack pp-card">
-    <div className="pp-row"><p className="sc-kicker">{payment.reference}</p><span className="pp-chip">{statusLabels[payment.status] ?? payment.status}</span></div>
-    <h2>{payment.courseName}</h2><p><strong>{currency.format(payment.amountVnd)}</strong></p>
+    <div className="pp-row"><p className="sc-kicker">{payment.reference}</p><span className="pp-chip">{payment.status === 'Pending' ? 'Chờ thanh toán' : statusLabels[payment.status] ?? payment.status}</span></div>
+    <h2>{payment.courseName}</h2><p><strong>{currency.format(payment.amountVnd)}</strong>{demo && ' · Mô phỏng'}</p>
     <p className="sc-muted">Ngày tạo {dateTime(payment.createdAt)}{payment.paidAt && ` · Thanh toán ${dateTime(payment.paidAt)}`}</p>
     {payment.invoiceNumber && <p>Số chứng từ {payment.invoiceNumber}</p>}
     {payment.refundStatus && <p>Yêu cầu hoàn tiền: {statusLabels[payment.refundStatus] ?? payment.refundStatus} · {dateTime(payment.refundRequestedAt)}{payment.refundReason && ` · ${payment.refundReason}`}</p>}
@@ -156,14 +161,51 @@ function PaymentCard({ payment, base, refresh }: { payment: Payment; base: strin
   </li>;
 }
 
-export function ParentPayments({ child }: { child: Child }) {
+function CheckoutCard({ checkout }: { checkout: Checkout }) {
+  const demoUrl = checkout.demoReference ? new URL(`${API_BASE_URL}/payments/demo/${checkout.demoReference}`, window.location.origin).href : null;
+  const qr = demoUrl ?? checkout.qrCode;
+  const paymentUrl = demoUrl ?? checkout.checkoutUrl;
+  const expired = Date.parse(checkout.expiresAt) <= Date.now();
+  return <article className="sc-panel pp-checkout pp-stack">
+    <div className="pp-stack">
+      <p className="sc-kicker">{checkout.classCode}{checkout.provider === 'Demo' && ' · Mô phỏng'}</p>
+      <h2>{checkout.courseName}</h2>
+      <strong>{currency.format(checkout.amountVnd)}</strong>
+      {checkout.status === 'Paid' ? <p role="status">Đã thanh toán. Học sinh có thể mở khóa học trong My Courses.</p>
+        : checkout.status === 'Failed' ? <p role="status">Đơn đã hết hiệu lực. Tạo đơn mới trong Course Management.</p>
+        : expired ? <p role="status">Mã QR đã hết hạn. Hệ thống đang đối soát giao dịch.</p>
+        : <>
+          <p>{demoUrl ? 'Thanh toán mô phỏng dành cho demo.' : qr ? 'Mở ứng dụng ngân hàng và quét mã QR.' : 'Mở trang thanh toán để xem mã QR.'}</p>
+          <p className="sc-muted">Hạn thanh toán {dateTime(checkout.expiresAt)} · Tự động cập nhật trạng thái</p>
+          {paymentUrl && <div><a className="sc-button" href={paymentUrl} target="_blank" rel="noreferrer">
+            {demoUrl ? 'Mở trang thanh toán mô phỏng' : 'Mở trang thanh toán payOS'}
+          </a></div>}
+          {!paymentUrl && <p>Quay lại Course Management và chọn mua để thử tạo lại mã.</p>}
+        </>}
+    </div>
+    {checkout.status === 'Pending' && !expired && qr && <div className="pp-qr">
+      <QRCodeSVG value={qr} size={188} marginSize={4} title="Mã QR thanh toán học phí" />
+    </div>}
+  </article>;
+}
+
+export function ParentPayments({ child, checkoutId }: { child: Child; checkoutId?: number }) {
   const base = `parent/children/${child.studentId}/payments`;
-  const resource = usePortalResource<Payment[]>(base);
-  return <section className="pp-stack"><h2>Lịch sử thanh toán học phí</h2>
-    {resource.loading && <p role="status">Đang tải học phí…</p>}
-    {resource.error && <PortalError message={resource.error} retry={resource.retry} />}
-    {resource.data && (resource.data.length ? <ul className="pp-grid pp-list">{resource.data.map(payment =>
-      <PaymentCard key={payment.paymentId} payment={payment} base={base} refresh={resource.retry} />)}</ul>
-      : <p className="sc-panel">Chưa có giao dịch học phí cho hồ sơ này.</p>)}
-  </section>;
+  const checkouts = usePortalResource<Checkout[]>(`parent/children/${child.studentId}/checkouts`, 2500);
+  const resource = usePortalResource<Payment[]>(base, 5000);
+  const selected = checkouts.data?.find(row => row.paymentId === checkoutId);
+  const open = checkouts.data?.filter(row => row.status === 'Pending' && row.paymentId !== checkoutId) ?? [];
+  return <>
+    {checkouts.error && <PortalError message={checkouts.error} retry={checkouts.retry} />}
+    {selected && <CheckoutCard key={selected.paymentId} checkout={selected} />}
+    {open.map(row => <CheckoutCard key={row.paymentId} checkout={row} />)}
+    <section className="pp-stack"><h2>Lịch sử thanh toán học phí</h2>
+      {resource.loading && !resource.data && <p role="status">Đang tải học phí…</p>}
+      {resource.error && <PortalError message={resource.error} retry={resource.retry} />}
+      {resource.data && (resource.data.length ? <ul className="pp-grid pp-list">{resource.data.map(payment =>
+        <PaymentCard key={payment.paymentId} payment={payment} base={base} refresh={resource.retry}
+          demo={checkouts.data?.some(row => row.paymentId === payment.paymentId && row.provider === 'Demo') ?? false} />)}</ul>
+        : <p className="sc-panel">Chưa có giao dịch học phí cho hồ sơ này.</p>)}
+    </section>
+  </>;
 }

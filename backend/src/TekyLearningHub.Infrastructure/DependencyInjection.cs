@@ -13,6 +13,7 @@ using TekyLearningHub.Infrastructure.Repositories.Backoffice;
 using TekyLearningHub.Infrastructure.Repositories.Portal;
 using TekyLearningHub.Infrastructure.Security;
 using TekyLearningHub.Infrastructure.Services.Auth;
+using TekyLearningHub.Infrastructure.Services.Portal;
 using TekyLearningHub.Infrastructure.Storage;
 
 namespace TekyLearningHub.Infrastructure;
@@ -70,6 +71,10 @@ public static class DependencyInjection
         services.AddScoped<IStudentOverviewRepository, StudentOverviewRepository>();
         services.AddScoped<IParentLearningRepository, ParentLearningRepository>();
         services.AddScoped<IParentCommerceRepository, ParentCommerceRepository>();
+        services.AddScoped<IParentCheckoutRepository, ParentCheckoutRepository>();
+        services.AddHttpClient<ICheckoutGateway, CheckoutGateway>(http => http.Timeout = TimeSpan.FromSeconds(6))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddHostedService<ParentCheckoutWorker>();
         services.AddScoped<ILearningMessageRepository, LearningMessageRepository>();
         return services;
     }
