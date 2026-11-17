@@ -1,0 +1,23 @@
+import { Link } from 'react-router-dom';
+import type { StudentOverview } from '../api-client/studentOverview';
+import { sessionStatus } from '../api-client/studentClasses';
+import { useStudentResource } from './useStudentResource';
+import { IconClock,IconUser } from './Icons';
+import './StudentClassesView.css';
+import './StudentOverviewView.css';
+const date=new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Ho_Chi_Minh'});
+export function StudentOverviewView(){
+ const resource=useStudentResource<StudentOverview>('overview');const data=resource.data;
+ if(resource.loading)return <section className="sc-view"><div className="sc-panel" role="status">Đang tải tổng quan học tập…</div></section>;
+ if(resource.error)return <section className="sc-view"><div className="sc-panel" role="alert"><h1>Chưa thể tải tổng quan</h1><p>{resource.error}</p><button className="sc-button" onClick={resource.retry}>Thử lại</button></div></section>;
+ if(!data)return null;
+ const percent=data.totalLessons?Math.round(data.reviewedLessons/data.totalLessons*100):0;
+ return <div className="sc-view so-view">
+  <header className="so-header"><div><p className="sc-kicker">TỔNG QUAN HỌC TẬP</p><h1>Chào {data.student.fullName}</h1><p className="sc-muted">Một nơi để theo dõi lịch học, việc cần làm và những bước tiến của em.</p></div><button className="sc-button" onClick={resource.retry}>Làm mới</button></header>
+  <section className="so-profile sc-panel" aria-label="Thông tin học sinh"><span className="so-avatar" aria-hidden="true"><IconUser size={28}/></span><div><strong>{data.student.fullName}</strong><p className="sc-muted">{data.student.studentCode} · {data.student.email}</p>{(data.student.schoolName||data.student.gradeLevel)&&<p className="sc-muted">{[data.student.schoolName,data.student.gradeLevel].filter(Boolean).join(' · ')}</p>}</div><Link className="sc-button" to="/account">Hồ sơ của em</Link></section>
+  <div className="so-stats"><section><IconClock size={22}/><strong>{data.upcomingAssignments.length}</strong><span>Bài cần nộp trong 7 ngày</span></section></div>
+  <section className="sc-panel so-progress"><div><h2>Tiến độ học tập tổng thể</h2><p className="sc-muted">Tính trên các bài học không trùng của những khoá đang học.</p></div><strong className="so-percent">{percent}%</strong><progress max={Math.max(data.totalLessons,1)} value={data.reviewedLessons} aria-label={`Đã ôn ${data.reviewedLessons} trên ${data.totalLessons} bài`}/><p>{data.reviewedLessons}/{data.totalLessons} bài đã tự xác nhận ôn tập</p><p className="sc-muted">{data.passedProjects}/{data.projectCount} sản phẩm đã nộp được giáo viên xác nhận đạt. Ôn tập và đạt yêu cầu là hai kết quả riêng.</p></section>
+  <div className="so-columns"><section className="sc-panel"><div className="so-section-head"><h2>Việc cần làm</h2><Link to="/dashboard/assignments">Tất cả bài tập →</Link></div><p className="sc-muted">Bài chưa nộp hoặc được yêu cầu sửa, còn trong hạn.</p>{!data.upcomingAssignments.length?<p className="so-empty">Không có bài tập cần nộp trong 7 ngày tới.</p>:<ul className="so-list">{data.upcomingAssignments.map(a=><li key={a.assignmentId}><div><p className="sc-kicker">{a.classCode}{a.needsRevision?' · CẦN NỘP LẠI':''}</p><h3>{a.title}</h3><p className="sc-muted">Hạn nộp: {date.format(new Date(a.dueAt))}</p></div><Link className="sc-button" to={`/dashboard/assignments/${a.assignmentId}`}>Xem bài tập</Link></li>)}</ul>}</section>
+  <section className="sc-panel"><div className="so-section-head"><h2>Lịch học sắp tới</h2><Link to="/dashboard/timetable">Xem lịch lớp →</Link></div>{!data.upcomingSessions.length?<p className="so-empty">Chưa có buổi học sắp tới.</p>:<ul className="so-list">{data.upcomingSessions.map(s=><li key={s.sessionId}><div><p className="sc-kicker">{s.classCode}</p><h3>{s.title}</h3><p className="sc-muted">{date.format(new Date(s.startsAt))}</p><p className="sc-muted">{s.teacherName||'Chưa phân công giáo viên'} · {s.roomName||'Chưa bố trí phòng'}</p></div><Link className="sc-button" to={`/dashboard/timetable/${s.sessionId}`}>{sessionStatus(s,Date.parse(data.asOf)).kind==='live'?'Vào lớp':'Xem buổi học'}</Link></li>)}</ul>}</section></div>
+ </div>;
+}

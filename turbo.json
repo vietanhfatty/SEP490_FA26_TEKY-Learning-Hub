@@ -10,6 +10,6 @@
       "cache": false,
       "persistent": true
     }
-  }
+  },
+  "ui": "stream"
 }
-
