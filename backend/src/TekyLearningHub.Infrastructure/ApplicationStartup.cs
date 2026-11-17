@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -17,8 +18,11 @@ public static class ApplicationStartup
         {
             await DevelopmentDatabaseMigrator.ApplyAsync(configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required."), logger);
             if (configuration.GetValue<bool>("migrate-only")) return true;
-            await DbInitializer.SeedAsync(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(), scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
-            return false;
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await DbInitializer.SeedAsync(db, scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
+            if (configuration["PaymentGateway:Mode"] == "Demo")
+                await db.Database.ExecuteSqlRawAsync("EXEC dbo.SeedDemoParentCheckout;");
+            return configuration.GetValue<bool>("seed-demo-only");
         }
         catch (Exception e) { logger.LogCritical(e, "Không thể cập nhật database Development. Backend dừng để tránh chạy với schema không tương thích."); throw; }
     }
