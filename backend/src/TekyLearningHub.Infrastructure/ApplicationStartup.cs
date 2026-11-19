@@ -13,16 +13,19 @@ public static class ApplicationStartup
     public static async Task<bool> InitializeAsync(IServiceProvider services, IConfiguration configuration, IHostEnvironment environment, ILogger logger)
     {
         if (!environment.IsDevelopment()) return false;
+        logger.LogInformation("Đang kết nối SQL Server và kiểm tra database Development…");
         using var scope = services.CreateScope();
         try
         {
             await DevelopmentDatabaseMigrator.ApplyAsync(configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required."), logger);
             if (configuration.GetValue<bool>("migrate-only")) return true;
+            logger.LogInformation("Đang chuẩn bị dữ liệu Development…");
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await DbInitializer.SeedAsync(db, scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
             if (configuration["PaymentGateway:Mode"] == "Demo")
                 await db.Database.ExecuteSqlRawAsync("EXEC dbo.SeedDemoParentCheckout;");
             await db.Database.ExecuteSqlRawAsync("EXEC dbo.SeedDemoAcademicOperations;");
+            logger.LogInformation("Database Development đã sẵn sàng.");
             return configuration.GetValue<bool>("seed-demo-only");
         }
         catch (Exception e) { logger.LogCritical(e, "Không thể cập nhật database Development. Backend dừng để tránh chạy với schema không tương thích."); throw; }

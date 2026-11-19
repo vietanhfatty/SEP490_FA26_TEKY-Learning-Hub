@@ -1,4 +1,4 @@
-﻿# TEKY frontend
+# TEKY frontend
 
 Chạy từ thư mục gốc repository:
 
@@ -29,3 +29,13 @@ Kiểm tra từ thư mục gốc:
 pnpm --filter frontend --filter @teky/portal --filter @teky/backoffice build
 pnpm --filter frontend test:rbac
 ```
+
+## Khởi động các giao diện từ thư mục gốc
+
+`npm run frontend` mở đồng thời Login ở 5173, Portal cho Student/Parent ở 3000
+và Backoffice ở 3001. Lệnh dùng Vite đã cài trong workspace. Giữ terminal này
+trong lúc sử dụng, nhấn Ctrl+C để dừng các server do lệnh tạo.
+
+Chạy API trong terminal riêng bằng `npm run backend`, hoặc profile `http`/
+`https` trong Visual Studio. API phục vụ HTTP ở cổng 5268. Đợi thông báo
+`Now listening on: http://localhost:5268` rồi đăng nhập tại cổng 5173.
