@@ -8,7 +8,7 @@ import {
   deleteAdminLesson,
   deleteAdminMaterial,
   getAdminCourse,
-  getAdminCourses,
+  getAllAdminCourses,
   getCourseDepartments,
   updateAdminCourse,
   upsertAdminLesson,
@@ -90,7 +90,7 @@ export function AdminCoursesView() {
     setLoading(true);
     setError('');
     try {
-      const [page, availableDepartments] = await Promise.all([getAdminCourses({ take: 200 }), getCourseDepartments()]);
+      const [page, availableDepartments] = await Promise.all([getAllAdminCourses(), getCourseDepartments()]);
       setCourses(page.items);
       setDepartments(availableDepartments);
     } catch (loadError) {
@@ -102,7 +102,7 @@ export function AdminCoursesView() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([getAdminCourses({ take: 200 }), getCourseDepartments()])
+    Promise.all([getAllAdminCourses(), getCourseDepartments()])
       .then(([page, departments]) => { if (active) { setCourses(page.items); setDepartments(departments); } })
       .catch(error => { if (active) setError(error instanceof Error ? error.message : 'Không thể tải danh sách khóa học.'); })
       .finally(() => { if (active) setLoading(false); });
@@ -137,6 +137,8 @@ export function AdminCoursesView() {
           ...form,
           departmentId: loaded.departmentId,
           description: loaded.description ?? '',
+          learningObjectives: loaded.learningObjectives ?? '',
+          tuitionVnd: loaded.tuitionVnd,
           levelCode: loaded.levelCode ?? '',
           status: loaded.status,
         })),
@@ -156,6 +158,8 @@ export function AdminCoursesView() {
         courseCode: courseForm.courseCode.trim(),
         name: courseForm.name.trim(),
         description: courseForm.description?.trim() || null,
+        learningObjectives: courseForm.learningObjectives?.trim() || null,
+        tuitionVnd: courseForm.tuitionVnd ?? null,
         levelCode: courseForm.levelCode?.trim() || null,
         status: courseForm.status ?? 'Draft',
       };
@@ -442,6 +446,16 @@ export function AdminCoursesView() {
                 <option key={status} value={status}>{courseStatusLabels[status]}</option>
               ))}
             </select>
+          </label>
+          <label>
+            Mục tiêu đầu ra
+            <textarea maxLength={2000} value={courseForm.learningObjectives ?? ''} disabled={saving}
+              onChange={e => setCourseForm(form => ({ ...form, learningObjectives: e.target.value }))} />
+          </label>
+          <label>
+            Học phí (VND)
+            <input type="number" min={0} step={1} value={courseForm.tuitionVnd ?? ''} disabled={saving}
+              onChange={e => setCourseForm(form => ({ ...form, tuitionVnd: e.target.value === '' ? null : Number(e.target.value) }))} />
           </label>
           <label>
             Description

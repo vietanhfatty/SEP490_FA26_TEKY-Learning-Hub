@@ -59,7 +59,7 @@ public sealed class ParentCommerceRepository(ApplicationDbContext db) : IParentC
                 LinkedStudents(parentId).Contains(r.StudentId))
             .OrderByDescending(r => r.RequestedAt)
             .Select(r => new ParentCourseRequestDto(r.RequestId, r.ClassId, r.Class.ClassCode, r.Class.Course.Name,
-                r.Status, r.RequestedAt)).ToListAsync(ct);
+                r.Status, r.RequestedAt, r.ManagerNote)).ToListAsync(ct);
 
     public async Task<bool> Register(int parentId, int studentId, int classId, CancellationToken ct) =>
         await db.Database.ExecuteSqlInterpolatedAsync($"""

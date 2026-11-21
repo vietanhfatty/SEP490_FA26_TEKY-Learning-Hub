@@ -20,7 +20,11 @@ public class StudentClassesService(IStudentClassesRepository db, IUnitOfWork uni
             e.Class.Teacher?.User.FullName, e.Class.Teacher?.User.Email,
             e.Class.ClassSessions.OrderBy(s => s.SessionDate).ThenBy(s => s.StartTime).ThenBy(s => s.SessionId)
                 .Select(s => MapSession(s, false)).ToList())).ToList();
-        return new StudentClassesDto(student.UserId, student.StudentCode, student.FullName, classes);
+        var makeup = await db.MakeupSessions(userId, cancellationToken);
+        return new StudentClassesDto(student.UserId, student.StudentCode, student.FullName, classes)
+        {
+            MakeupSessions = makeup.Select(s => MapSession(s, false)).ToList()
+        };
     }
 
     public async Task<StudentSessionDto?> GetSessionAsync(int userId, int sessionId, CancellationToken cancellationToken)

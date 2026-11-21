@@ -40,8 +40,19 @@ public sealed class StudentClassesRepository(ApplicationDbContext db) : IStudent
                .Include(e => e.Class.ClassSessions).ThenInclude(s => s.Lesson)
                .Include(e => e.Class.ClassSessions).ThenInclude(s => s.Room)
                .AsSplitQuery().OrderBy(e => e.Class.ClassCode).ToListAsync(cancellationToken);
+    public async Task<List<ClassSession>> MakeupSessions(int userId, CancellationToken cancellationToken) =>
+        await db.ClassSessions.AsNoTracking().Where(s => db.MakeupRequests.Any(m =>
+                m.Status == "Approved" && m.PreferredSessionId == s.SessionId && m.Attendance.StudentId == userId))
+            .Include(s => s.Class.Course)
+            .Include(s => s.Class.Teacher!).ThenInclude(t => t.User)
+            .Include(s => s.Lesson)
+            .Include(s => s.Room)
+            .OrderBy(s => s.SessionDate).ThenBy(s => s.StartTime)
+            .ToListAsync(cancellationToken);
     public async Task<ClassSession?> Session(int userId, int sessionId, CancellationToken cancellationToken) => await db.ClassSessions.AsNoTracking()
-               .Where(s => s.SessionId == sessionId && Enrollments(userId).Any(e => e.ClassId == s.ClassId))
+               .Where(s => s.SessionId == sessionId && (Enrollments(userId).Any(e => e.ClassId == s.ClassId)
+                   || db.MakeupRequests.Any(m => m.Status == "Approved" && m.PreferredSessionId == s.SessionId
+                       && m.Attendance.StudentId == userId)))
                .Include(s => s.Class.Course)
                .Include(s => s.Class.Teacher!).ThenInclude(t => t.User)
                .Include(s => s.Lesson!).ThenInclude(l => l.LessonMaterials)

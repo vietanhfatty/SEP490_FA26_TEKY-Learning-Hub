@@ -42,6 +42,8 @@ export interface AdminLesson {
 
 export interface AdminCourseDetail extends AdminCourse {
   description: string | null;
+  learningObjectives: string | null;
+  tuitionVnd: number | null;
   lessons: AdminLesson[];
 }
 
@@ -55,6 +57,8 @@ export interface CourseUpsertPayload {
   courseCode: string;
   name: string;
   description?: string | null;
+  learningObjectives?: string | null;
+  tuitionVnd?: number | null;
   levelCode?: string | null;
   status?: CourseStatus | null;
 }
@@ -167,4 +171,16 @@ export async function deleteAdminLesson(courseId: number, lessonId: number): Pro
 
 export async function deleteAdminMaterial(courseId: number, lessonId: number, materialId: number): Promise<void> {
   await requestAdmin<void>(`/${courseId}/lessons/${lessonId}/materials/${materialId}`, { method: 'DELETE' });
+}
+
+export async function getAllAdminCourses(): Promise<AdminCoursePage> {
+  const items: AdminCourse[] = [];
+  let total = 0;
+  do {
+    const page = await getAdminCourses({ skip: items.length, take: 200 });
+    total = page.total;
+    if (!page.items.length) break;
+    items.push(...page.items);
+  } while (items.length < total);
+  return { total, items };
 }

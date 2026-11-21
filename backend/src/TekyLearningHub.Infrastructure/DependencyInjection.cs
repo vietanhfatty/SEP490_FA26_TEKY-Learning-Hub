@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IShellSessionRepository, ShellSessionRepository>();
         services.AddScoped<ICourseRepository, CourseRepository>();
+        services.AddScoped<IAcademicRepository, AcademicRepository>();
         services.AddScoped<IUserAdministrationRepository, UserAdministrationRepository>();
         services.AddScoped<IStaffAccessRepository, StaffAccessRepository>();
         services.AddScoped<IStudentClassesRepository, StudentClassesRepository>();

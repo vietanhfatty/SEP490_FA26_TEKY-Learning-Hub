@@ -27,6 +27,10 @@ public sealed class ParentCheckoutController(IParentCheckoutService service) : C
                 ? Problem(statusCode: 409, title: "Không thể tạo đơn. Kiểm tra hồ sơ, chỗ trống, ghi danh và các đơn đang mở.")
                 : Ok(checkout);
         }
+        catch (CheckoutConflictException error)
+        {
+            return Problem(statusCode: 409, title: error.Message);
+        }
         catch (CheckoutGatewayException error)
         {
             return Problem(statusCode: 503, title: error.Message);

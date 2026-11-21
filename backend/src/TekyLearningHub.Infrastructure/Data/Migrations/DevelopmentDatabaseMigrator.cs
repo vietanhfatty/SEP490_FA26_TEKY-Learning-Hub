@@ -10,8 +10,26 @@ namespace TekyLearningHub.Infrastructure.Data.Migrations;
 /// </summary>
 public static class DevelopmentDatabaseMigrator
 {
-    public static Task ApplyAsync(string connectionString, ILogger logger, CancellationToken cancellationToken = default) =>
-        ApplyAsync(connectionString, SqlMigrationCatalog.Load(), logger, cancellationToken);
+    public static async Task ApplyAsync(string connectionString, ILogger logger, CancellationToken cancellationToken = default)
+    {
+        var migrations = SqlMigrationCatalog.Load();
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await ApplyAsync(connectionString, migrations, logger, cancellationToken);
+                return;
+            }
+            catch (SqlException error) when (attempt < 3 &&
+                error.Number is -2 or 2 or 26 or 53 or 64 or 233 or 258 or 10053 or 10054 or 10060)
+            {
+                logger.LogWarning("SQL Server chưa sẵn sàng. Đang thử kết nối lại ({Attempt}/3).", attempt + 1);
+                using var failedConnection = new SqlConnection(connectionString);
+                SqlConnection.ClearPool(failedConnection);
+                await Task.Delay(TimeSpan.FromSeconds(2 * attempt), cancellationToken);
+            }
+        }
+    }
 
     internal static async Task ApplyAsync(string connectionString, IReadOnlyList<SqlMigration> migrations,
         ILogger logger, CancellationToken cancellationToken = default)

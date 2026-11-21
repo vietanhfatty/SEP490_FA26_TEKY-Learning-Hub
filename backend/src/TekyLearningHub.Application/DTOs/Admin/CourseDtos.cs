@@ -11,7 +11,7 @@ public record CourseDepartmentDto(int Id, string Name);
 /// <summary>Chi tiết khóa học kèm bài học và học liệu.</summary>
 public record CourseDetailDto(int CourseId, string CourseCode, string Name, string? Description,
     string? LevelCode, string Status, int ClassCount, DateTime CreatedAt,
-    IReadOnlyList<LessonDto> Lessons, int? DepartmentId = null);
+    IReadOnlyList<LessonDto> Lessons, int? DepartmentId = null, string? LearningObjectives = null, int? TuitionVnd = null);
 
 public record LessonDto(int LessonId, int OrderNo, string Title, string? Content,
     IReadOnlyList<LessonMaterialDto> Materials);
@@ -30,6 +30,8 @@ public record CourseUpsertRequest
     public string Name { get; init; } = null!;
 
     public string? Description { get; init; }
+    [StringLength(2000)] public string? LearningObjectives { get; init; }
+    [Range(0, int.MaxValue)] public int? TuitionVnd { get; init; }
 
     [StringLength(30)]
     public string? LevelCode { get; init; }

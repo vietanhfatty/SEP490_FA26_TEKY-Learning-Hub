@@ -2,9 +2,10 @@ import { AcceptInvitationPage } from '@teky/shared/account/AcceptInvitationPage'
 import { AccountPage } from '@teky/shared/account/AccountPage';
 import { RecoveryPage } from '@teky/shared/account/RecoveryPage';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
-import { AcademicManagerDashboard } from './pages/academic-manager/AcademicManagerDashboard';
+const AcademicManagerDashboard = lazy(() => import('./pages/academic-manager/AcademicManagerDashboard')
+  .then(module => ({ default: module.AcademicManagerDashboard })));
 import { AdminDashboard } from './pages/system-admin/AdminDashboard';
 import { StaffDashboard } from './pages/staff/StaffDashboard';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -162,13 +163,16 @@ export function App() {
             <RoleGuard allowedRoles={['academic_manager']} fallback={forbidden('Quản lý học thuật')}>
               <LmsShell
                 currentRole="academic_manager"
+                onSelectNav={id => navigate(`/academic-manager?tab=${id}`)}
                 userName={user?.fullName}
                 userEmail={user?.email}
                 isDarkMode={isDarkMode}
                 onToggleTheme={() => setIsDarkMode((value) => !value)}
                 onLogout={logout}
               >
-                {(activeNavId, onSelectNav) => <AcademicManagerDashboard activeNavId={activeNavId} onSelectNav={onSelectNav} />}
+                {(activeNavId, onSelectNav) => <Suspense fallback={<p role="status">Đang mở Academic Manager…</p>}>
+                  <AcademicManagerDashboard activeNavId={activeNavId} onSelectNav={onSelectNav} />
+                </Suspense>}
               </LmsShell>
             </RoleGuard>
           }

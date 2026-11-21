@@ -18,7 +18,7 @@ export type Learning = {
 export type Course = { courseId: number; courseCode: string; name: string; description: string | null; levelCode: string | null; tuitionVnd: number | null; lessonCount: number; openClassCount: number };
 export type ClassOffer = { classId: number; classCode: string; name: string; status: string; startDate: string | null; endDate: string | null; teacherName: string | null; nextDate: string | null; startsAt: string | null; endsAt: string | null; schedule: { sessionId: number; title: string; date: string; startsAt: string; endsAt: string }[] };
 export type CourseDetail = { course: Course; learningObjectives: string | null; lessons: { lessonId: number; orderNo: number; title: string }[]; classes: ClassOffer[] };
-export type Registration = { requestId: number; classId: number; classCode: string; courseName: string; status: string; requestedAt: string };
+export type Registration = { requestId: number; classId: number; classCode: string; courseName: string; status: string; requestedAt: string; managerNote: string | null };
 export type Payment = {
   paymentId: number; reference: string; invoiceNumber: string | null; courseName: string; amountVnd: number; status: string;
   createdAt: string; paidAt: string | null; refundStatus: string | null; refundReason: string | null; refundRequestedAt: string | null;

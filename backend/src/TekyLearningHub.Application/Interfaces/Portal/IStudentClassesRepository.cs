@@ -8,6 +8,7 @@ public interface IStudentClassesRepository
     Task<StudentIdentity?> Student(int userId, CancellationToken cancellationToken);
     Task<bool> IsStudent(int userId, CancellationToken cancellationToken);
     Task<List<Enrollment>> EnrolledClasses(int userId, CancellationToken cancellationToken);
+    Task<List<ClassSession>> MakeupSessions(int userId, CancellationToken cancellationToken);
     Task<ClassSession?> Session(int userId, int sessionId, CancellationToken cancellationToken);
     Task<bool> ActiveEnrollment(int userId, int classId, CancellationToken cancellationToken);
     Task<Assignment?> WritableAssignment(int userId, int? sessionId, int assignmentId, CancellationToken cancellationToken);

@@ -23,7 +23,7 @@ test('student retains the five existing learning destinations', () => {
 });
 
 test('all three staff roles are available regardless of primary role or current page', () => {
-  const user = account(['teacher','academic_staff','academic_manager'], [permission('course.manage', false, [7])]);
+  const user = account(['teacher','academic_staff','academic_manager'], [permission('course.manage', false, [7]), permission('academic.manage', false, [7])]);
   const items = getAccessibleFeatures(user);
   for (const id of ['teacher.grading','teacher.communication','academic_staff.makeup','academic_staff.kits','academic_manager.teachers','courses.manage']) {
     assert.ok(items.some(item => item.id === id), id);
@@ -53,6 +53,9 @@ test('each permission retains its own department scope', () => {
 });
 
 test('privileged menu entries require their actual permissions and global identity scope', () => {
+  assert.ok(!getAccessibleFeatures(account(['academic_manager'])).some(item => item.permission === 'academic.manage'));
+  assert.ok(getAccessibleFeatures(account(['academic_manager'], [permission('academic.manage', false, [7])]))
+    .some(item => item.id === 'academic_manager.registrations'));
   assert.ok(!getAccessibleFeatures(account(['system_admin'])).some(item => ['courses.manage','system_admin.users','system_admin.directory'].includes(item.id)));
   assert.ok(!getAccessibleFeatures(account(['academic_manager'],[permission('identity.manage',false,[1])])).some(item => item.id === 'system_admin.users'));
   assert.ok(getAccessibleFeatures(account(['academic_manager'],[permission('course.manage',false,[1])])).some(item => item.id === 'courses.manage'));

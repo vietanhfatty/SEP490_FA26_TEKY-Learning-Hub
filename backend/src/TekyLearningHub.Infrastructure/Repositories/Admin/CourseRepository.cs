@@ -38,6 +38,11 @@ public sealed class CourseRepository(ApplicationDbContext db) : ICourseRepositor
         return new CoursePageDto(total, items);
     }
     public Task<Course?> FindCourse(int id, CancellationToken ct) => db.Courses.Include(c => c.Classes).Include(c => c.Lessons.Where(l => !l.IsDeleted)).ThenInclude(l => l.LessonMaterials).AsSplitQuery().SingleOrDefaultAsync(c => c.CourseId == id, ct);
+    public async Task<bool> IsApproved(int courseId, CancellationToken ct) =>
+        await db.Database.SqlQuery<int>($"""
+            SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.CourseApprovals
+                WHERE CourseId={courseId} AND ReviewStatus=N'Approved') THEN 1 ELSE 0 END AS int) Value
+            """).SingleAsync(ct) == 1;
     public Task<bool> DepartmentExists(int id, CancellationToken ct) => db.Departments.AnyAsync(department => department.DepartmentId == id && department.IsActive, ct);
     public Task<CourseDepartmentDto[]> Departments(bool isGlobal, int[] departmentIds, CancellationToken ct) => db.Departments.AsNoTracking()
         .Where(department => department.IsActive && (isGlobal || departmentIds.Contains(department.DepartmentId)))

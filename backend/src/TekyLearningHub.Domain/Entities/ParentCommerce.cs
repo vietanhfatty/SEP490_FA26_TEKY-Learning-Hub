@@ -3,6 +3,7 @@ namespace TekyLearningHub.Domain.Entities;
 public sealed class ParentCourseRequest
 {
     public long RequestId { get; set; }
+    public string? ManagerNote { get; set; }
     public int ParentId { get; set; }
     public int StudentId { get; set; }
     public int ClassId { get; set; }

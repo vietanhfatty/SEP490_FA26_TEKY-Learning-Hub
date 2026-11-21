@@ -10,6 +10,8 @@ using TekyLearningHub.Application;
 using TekyLearningHub.Infrastructure;
 using TekyLearningHub.Infrastructure.Hubs;
 
+Console.OutputEncoding = Encoding.UTF8;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Register Application & Infrastructure Clean Architecture Layers

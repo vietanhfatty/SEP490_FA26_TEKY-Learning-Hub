@@ -11,6 +11,8 @@ public sealed class UnitOfWork(ApplicationDbContext db) : IUnitOfWork
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
         try { return await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException e) when (e.InnerException is SqlException { Number: >= 51000 } sql)
+        { throw new PersistenceConflictException(sql.Message, false, e); }
         catch (DbUpdateConcurrencyException e) { throw new PersistenceConflictException("Dữ liệu vừa thay đổi. Hãy tải lại trước khi lưu.", false, e); }
         catch (DbUpdateException e) when (e.InnerException is SqlException { Number: 2601 or 2627 }) { throw new PersistenceConflictException("Email, số điện thoại hoặc phân công đã tồn tại.", true, e); }
     }

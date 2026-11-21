@@ -39,7 +39,7 @@ export interface StudentClass {
   teacherName: string | null; teacherEmail: string | null; sessions: StudentSession[];
 }
 export interface StudentClasses {
-  studentId: number; studentCode: string; fullName: string; classes: StudentClass[];
+  studentId: number; studentCode: string; fullName: string; classes: StudentClass[]; makeupSessions?: StudentSession[];
 }
 
 export async function requestStudent(path: string, init: RequestInit = {}): Promise<Response> {
