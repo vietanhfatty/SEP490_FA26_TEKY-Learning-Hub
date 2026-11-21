@@ -9,7 +9,9 @@ namespace TekyLearningHub.Infrastructure.Repositories.Backoffice;
 public sealed class ProjectReviewRepository(ApplicationDbContext db) : IProjectReviewRepository
 {
     private IQueryable<Assignment> TeacherAssignments(int teacherId) => db.Assignments.Where(a => a.Class.TeacherId == teacherId
-        && a.Class.Teacher!.User.Status == "Active" && a.Class.Teacher.User.RoleAssignments.Any(r => r.RoleId == 2 && r.RevokedAt == null));
+        && a.Class.Teacher!.User.Status == "Active" && a.Class.Teacher.User.RoleAssignments.Any(r => r.RoleId == 2 && r.RevokedAt == null && (!r.User.StaffAccessManaged ||
+            (r.ScopeType == "GLOBAL" || a.Class.Course.DepartmentId != null && r.DepartmentId == a.Class.Course.DepartmentId) &&
+            r.Sources.Any(source => source.EndedAt == null && (source.Kind == "EXCEPTION" || source.Kind == "APPOINTMENT" && source.Appointment != null && source.Appointment.ValidTo == null && source.Appointment.PolicyId == source.PolicyId)))));
     public async Task<List<ProjectReviewDto>> Reviews(int teacherId, CancellationToken ct) => await (
         from s in db.StudentProjectSubmissions.AsNoTracking()
         join a in TeacherAssignments(teacherId) on s.AssignmentId equals a.AssignmentId

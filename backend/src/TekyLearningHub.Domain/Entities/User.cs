@@ -32,6 +32,7 @@ public partial class User
     public int SecurityVersion { get; set; }
     public bool ActivationPending { get; set; }
     public int AdministrationVersion { get; set; }
+    public bool StaffAccessManaged { get; set; }
     public string? Bio { get; set; }
 
     public DateTime? LastLoginAt { get; set; }

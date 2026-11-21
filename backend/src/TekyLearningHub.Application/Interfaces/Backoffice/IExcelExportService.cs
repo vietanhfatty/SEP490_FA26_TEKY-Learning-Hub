@@ -8,6 +8,10 @@ namespace TekyLearningHub.Application.Interfaces.Backoffice;
 public interface IExcelExportService
 {
     Task<byte[]> ExportClassGradebookAsync(int classId, CancellationToken cancellationToken = default);
+    /// <summary>Mẫu Excel để quản trị viên điền danh sách nhân sự rồi nhập hàng loạt.</summary>
+    Task<byte[]> BuildStaffImportTemplateAsync(CancellationToken cancellationToken = default);
+    /// <summary>Đọc danh sách email và họ tên từ file Excel do quản trị viên tải lên.</summary>
+    Task<(string Email, string? FullName)[]> ReadStaffImportAsync(Stream content, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Kết quả sinh sa bàn và nhiệm vụ học thuật.</summary>

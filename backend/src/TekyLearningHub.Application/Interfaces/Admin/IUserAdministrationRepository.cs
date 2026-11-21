@@ -15,6 +15,7 @@ public interface IUserAdministrationRepository
     Task EnsureTeacherProfile(int id, string code, CancellationToken ct);
     Task EnsureAdminProfile(int id, string code, CancellationToken ct);
     Task EnsureParentProfile(int id, CancellationToken ct);
+    Task EnsureProfileForRole(int userId, byte role, CancellationToken ct);
     Task<bool> EmailExists(string email, CancellationToken ct);
     Task<bool> RecentInvitation(int id, DateTime now, CancellationToken ct);
     Task<List<AccountInvitation>> OpenInvitations(int id, CancellationToken ct);
@@ -33,9 +34,27 @@ public interface IUserAdministrationRepository
     Task<string?> DepartmentCode(int id, CancellationToken ct);
     /// <summary>Checks that a position belongs to the given department.</summary>
     Task<bool> PositionBelongsToDepartment(int positionId, int departmentId, CancellationToken ct);
+    Task<bool> HasPositionAppointments(int positionId, CancellationToken ct);
     Task<bool> DirectoryCodeExists(string kind, string? code, int? departmentId, CancellationToken ct);
     Task<int> WriteDirectory(string kind, int? id, DirectoryRequest r, CancellationToken ct);
+    /// <summary>Hard deletes a department or job title. Returns 0 when the row is gone or still referenced.</summary>
+    Task<int> DeleteDirectory(string kind, int id, CancellationToken ct);
+    /// <summary>Explains what still references a department. Null when it can be deleted.</summary>
+    Task<string?> DepartmentDeleteBlocker(int id, CancellationToken ct);
+    /// <summary>Explains what still references a job title. Null when it can be deleted.</summary>
+    Task<string?> PositionDeleteBlocker(int id, CancellationToken ct);
+    /// <summary>All permissions an administrator can attach to a job title.</summary>
+    Task<List<PermissionCatalogDto>> AvailablePermissions(CancellationToken ct);
+    /// <summary>Permission codes that already exist, so unknown codes are rejected.</summary>
+    Task<HashSet<string>> ExistingPermissionCodes(CancellationToken ct);
+    /// <summary>Loads a job title with its published policy so an appointment can inherit the permissions.</summary>
+    Task<Position?> PositionWithPolicy(int id, CancellationToken ct);
     void AddUser(User entity);
     void AddAudit(AuditLog entity);
     void AddInvitation(AccountInvitation entity);
+    void AddPolicyRole(PositionPolicyRole entity);
+    void AddPolicyPermission(PositionPolicyPermission entity);
+    void AddRoleGrant(UserRoleAssignment entity);
+    /// <summary>Sets IsActive on a department or job title; returns affected rows.</summary>
+    Task<int> SetDirectoryStatus(string kind, int id, bool isActive, CancellationToken ct);
 }

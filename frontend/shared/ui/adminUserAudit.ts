@@ -19,6 +19,10 @@ const actionLabels: Record<string, string> = {
   INVITATION_ACCEPTED: 'Kích hoạt tài khoản',
   APPOINTMENT_CREATED: 'Bổ nhiệm chức danh và phòng ban',
   APPOINTMENT_ENDED: 'Kết thúc bổ nhiệm',
+  APPOINTMENT_TRANSFERRED: 'Chuyển phòng/chức danh',
+  STAFF_ACCESS_RECONCILED: 'Đối soát bổ nhiệm và quyền',
+  POSITION_ACCESS_CHANGED: 'Cập nhật quyền theo chức danh',
+  STAFF_EXCEPTION_GRANTED: 'Cấp quyền bổ sung',
 };
 const employmentLabels: Record<string, string> = {
   FULL_TIME: 'Toàn thời gian', PART_TIME: 'Bán thời gian', CONTRACTOR: 'Cộng tác viên',
@@ -127,6 +131,15 @@ export function describeUserAudit(
     case 'INVITATION_ACCEPTED':
       message = 'Người dùng đã đặt mật khẩu và kích hoạt tài khoản.';
       break;
+  }
+
+  if (Array.isArray(after.grants) && event.action !== 'USER_CREATED') {
+    const oldGrants = Array.isArray(before.grants) ? before.grants : [];
+    const previous = oldGrants.map(grant).sort().join('\n') || 'Chưa có';
+    const next = after.grants.map(grant).sort().join('\n') || 'Không còn quyền';
+    if (previous !== next) changes.push({label: 'Vai trò và phạm vi', before: previous, after: next});
+    else message = 'Đã cập nhật nguồn bổ nhiệm; các vai trò đang có được giữ nguyên.';
+    if (event.action === 'APPOINTMENT_ENDED') changes.splice(0, 1);
   }
 
   return {

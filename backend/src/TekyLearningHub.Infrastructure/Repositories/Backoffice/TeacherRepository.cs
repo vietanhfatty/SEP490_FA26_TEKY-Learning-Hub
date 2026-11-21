@@ -17,16 +17,21 @@ public sealed class TeacherRepository(ApplicationDbContext db) : ITeacherReposit
     public Task<User?> FindUserForUpdate(int userId, CancellationToken ct) =>
         db.Users.SingleOrDefaultAsync(u => u.UserId == userId, ct);
 
+    private IQueryable<Class> ScopedClasses(int teacherId) => db.Classes.Where(c => c.TeacherId == teacherId &&
+        (!db.Users.Any(u => u.UserId == teacherId && u.StaffAccessManaged) || db.UserRoles.Any(g => g.UserId == teacherId && g.RoleId == 2 && g.RevokedAt == null &&
+            (g.ScopeType == "GLOBAL" || c.Course.DepartmentId != null && g.DepartmentId == c.Course.DepartmentId) &&
+            g.Sources.Any(source => source.EndedAt == null && (source.Kind == "EXCEPTION" || source.Kind == "APPOINTMENT" && source.Appointment != null && source.Appointment.ValidTo == null && source.Appointment.PolicyId == source.PolicyId)))));
+
     public Task<List<Class>> TeacherClasses(int teacherId, CancellationToken ct) =>
-        db.Classes.AsNoTracking()
-            .Where(c => c.TeacherId == teacherId && c.Status == "Open")
+        ScopedClasses(teacherId).AsNoTracking()
+            .Where(c => c.Status == "Open")
             .Include(c => c.ClassSessions)
             .Include(c => c.Enrollments)
             .ToListAsync(ct);
 
     public Task<List<Class>> TeacherClassesIncludingPlanned(int teacherId, CancellationToken ct) =>
-        db.Classes.AsNoTracking()
-            .Where(c => c.TeacherId == teacherId && (c.Status == "Open" || c.Status == "Planned"))
+        ScopedClasses(teacherId).AsNoTracking()
+            .Where(c => c.Status == "Open" || c.Status == "Planned")
             .Include(c => c.Enrollments)
             .ToListAsync(ct);
 
@@ -75,7 +80,7 @@ public sealed class TeacherRepository(ApplicationDbContext db) : ITeacherReposit
 
     public Task<List<MakeupRequest>> TeacherMakeupRequests(int teacherId, CancellationToken ct) =>
         db.MakeupRequests.AsNoTracking()
-            .Where(m => m.Attendance.Session.Class.TeacherId == teacherId)
+            .Where(m => ScopedClasses(teacherId).Any(c => c.ClassId == m.Attendance.Session.ClassId))
             .Include(m => m.Attendance).ThenInclude(a => a.Student).ThenInclude(s => s!.User)
             .Include(m => m.Attendance).ThenInclude(a => a.Session).ThenInclude(s => s!.Class)
             .Include(m => m.PreferredSession)
@@ -92,7 +97,7 @@ public sealed class TeacherRepository(ApplicationDbContext db) : ITeacherReposit
     public Task<List<Submission>> GradingQueue(int teacherId, int? classId, CancellationToken ct)
     {
         var query = db.Submissions.AsNoTracking()
-            .Where(s => s.IsCurrent && s.Assignment.Class.TeacherId == teacherId);
+            .Where(s => s.IsCurrent && ScopedClasses(teacherId).Any(c => c.ClassId == s.Assignment.ClassId));
         if (classId.HasValue) query = query.Where(s => s.Assignment.ClassId == classId.Value);
         return query
             .Include(s => s.Assignment).ThenInclude(a => a.Class)

@@ -1,1 +1,90 @@
 .directory-page{max-width:1440px;margin:auto;padding:clamp(16px,3vw,32px);color:#172b4d}.directory-heading h1{font-size:28px;letter-spacing:-.02em;margin:0}.directory-page p{max-width:70ch;line-height:1.6}.directory-page section{margin-top:36px}.directory-section-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}.directory-section-heading h2{font-size:20px;margin:0}.directory-page button,.directory-dialog button{font:inherit;min-height:40px;padding:8px 14px;border:1px solid #b8c8da;border-radius:7px;background:#fff;color:#17365f;cursor:pointer;transition:background .15s ease}.directory-page button:hover,.directory-dialog button:hover{background:#edf4ff}.directory-page button:active,.directory-dialog button:active{background:#dbeafe}.directory-page button:disabled,.directory-dialog button:disabled{opacity:.55;cursor:default}.directory-page :focus-visible,.directory-dialog :focus-visible{outline:3px solid #2563eb;outline-offset:2px}.directory-page .directory-primary,.directory-dialog .directory-primary{background:#1d4ed8;border-color:#1d4ed8;color:#fff}.directory-page .directory-primary:hover,.directory-dialog .directory-primary:hover{background:#1e40af}.directory-table-wrap{overflow-x:auto;background:#fff;border:1px solid #d8e1ed;border-radius:9px}.directory-table-wrap table{width:100%;border-collapse:collapse;text-align:left;table-layout:fixed;min-width:690px}.directory-table-wrap th,.directory-table-wrap td{padding:12px 16px;border-bottom:1px solid #e4ebf3;vertical-align:top;overflow-wrap:anywhere}.directory-table-wrap th{background:#eff4fa}.directory-table-wrap th:nth-child(1){width:22%}.directory-table-wrap th:nth-child(2){width:26%}.directory-table-wrap th:nth-child(3){width:18%}.directory-table-wrap th:nth-child(4){width:14%}.directory-table-wrap th:nth-child(5){width:20%}.directory-table-wrap caption{text-align:left;padding:12px 16px;font-weight:600}.directory-table-wrap tr:last-child td{border-bottom:0}.directory-table-wrap code{font-size:12px}.directory-table-wrap td{font-variant-numeric:tabular-nums}.directory-status{display:inline-block;border-radius:20px;padding:4px 10px;font-size:13px;background:#f1f5f9;color:#334155}.directory-status.is-active,.directory-success{background:#ecfdf5;color:#065f46}.directory-actions{display:flex;flex-wrap:wrap;gap:8px}.directory-error{background:#fef2f2;color:#991b1b}.directory-error,.directory-success{padding:12px;border-radius:6px;margin:16px 0}.directory-empty{padding:16px;background:#fff}.directory-dialog{position:fixed;inset:0;margin:auto;width:min(560px,calc(100vw - 32px));max-height:88vh;overflow:auto;padding:24px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;color:#172b4d;box-shadow:0 16px 48px #0f172a33}.directory-dialog::backdrop{background:#0f172a70}.directory-dialog fieldset{border:0;padding:0;margin:0;min-width:0}.directory-dialog label{display:flex;flex-direction:column;gap:6px;font-weight:600;margin-top:20px}.directory-dialog input,.directory-dialog select{font:inherit;min-height:42px;padding:8px 10px;border:1px solid #aebed0;border-radius:6px;color:#172b4d;background:#fff;box-sizing:border-box;width:100%}.directory-dialog input[readonly]{background:#f1f5f9}.directory-code-row{display:flex;gap:12px;align-items:flex-end}.directory-code-row label{flex:1 1 auto;min-width:0}.directory-help{font-size:13px;color:#475569;line-height:1.6;margin:8px 0}.directory-help code{font-size:12px;background:#eef4fb;padding:2px 6px;border-radius:4px}.directory-form-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}.talent-dark .directory-page{color:#f8fafc}.talent-dark .directory-table-wrap,.talent-dark .directory-dialog{background:#1e293b;color:#f8fafc;border-color:#475569}.talent-dark .directory-table-wrap th{background:#334155}.talent-dark .directory-table-wrap td,.talent-dark .directory-table-wrap th{border-color:#475569}.talent-dark .directory-help{color:#cbd5e1}.talent-dark .directory-help code{background:#334155;color:#e2e8f0}.talent-dark .directory-dialog input,.talent-dark .directory-dialog select{background:#0f172a;color:#f8fafc;border-color:#475569}.talent-dark .directory-dialog input[readonly]{background:#334155}.talent-dark .directory-empty{background:#1e293b}@media(max-width:760px){.directory-page button,.directory-dialog button{min-height:44px}.directory-dialog{padding:18px}.directory-code-row{flex-direction:column;align-items:stretch}.directory-page section{margin-top:28px}.directory-heading h1{font-size:25px}}
+
+.directory-position-policy { margin:24px 0 8px; padding:16px; background:#f8fafc; border-radius:8px; }
+.directory-position-policy h3 { margin:0 0 8px; font-size:16px; }
+.directory-position-policy h4 { margin:20px 0 8px; font-size:14px; }
+.directory-position-policy .directory-policy-roles,.directory-position-policy .directory-policy-employment { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:4px 16px; }
+.directory-position-policy .staff-checkbox { display:flex; flex-direction:row; align-items:center; gap:10px; min-height:44px; margin:0; font-weight:400; }
+.directory-position-policy .staff-checkbox input { width:18px; height:18px; min-height:18px; flex:none; accent-color:#2563eb; }
+.directory-position-policy textarea { display:block; width:100%; min-height:68px; padding:9px 10px; border:1px solid #aebed0; border-radius:6px; font:inherit; color:#172b4d; background:#fff; box-sizing:border-box; resize:vertical; }
+.directory-policy-impact-hint { margin:12px 0; color:#92400e; }
+.directory-policy-preview { margin-top:16px; padding-top:12px; border-top:1px solid #dce5ef; }
+.talent-dark .directory-position-policy { background:#334155; }
+.talent-dark .directory-position-policy textarea { background:#0f172a; color:#f8fafc; border-color:#475569; }
+@media(max-width:600px) { .directory-position-policy { padding:12px; } }
+
+/* Tab switcher: one screen, two directory lists. */
+.directory-tabs { display:flex; gap:4px; margin-top:24px; border-bottom:1px solid #d8e1ed; }
+.directory-tab { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:10px 16px;
+  border:1px solid transparent; border-bottom:none; border-radius:8px 8px 0 0; background:transparent; color:#475569; font-weight:600; }
+.directory-tab:hover { background:#eff4fa; }
+.directory-tab:active { background:#dbeafe; }
+.directory-tab.is-active { background:#fff; border-color:#d8e1ed; color:#1d4ed8; margin-bottom:-1px; padding-bottom:11px; }
+.directory-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px;
+  padding:0 6px; border-radius:11px; background:#e2e8f0; color:#334155; font-size:12px; font-variant-numeric:tabular-nums; }
+.directory-tab.is-active .directory-tab-count { background:#dbeafe; color:#1d4ed8; }
+.directory-tabs + section { margin-top:0; }
+
+/* Permission picker grouped by the permission prefix. */
+.directory-permission-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:8px; }
+.directory-permission-group { border:1px solid #d8e1ed; border-radius:8px; padding:10px 12px 6px; margin:0; background:#fff; }
+.directory-permission-group legend { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#475569; padding:0 6px; }
+.directory-position-policy .directory-permission-group .staff-checkbox { font-size:13px; }
+.directory-position-policy .directory-permission-group .staff-checkbox code { font-size:11px; }
+
+/* Muted cell text and the destructive delete action. */
+.directory-muted { color:#64748b; }
+.directory-permission-cell { font-variant-numeric:tabular-nums; }
+.directory-page .directory-danger { color:#b91c1c; border-color:#fca5a5; background:#fff; }
+.directory-page .directory-danger:hover:not(:disabled) { background:#fef2f2; }
+.directory-page .directory-danger:active:not(:disabled) { background:#fee2e2; }
+.directory-page .directory-danger:disabled { color:#94a3b8; border-color:#e2e8f0; background:#f8fafc; opacity:1; }
+
+.talent-dark .directory-tabs { border-color:#475569; }
+.talent-dark .directory-tab { color:#cbd5e1; }
+.talent-dark .directory-tab:hover { background:#334155; }
+.talent-dark .directory-tab.is-active { background:#1e293b; border-color:#475569; color:#93c5fd; }
+.talent-dark .directory-tab-count { background:#475569; color:#e2e8f0; }
+.talent-dark .directory-tab.is-active .directory-tab-count { background:#1e40af; color:#dbeafe; }
+.talent-dark .directory-permission-group { background:#0f172a; border-color:#475569; }
+.talent-dark .directory-permission-group legend { color:#cbd5e1; }
+.talent-dark .directory-page .directory-danger { color:#fca5a5; border-color:#7f1d1d; background:transparent; }
+.talent-dark .directory-page .directory-danger:hover:not(:disabled) { background:#450a0a; }
+.talent-dark .directory-page .directory-danger:disabled { color:#64748b; border-color:#475569; background:#0f172a; }
+@media(max-width:760px) { .directory-tabs { flex-wrap:wrap; } .directory-permission-groups { grid-template-columns:1fr; } }
+
+.directory-page { max-width:none; width:100%; margin:0; padding:0; box-sizing:border-box; }
+.directory-heading h1 { font-size:24px; letter-spacing:0; }
+.directory-page > section { margin-top:20px; }
+.directory-section-heading { margin-bottom:14px; }
+.directory-section-heading h2 { font-size:18px; }
+.directory-page .directory-primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.directory-filterbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 12px; }
+.directory-search { display:flex; align-items:center; gap:8px; flex:1 1 270px; max-width:400px; min-height:40px; padding:0 12px; border:1px solid #b8c8da; border-radius:6px; background:#fff; color:#475569; }
+.directory-search:focus-within,.directory-department-filter:focus-within { outline:2px solid #2563eb; outline-offset:2px; }
+.directory-search input { width:100%; min-width:0; height:38px; border:0; outline:0; background:transparent; color:#172b4d; font:inherit; }
+.directory-search input::placeholder { color:#52647d; }
+.directory-department-filter select { min-height:40px; max-width:280px; padding:8px 32px 8px 12px; border:1px solid #b8c8da; border-radius:6px; background:#fff; color:#17365f; font:inherit; }
+.directory-result-count { margin-left:auto; color:#475569; font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.directory-table-wrap { max-height:min(72vh,720px); overflow:auto; border-radius:6px; }
+.directory-table-wrap table { table-layout:auto; min-width:850px; font-size:13px; }
+.directory-table-wrap table.directory-table--positions { min-width:1120px; }
+.directory-table-wrap th:nth-child(-n+5) { width:auto; }
+.directory-table-wrap th,.directory-table-wrap td { padding:10px 12px; vertical-align:middle; overflow-wrap:normal; }
+.directory-table-wrap th { position:sticky; top:0; z-index:1; white-space:nowrap; font-weight:700; color:#334155; }
+.directory-table-wrap td:first-child { min-width:135px; }
+.directory-table-wrap td:nth-child(2) { min-width:180px; }
+.directory-table-wrap td:last-child { min-width:218px; }
+.directory-table-wrap tbody tr:hover { background:#f8fbff; }
+.directory-status { white-space:nowrap; }
+.directory-table-wrap code { overflow-wrap:anywhere; color:#17365f; }
+.directory-actions { flex-wrap:nowrap; gap:4px; }
+.directory-actions button,.directory-page .directory-danger { min-height:34px; padding:6px 8px; font-size:12px; white-space:nowrap; }
+.directory-empty { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #d8e1ed; border-top:0; }
+.talent-dark .directory-search,.talent-dark .directory-department-filter select { background:#1e293b; color:#f8fafc; border-color:#475569; }
+.talent-dark .directory-search input { color:#f8fafc; }
+.talent-dark .directory-search input::placeholder,.talent-dark .directory-result-count { color:#cbd5e1; }
+.talent-dark .directory-table-wrap th { color:#e2e8f0; }
+.talent-dark .directory-table-wrap code { color:#bfdbfe; }
+.talent-dark .directory-table-wrap tbody tr:hover { background:#25364e; }
+@media(max-width:760px) { .directory-page { padding:0; } .directory-heading h1 { font-size:22px; } .directory-filterbar { align-items:stretch; } .directory-search { max-width:none; flex-basis:100%; } .directory-department-filter select { max-width:none; width:100%; } .directory-result-count { margin-left:0; align-self:center; } .directory-actions button,.directory-page .directory-danger { min-height:44px; } }

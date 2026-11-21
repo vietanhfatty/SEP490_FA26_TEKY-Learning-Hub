@@ -6,6 +6,7 @@ export type AccessGrant = {
   departmentId: number | null;
   departmentName: string | null;
   permissions: string[];
+  sources?: {kind:string;position:string|null;department:string|null;reason:string}[];
 };
 export type ScopedPermission = {
   code: string;

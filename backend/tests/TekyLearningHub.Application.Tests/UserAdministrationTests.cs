@@ -21,7 +21,7 @@ public class UserAdministrationTests
         var academic = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='ACADEMIC'");
         foreach (var (kind, table, key, label) in new[] { ("positions", "Positions", "PositionId", "chức danh"), ("departments", "Departments", "DepartmentId", "phòng ban") })
         {
-            var code = kind == "positions" ? "TEACHER" : "ACADEMIC";
+            var code = kind == "positions" ? "ACADEMIC_SPECIALIST" : "ACADEMIC";
             // Positions belong to a department; departments do not.
             int? owner = kind == "positions" ? academic : null;
             var id = await database.Scalar($"SELECT {key} FROM dbo.{table} WHERE Code='{code}'");
@@ -64,9 +64,9 @@ public class UserAdministrationTests
         Assert.Equal(1, await database.Scalar($"SELECT COUNT(*) FROM dbo.Positions WHERE Code='ACADEMIC_CHUYEN_VIEN_GIAO_DUC_HOC_THUAT' AND DepartmentId={academic}"));
 
         // The same name in another department produces a different code.
-        var operations = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='STEM_OPERATIONS'");
+        var operations = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='TRAINING'");
         await service.Directory(1, "positions", null, new() { Name = "Giáo viên Fulltime", DepartmentId = operations });
-        Assert.Equal(1, await database.Scalar($"SELECT COUNT(*) FROM dbo.Positions WHERE Code='STEM_OPERATIONS_GIAO_VIEN_FULLTIME' AND DepartmentId={operations}"));
+        Assert.Equal(1, await database.Scalar($"SELECT COUNT(*) FROM dbo.Positions WHERE Code='TRAINING_GIAO_VIEN_FULLTIME' AND DepartmentId={operations}"));
 
         // The same code is rejected twice inside one department but allowed across departments.
         var duplicate = await Assert.ThrowsAsync<UserAdministrationException>(() =>
@@ -94,18 +94,19 @@ public class UserAdministrationTests
         var service = TestServices.Administration(db, new PasswordHasher(), new EphemeralDataProtectionProvider(), new ConfigurationBuilder().Build());
 
         var academic = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='ACADEMIC'");
-        var operations = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='STEM_OPERATIONS'");
-        var position = await database.Scalar("SELECT PositionId FROM dbo.Positions WHERE Code='TEACHER'");
+        var operations = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='TRAINING'");
+        var position = await database.Scalar("SELECT PositionId FROM dbo.Positions WHERE Code='TEACHER_FULL_TIME'");
+        await database.Execute("UPDATE dbo.Users SET StaffAccessManaged=1 WHERE UserId=2; INSERT dbo.UserRoleGrantSources(UserRoleId,Kind,Reason) SELECT UserRoleId,'EXCEPTION',N'Test assignment' FROM dbo.UserRoles WHERE UserId=2;");
 
-        // The position belongs to ACADEMIC, so appointing it to STEM_OPERATIONS is rejected.
+        // The position belongs to ACADEMIC, so appointing it to TRAINING is rejected.
         var mismatch = await Assert.ThrowsAsync<UserAdministrationException>(() =>
-            service.Appointment(1, 2, new() { Version = 0, DepartmentId = operations, PositionId = position, EmploymentType = "FULL_TIME" }, null));
+            service.Appointment(1, 2, new() { Version = 0, PolicyVersion = 1, DepartmentId = operations, PositionId = position, EmploymentType = "FULL_TIME" }, null));
         Assert.Equal(400, mismatch.Status);
         Assert.Contains("Chức danh không thuộc phòng ban đã chọn", mismatch.Message);
         Assert.Equal(0, await database.Scalar("SELECT COUNT(*) FROM dbo.StaffAppointments WHERE UserId=2"));
 
         // The matching department is accepted.
-        await service.Appointment(1, 2, new() { Version = 0, DepartmentId = academic, PositionId = position, EmploymentType = "FULL_TIME" }, null);
+        await service.Appointment(1, 2, new() { Version = 0, PolicyVersion = 1, DepartmentId = academic, PositionId = position, EmploymentType = "FULL_TIME" }, null);
         Assert.Equal(1, await database.Scalar("SELECT COUNT(*) FROM dbo.StaffAppointments WHERE UserId=2 AND DepartmentId=" + academic));
     }
 
@@ -129,7 +130,12 @@ public class UserAdministrationTests
             var appointment = await Assert.ThrowsAsync<UserAdministrationException>(() => service.Appointment(1, id, new() { DepartmentId = 1, PositionId = 1 }, null)); Assert.Equal(409, appointment.Status);
         }
         // The default role need not be the first grant in the request.
-        await service.Create(1, new() { Email = "staff@test.local", FullName = "Staff", PrimaryRoleId = 6, Grants = [new() { RoleId = 2 }, new() { RoleId = 6, ScopeType = "DEPARTMENT", DepartmentId = 1 }] });
+        var staffService = TestServices.StaffAccess(db);
+        var positionPolicy = (await staffService.Policies(1)).Single(x => x.Position == "Giáo viên Fulltime");
+        var updated = await staffService.SavePolicy(1, positionPolicy.PositionId, new() { Version = positionPolicy.Version,
+            RoleIds = [2,6], PermissionCodes = positionPolicy.ActivePermissionCodes ?? [], EmploymentTypes = ["FULL_TIME"], Publish = true });
+        await service.Create(1, new() { Email = "staff@test.local", FullName = "Staff", PrimaryRoleId = 6,
+            Appointments = [new() { PositionId = updated.PositionId, DepartmentId = updated.DepartmentId, PolicyVersion = updated.ActiveVersion!.Value }] });
         Assert.Equal(2, await database.Scalar("SELECT COUNT(*) FROM dbo.UserRoles WHERE UserId=(SELECT UserId FROM dbo.Users WHERE Email='staff@test.local') AND RevokedAt IS NULL"));
         Assert.Equal(2, await database.Scalar("SELECT COUNT(*) FROM dbo.UserRoles WHERE UserId IN (2,3) AND RevokedAt IS NULL"));
     }
@@ -158,7 +164,11 @@ public class UserAdministrationTests
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(database.ConnectionString).Options);
         var service = TestServices.Administration(db, new PasswordHasher(), new EphemeralDataProtectionProvider(), new ConfigurationBuilder().Build());
         var denied = await Assert.ThrowsAsync<UserAdministrationException>(() => service.List(2, null, null, null, null, 0, 20)); Assert.Equal(403, denied.Status);
-        await service.Mutate(1, 2, "grant", new() { Version = 0, Grant = new() { RoleId = 5, ScopeType = "DEPARTMENT", DepartmentId = 1 } });
+        await Assert.ThrowsAsync<UserAdministrationException>(() => service.Mutate(1, 2, "grant", new() { Version = 0, Grant = new() { RoleId = 5, ScopeType = "DEPARTMENT", DepartmentId = 1 } }));
+        var staffService = TestServices.StaffAccess(db);
+        var policy = (await staffService.Policies(1)).Single(x => x.Position == "Giáo viên Fulltime");
+        await staffService.Reconcile(1, 2, new() { Version = 0, Reason = "Liên kết quyền với công tác thực tế",
+            Appointments = [new() { PositionId = policy.PositionId, DepartmentId = policy.DepartmentId, PolicyVersion = policy.ActiveVersion!.Value }] });
         Assert.Equal(0, await database.Scalar("SELECT COUNT(*) FROM dbo.UserSessions WHERE UserId=2 AND IsActive=1"));
         Assert.Equal(1, await database.Scalar("SELECT SecurityVersion FROM dbo.Users WHERE UserId=2"));
         var stale = await Assert.ThrowsAsync<UserAdministrationException>(() => service.Update(1, 2, new() { Version = 0, FullName = "Stale" })); Assert.Equal(409, stale.Status);

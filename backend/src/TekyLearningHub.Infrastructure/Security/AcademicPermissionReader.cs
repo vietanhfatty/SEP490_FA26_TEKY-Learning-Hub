@@ -7,14 +7,9 @@ namespace TekyLearningHub.Infrastructure.Security;
 /// <summary>Checks live scoped grants. JWT role membership alone never grants content access.</summary>
 public sealed class AcademicPermissionReader(ApplicationDbContext db) : IAcademicPermissionReader
 {
-    public Task<bool> HasPermissionAsync(int userId, string permission, int? departmentId, CancellationToken ct = default) =>
-        (from grant in db.UserRoles
-         join rolePermission in db.RolePermissions on grant.RoleId equals rolePermission.RoleId
-         join definition in db.Permissions on rolePermission.PermissionId equals definition.PermissionId
-         where grant.UserId == userId && grant.User.Status == "Active" && grant.RevokedAt == null
-             && definition.Code == permission
-             && (grant.ScopeType == "GLOBAL" || (departmentId != null && grant.DepartmentId == departmentId))
-         select grant.UserRoleId).AnyAsync(ct);
+    public async Task<bool> HasPermissionAsync(int userId, string permission, int? departmentId, CancellationToken ct = default) =>
+        await db.Database.SqlQuery<int>($"SELECT CAST(dbo.HasAcademicPermission({userId},{permission},{departmentId}) AS int) AS Value")
+            .SingleAsync(ct) == 1;
 
     public async Task<bool> CanEditAsync(int userId, long contentId, CancellationToken ct = default) =>
         await db.Database.SqlQuery<int>($"""

@@ -196,6 +196,7 @@ public class DatabaseMigrationTests
             // Only drop the uniquely generated database belonging to this test, never a configured app DB.
             if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^Teky_MigrationTests_[a-f0-9]{32}$")) throw new InvalidOperationException();
             await using var master = Master(); await master.OpenAsync(); await using var command = master.CreateCommand();
+            command.CommandTimeout = 120;
             command.CommandText = $"IF DB_ID(N'{name}') IS NOT NULL BEGIN ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{name}]; END";
             await command.ExecuteNonQueryAsync();
         }

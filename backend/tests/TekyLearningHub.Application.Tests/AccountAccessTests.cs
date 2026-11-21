@@ -18,7 +18,7 @@ public class AccountAccessTests
         await using var database = new DatabaseMigrationTests.TestDatabase();
         await database.Migrate();
         var academic = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='ACADEMIC'");
-        var operations = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='STEM_OPERATIONS'");
+        var operations = await database.Scalar("SELECT DepartmentId FROM dbo.Departments WHERE Code='TRAINING'");
         await database.Execute($"""
             INSERT dbo.Users(Email,PasswordHash,PrimaryRoleId,FullName) VALUES('scoped@test.local','hash',2,'Scoped');
             INSERT dbo.UserRoles(UserId,RoleId,ScopeType,DepartmentId) VALUES

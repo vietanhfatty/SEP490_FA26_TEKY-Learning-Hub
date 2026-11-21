@@ -41,6 +41,11 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
     public async Task EnsureTeacherProfile(int id, string code, CancellationToken ct) => await db.Database.ExecuteSqlInterpolatedAsync($"IF NOT EXISTS(SELECT 1 FROM dbo.TeacherProfiles WHERE UserId={id}) INSERT dbo.TeacherProfiles(UserId,TeacherCode) VALUES({id},{code});", ct);
     public async Task EnsureAdminProfile(int id, string code, CancellationToken ct) => await db.Database.ExecuteSqlInterpolatedAsync($"IF NOT EXISTS(SELECT 1 FROM dbo.AdminProfiles WHERE UserId={id}) INSERT dbo.AdminProfiles(UserId,StaffCode) VALUES({id},{code});", ct);
     public async Task EnsureParentProfile(int id, CancellationToken ct) => await db.Database.ExecuteSqlInterpolatedAsync($"IF NOT EXISTS(SELECT 1 FROM dbo.ParentProfiles WHERE UserId={id}) INSERT dbo.ParentProfiles(UserId) VALUES({id});", ct);
+    public Task EnsureProfileForRole(int id, byte role, CancellationToken ct) => role switch
+    {
+        1 => EnsureStudentProfile(id, "ST-" + id, ct), 2 => EnsureTeacherProfile(id, "TC-" + id, ct),
+        3 => EnsureAdminProfile(id, "AD-" + id, ct), 4 => EnsureParentProfile(id, ct), _ => Task.CompletedTask
+    };
     public async Task<bool> EmailExists(string email, CancellationToken ct) => await db.Users.AnyAsync(x => x.Email.Trim().ToLower() == email, ct);
     public async Task<bool> RecentInvitation(int id, DateTime now, CancellationToken ct) => await db.AccountInvitations.AnyAsync(x => x.UserId == id && x.CreatedAt > now.AddSeconds(-60), ct);
     public async Task<List<AccountInvitation>> OpenInvitations(int id, CancellationToken ct) => await db.AccountInvitations.Where(x => x.UserId == id && x.UsedAt == null && x.RevokedAt == null).ToListAsync(ct);
@@ -54,9 +59,25 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
     {
         var roles = await db.Roles.AsNoTracking().OrderBy(x => x.RoleId).Select(x => new RoleCatalogDto(x.RoleId, x.RoleName)).ToListAsync(ct);
         var permissions = await (from rp in db.RolePermissions join p in db.Permissions on rp.PermissionId equals p.PermissionId select new RolePermissionDto(rp.RoleId, p.Code, p.Description)).ToListAsync(ct);
-        var departments = await db.Database.SqlQuery<DirectoryEntry>($"SELECT DepartmentId AS Id,Code,Name,IsActive,CAST(NULL AS int) AS DepartmentId,CAST('' AS nvarchar(160)) AS DepartmentName FROM dbo.Departments ORDER BY Name").ToListAsync(ct);
-        var positions = await db.Database.SqlQuery<DirectoryEntry>($"SELECT p.PositionId AS Id,p.Code,p.Name,p.IsActive,p.DepartmentId,d.Name AS DepartmentName FROM dbo.Positions p JOIN dbo.Departments d ON d.DepartmentId=p.DepartmentId ORDER BY d.Name,p.Name").ToListAsync(ct);
-        return new AdministrationCatalog(roles, permissions, departments, positions);
+        var available = await db.Permissions.AsNoTracking().OrderBy(x => x.Code).Select(x => new PermissionCatalogDto(x.Code, x.Description)).ToListAsync(ct);
+        // Delete blockers are computed in the same query as the list so the catalogue costs two round trips.
+        var departments = await db.Database.SqlQueryRaw<DirectoryEntry>($"""
+            SELECT d.DepartmentId AS Id,d.Code,d.Name,d.IsActive,d.FunctionCode,CAST(NULL AS int) AS DepartmentId,
+              CAST('' AS nvarchar(160)) AS DepartmentName,
+              (SELECT COUNT(*) FROM dbo.Positions p WHERE p.DepartmentId=d.DepartmentId) AS PositionCount,
+              (SELECT COUNT(*) FROM dbo.StaffAppointments a WHERE a.DepartmentId=d.DepartmentId AND a.ValidTo IS NULL) AS ActiveAppointmentCount,
+              CAST(CASE WHEN b.Value IS NULL THEN 1 ELSE 0 END AS bit) AS CanDelete,b.Value AS DeleteBlockedReason
+            FROM dbo.Departments d OUTER APPLY ({DepartmentBlockerSql("d.DepartmentId")}) b ORDER BY d.Name
+            """).ToListAsync(ct);
+        var positions = await db.Database.SqlQueryRaw<DirectoryEntry>($"""
+            SELECT p.PositionId AS Id,p.Code,p.Name,p.IsActive,d.FunctionCode,p.DepartmentId,d.Name AS DepartmentName,
+              CAST(0 AS int) AS PositionCount,
+              (SELECT COUNT(*) FROM dbo.StaffAppointments a WHERE a.PositionId=p.PositionId AND a.ValidTo IS NULL) AS ActiveAppointmentCount,
+              CAST(CASE WHEN b.Value IS NULL THEN 1 ELSE 0 END AS bit) AS CanDelete,b.Value AS DeleteBlockedReason
+            FROM dbo.Positions p JOIN dbo.Departments d ON d.DepartmentId=p.DepartmentId
+            OUTER APPLY ({PositionBlockerSql("p.PositionId")}) b ORDER BY d.Name,p.Name
+            """).ToListAsync(ct);
+        return new AdministrationCatalog(roles, permissions, departments, positions, available);
     }
     public async Task<AuditPage> AuditEvents(int id, int skip, int take, CancellationToken ct)
     {
@@ -66,7 +87,8 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
     public async Task<int> EndAppointment(int id, long endId, CancellationToken ct) => await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.StaffAppointments SET ValidTo=SYSUTCDATETIME() WHERE AppointmentId={endId} AND UserId={id} AND ValidTo IS NULL", ct);
     public async Task<bool> PositionExists(int id, CancellationToken ct) => await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE PositionId={id} AND IsActive=1").AnyAsync(ct);
     public async Task<string?> DepartmentCode(int id, CancellationToken ct) => await db.Database.SqlQuery<string>($"SELECT Code AS Value FROM dbo.Departments WHERE DepartmentId={id}").SingleOrDefaultAsync(ct);
-    public async Task<bool> PositionBelongsToDepartment(int positionId, int departmentId, CancellationToken ct) => await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE PositionId={positionId} AND DepartmentId={departmentId}").AnyAsync(ct);
+    public async Task<bool> PositionBelongsToDepartment(int positionId, int departmentId, CancellationToken ct) => await db.Database.SqlQuery<int>($"SELECT PositionId AS Value FROM dbo.Positions WHERE PositionId={positionId} AND DepartmentId={departmentId} AND IsActive=1").AnyAsync(ct);
+    public Task<bool> HasPositionAppointments(int positionId, CancellationToken ct) => db.StaffAppointments.AnyAsync(x => x.PositionId == positionId, ct);
     public async Task<int> AddAppointment(int id, AppointmentRequest r, CancellationToken ct) => await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.StaffAppointments(UserId,DepartmentId,PositionId,EmploymentType) VALUES({id},{r.DepartmentId},{r.PositionId},{r.EmploymentType})", ct);
     public async Task<bool> DirectoryCodeExists(string kind, string? code, int? departmentId, CancellationToken ct) => kind == "departments"
                    ? await db.Database.SqlQuery<int>($"SELECT DepartmentId AS Value FROM dbo.Departments WHERE Code={code}").AnyAsync(ct)
@@ -76,8 +98,8 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
         int changed; try
         {
             if (kind == "departments") changed = id.HasValue
-                   ? await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Departments SET Name={r.Name.Trim()},IsActive={r.IsActive} WHERE DepartmentId={id.Value}", ct)
-                   : await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Departments(Code,Name,IsActive) VALUES({r.Code},{r.Name.Trim()},{r.IsActive})", ct);
+                   ? await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Departments SET Name={r.Name.Trim()},IsActive={r.IsActive},FunctionCode={r.FunctionCode ?? "ACADEMIC"} WHERE DepartmentId={id.Value}", ct)
+                   : await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Departments(Code,Name,IsActive,FunctionCode) VALUES({r.Code},{r.Name.Trim()},{r.IsActive},{r.FunctionCode ?? "ACADEMIC"})", ct);
             else changed = id.HasValue
                 ? await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Positions SET Name={r.Name.Trim()},IsActive={r.IsActive},DepartmentId={r.DepartmentId} WHERE PositionId={id.Value}", ct)
                 : await db.Database.ExecuteSqlInterpolatedAsync($"INSERT dbo.Positions(Code,Name,IsActive,DepartmentId) VALUES({r.Code},{r.Name.Trim()},{r.IsActive},{r.DepartmentId})", ct); return changed;
@@ -87,4 +109,54 @@ public sealed class UserAdministrationRepository(ApplicationDbContext db) : IUse
     public void AddUser(User entity) => db.Users.Add(entity);
     public void AddAudit(AuditLog entity) => db.AuditLogs.Add(entity);
     public void AddInvitation(AccountInvitation entity) => db.AccountInvitations.Add(entity);
+    public void AddPolicyRole(PositionPolicyRole entity) => db.PositionPolicyRoles.Add(entity);
+    public void AddPolicyPermission(PositionPolicyPermission entity) => db.PositionPolicyPermissions.Add(entity);
+    public void AddRoleGrant(UserRoleAssignment entity) => db.UserRoles.Add(entity);
+    public async Task<int> DeleteDirectory(string kind, int id, CancellationToken ct)
+    {
+        try
+        {
+            if (kind == "departments")
+                return await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM dbo.Departments WHERE DepartmentId={id}", ct);
+            // Every job title carries at least one policy row; unused policies go with the title.
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                DELETE ppp FROM dbo.PositionPolicyPermissions ppp JOIN dbo.PositionAccessPolicies p ON p.PolicyId=ppp.PolicyId WHERE p.PositionId={id};
+                DELETE ppr FROM dbo.PositionPolicyRoles ppr JOIN dbo.PositionAccessPolicies p ON p.PolicyId=ppr.PolicyId WHERE p.PositionId={id};
+                DELETE FROM dbo.PositionAccessPolicies WHERE PositionId={id};
+                """, ct);
+            return await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM dbo.Positions WHERE PositionId={id}", ct);
+        }
+        catch (SqlException e) when (e.Number == 547) { throw new PersistenceConflictException("Directory entry is still referenced", false, e); }
+    }
+    /// <summary>First reason a department cannot be deleted, as a one-column (Value) query over the given id expression.</summary>
+    private static string DepartmentBlockerSql(string id) => $"""
+        SELECT TOP 1 CAST(reason AS nvarchar(200)) AS Value FROM (
+          SELECT N'còn chức danh' AS reason,COUNT(*) AS n FROM dbo.Positions WHERE DepartmentId={id}
+          UNION ALL SELECT N'còn nhân sự được bổ nhiệm',COUNT(*) FROM dbo.StaffAppointments WHERE DepartmentId={id}
+          UNION ALL SELECT N'còn quyền cấp phòng ban',COUNT(*) FROM dbo.UserRoles WHERE DepartmentId={id}
+          UNION ALL SELECT N'còn khóa học',COUNT(*) FROM dbo.Courses WHERE DepartmentId={id}
+          UNION ALL SELECT N'còn nội dung',COUNT(*) FROM dbo.Contents WHERE DepartmentId={id}) x WHERE n>0 ORDER BY n DESC
+        """;
+    /// <summary>First reason a job title cannot be deleted. Draft or unused policies do not block: they are removed with it.</summary>
+    private static string PositionBlockerSql(string id) => $"""
+        SELECT TOP 1 CAST(reason AS nvarchar(200)) AS Value FROM (
+          SELECT N'còn nhân sự được bổ nhiệm' AS reason,COUNT(*) AS n FROM dbo.StaffAppointments WHERE PositionId={id}
+          UNION ALL SELECT N'còn quyền được cấp theo chức danh',COUNT(*) FROM dbo.UserRoleGrantSources s
+            JOIN dbo.PositionAccessPolicies p ON p.PolicyId=s.PolicyId WHERE p.PositionId={id}) x WHERE n>0 ORDER BY n DESC
+        """;
+    public async Task<string?> DepartmentDeleteBlocker(int id, CancellationToken ct) =>
+        await db.Database.SqlQueryRaw<string>(DepartmentBlockerSql("{0}"), id).SingleOrDefaultAsync(ct);
+    public async Task<string?> PositionDeleteBlocker(int id, CancellationToken ct) =>
+        await db.Database.SqlQueryRaw<string>(PositionBlockerSql("{0}"), id).SingleOrDefaultAsync(ct);
+    public async Task<int> SetDirectoryStatus(string kind, int id, bool isActive, CancellationToken ct) => kind == "departments"
+        ? await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Departments SET IsActive={isActive} WHERE DepartmentId={id}", ct)
+        : await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Positions SET IsActive={isActive} WHERE PositionId={id}", ct);
+    public Task<List<PermissionCatalogDto>> AvailablePermissions(CancellationToken ct) =>
+        db.Permissions.AsNoTracking().OrderBy(x => x.Code).Select(x => new PermissionCatalogDto(x.Code, x.Description)).ToListAsync(ct);
+    public async Task<HashSet<string>> ExistingPermissionCodes(CancellationToken ct) =>
+        await db.Permissions.AsNoTracking().Select(x => x.Code).ToHashSetAsync(ct);
+    public Task<Position?> PositionWithPolicy(int id, CancellationToken ct) => db.Positions
+        .Include(x => x.Department).Include(x => x.Policies).ThenInclude(x => x.Roles)
+        .Include(x => x.Policies).ThenInclude(x => x.Permissions).ThenInclude(x => x.Permission)
+        .SingleOrDefaultAsync(x => x.PositionId == id, ct);
 }

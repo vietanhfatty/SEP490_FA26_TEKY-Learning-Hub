@@ -14,8 +14,10 @@ public class AcademicGovernanceTests
         ('manager@test.local','hash',6,N'Manager'),('admin@test.local','hash',3,N'Admin');
         INSERT dbo.UserRoles(UserId,RoleId,ScopeType,DepartmentId) VALUES
         (1,5,'DEPARTMENT',1),(2,5,'DEPARTMENT',1),(3,6,'DEPARTMENT',1),(4,3,'GLOBAL',NULL);
-        INSERT dbo.StaffAppointments(UserId,DepartmentId,PositionId,EmploymentType) VALUES
-        (1,1,1,'FULL_TIME'),(2,1,2,'PART_TIME'),(3,1,3,'FULL_TIME');
+        INSERT dbo.StaffAppointments(UserId,DepartmentId,PositionId,EmploymentType)
+        SELECT x.UserId,1,p.PositionId,x.EmploymentType FROM (VALUES
+        (1,'ACADEMIC_SPECIALIST','FULL_TIME'),(2,'TRAINING_QA','PART_TIME'),(3,'PD_ACADEMIC','FULL_TIME')) x(UserId,Code,EmploymentType)
+        JOIN dbo.Positions p ON p.Code=x.Code AND p.DepartmentId=1;
         INSERT dbo.Contents(DepartmentId,ContentType,CreatedBy) VALUES(1,'DOCUMENT',3);
         INSERT dbo.ContentVersions(ContentId,VersionNo,Title,Payload,CreatedBy) VALUES(1,1,N'Robotics',N'{"lesson":"v1"}',1);
         UPDATE dbo.Contents SET CandidateVersionId=1 WHERE ContentId=1;

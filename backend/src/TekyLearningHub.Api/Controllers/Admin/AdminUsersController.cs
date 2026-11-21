@@ -26,4 +26,27 @@ public sealed class AdminUsersController(IUserAdministrationService service, ILo
     [HttpPut("/api/admin/directory/{kind}/{id:int}")] public Task<IActionResult> UpdateDirectory(string kind, int id, DirectoryRequest r, CancellationToken ct) => Run(() => service.Directory(Actor, kind, id, r, ct));
     [HttpPost("{id:int}/appointments")] public Task<IActionResult> Appointment(int id, AppointmentRequest r, CancellationToken ct) => Run(() => service.Appointment(Actor, id, r, null, ct));
     [HttpPost("{id:int}/appointments/{appointmentId:long}/end")] public Task<IActionResult> EndAppointment(int id, long appointmentId, AppointmentRequest r, CancellationToken ct) => Run(() => service.Appointment(Actor, id, r, appointmentId, ct));
+    [HttpPut("/api/admin/directory/{kind}/{id:int}/status")] public Task<IActionResult> DirectoryStatus(string kind, int id, DirectoryStatusRequest r, CancellationToken ct) => Run(() => service.DirectoryStatus(Actor, kind, id, r, ct));
+    [HttpDelete("/api/admin/directory/{kind}/{id:int}")] public Task<IActionResult> DeleteDirectory(string kind, int id, CancellationToken ct) => Run(() => service.DirectoryDelete(Actor, kind, id, ct));
+    [HttpPost("/api/admin/users/bulk")] public Task<IActionResult> BulkCreate(BulkCreateUsersRequest r, CancellationToken ct) => Run(() => service.BulkCreate(Actor, r, ct));
+    [HttpPost("/api/admin/users/bulk-preview")] public async Task<IActionResult> BulkPreview(IFormFile file, CancellationToken ct)
+    {
+        try
+        {
+            if (file.Length == 0) return BadRequest(new { message = "File Excel trống." });
+            await using var stream = file.OpenReadStream();
+            return Ok(await service.BulkCreatePreview(Actor, stream, ct));
+        }
+        catch (UserAdministrationException e) { return StatusCode(e.Status, new { message = e.Message }); }
+        catch (InvalidOperationException e) { return BadRequest(new { message = e.Message }); }
+    }
+    [HttpGet("/api/admin/users/bulk-template")] public async Task<IActionResult> BulkTemplate(CancellationToken ct)
+    {
+        try
+        {
+            var content = await service.BulkCreateTemplate(Actor, ct);
+            return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "mau-nhan-su-teky.xlsx");
+        }
+        catch (UserAdministrationException e) { return StatusCode(e.Status, new { message = e.Message }); }
+    }
 }

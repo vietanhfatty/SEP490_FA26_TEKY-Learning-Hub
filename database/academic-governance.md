@@ -17,7 +17,7 @@ Users.PrimaryRoleId chọn giao diện mặc định và xác định nhóm tài
 
 Script `database/tools/repair_account_roles.sql` mặc định chỉ xem trước và rollback. Sau khi xem danh sách, đặt `@Apply=1` để thu hồi role sai nhóm theo PrimaryRoleId, chuẩn hóa grant cá nhân, ghi audit và vô hiệu hóa phiên. Không xóa profile hoặc liên kết nghiệp vụ; các liên kết nhân sự bất thường được báo riêng để rà soát. Script không thay đổi dữ liệu đã hợp lệ khi chạy lại.
 
-StaffAppointments lưu chức danh và thành viên phòng theo thời gian. Không dùng position để tự động cấp quyền. Phân công EDITOR/COMMENTER đặt trong ContentAssignments; danh sách APPROVER nằm trong ApprovalParticipants của từng vòng.
+StaffAppointments lưu chức danh và thành viên phòng theo thời gian. Bổ nhiệm gắn với một PositionAccessPolicy đã công bố; policy lưu role hệ thống trong PositionPolicyRoles và quyền tùy chỉnh trong PositionPolicyPermissions. Grant từ bổ nhiệm mang scope DEPARTMENT, liên kết tới policy qua UserRoleGrantSources. `HasAcademicPermission` nhận hợp các quyền của role hệ thống và policy của grant đang hiệu lực; tài khoản Pending hoặc còn chờ kích hoạt không có quyền. Phân công EDITOR/COMMENTER đặt trong ContentAssignments; danh sách APPROVER nằm trong ApprovalParticipants của từng vòng.
 
 ## Ràng buộc database
 

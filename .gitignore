@@ -57,3 +57,4 @@ PROJECT_STRUCTURE.md
 **/.turbo/
 # Codex
 work/
+.tmp/

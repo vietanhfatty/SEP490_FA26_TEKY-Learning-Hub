@@ -1,7 +1,8 @@
 namespace TekyLearningHub.Application.DTOs.Auth;
 
 public record AccessGrantDto(long GrantId, byte RoleId, string Role, string ScopeType,
-    int? DepartmentId, string? DepartmentName, string[] Permissions);
+    int? DepartmentId, string? DepartmentName, string[] Permissions, AccessSourceDto[]? Sources = null);
+public record AccessSourceDto(string Kind, string? Position, string? Department, string Reason);
 
 public record ScopedPermissionDto(string Code, string Description, bool IsGlobal, int[] DepartmentIds);
 

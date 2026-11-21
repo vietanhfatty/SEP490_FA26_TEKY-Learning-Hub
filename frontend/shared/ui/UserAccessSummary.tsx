@@ -22,7 +22,10 @@ export function UserAccessSummary({ access }: { access: AccountAccess }) {
         const scope = feature.role === 'student' ? 'Dữ liệu học tập của học viên'
           : feature.role === 'parent' ? 'Học sinh được liên kết'
           : feature.role === 'teacher' && !feature.permission ? 'Theo lớp và phân công được giao' : scopes;
-        return <li key={feature.id}><span>{feature.label}</span><small>{scope}</small></li>;
+        const origins = [...new Set(grants.flatMap(grant => grant.sources?.map(source => source.kind === 'APPOINTMENT'
+          ? source.position : source.kind === 'LEGACY' ? 'Quyền cũ cần đối soát' : source.kind === 'EXCEPTION'
+          ? 'Quyền bổ sung có lý do' : source.kind === 'SYSTEM_ADMIN' ? 'Quản trị đặc biệt' : 'Tài khoản cá nhân') ?? []))];
+        return <li key={feature.id}><span>{feature.label}{origins.length > 0 && <small className="staff-source-label">Được cấp từ: {origins.join(', ')}</small>}</span><small>{scope}</small></li>;
       })}</ul>
     </div>)}
     {access.permissions.length > 0 && <div>

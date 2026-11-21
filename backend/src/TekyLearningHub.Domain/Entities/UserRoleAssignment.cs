@@ -12,4 +12,5 @@ public class UserRoleAssignment
     public DateTime? RevokedAt { get; set; }
     public User User { get; set; } = null!;
     public Role Role { get; set; } = null!;
+    public ICollection<UserRoleGrantSource> Sources { get; set; } = [];
 }

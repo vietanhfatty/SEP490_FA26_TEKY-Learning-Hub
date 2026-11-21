@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
         services.AddScoped<IAcademicPermissionReader, AcademicPermissionReader>();
+        services.AddScoped<ITeacherAccessReader, TeacherAccessReader>();
         services.AddScoped<IAccountAccessReader, AccountAccessReader>();
 
 
@@ -60,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<IShellSessionRepository, ShellSessionRepository>();
         services.AddScoped<ICourseRepository, CourseRepository>();
         services.AddScoped<IUserAdministrationRepository, UserAdministrationRepository>();
+        services.AddScoped<IStaffAccessRepository, StaffAccessRepository>();
         services.AddScoped<IStudentClassesRepository, StudentClassesRepository>();
         services.AddScoped<IStudentLearningRepository, StudentLearningRepository>();
         services.AddScoped<IProjectReviewRepository, ProjectReviewRepository>();

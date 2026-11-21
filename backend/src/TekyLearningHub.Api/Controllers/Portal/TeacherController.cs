@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using TekyLearningHub.Application.DTOs;
 using TekyLearningHub.Application.Interfaces.Backoffice;
 using TekyLearningHub.Application.Interfaces.Portal;
@@ -10,9 +12,12 @@ using TekyLearningHub.Application.Interfaces.Portal;
 namespace TekyLearningHub.Api.Controllers.Portal;
 
 [ApiController]
+[Authorize(Roles = "teacher")]
 [Route("api/[controller]")]
 public class TeacherController : ControllerBase
 {
+    private int Actor => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private readonly ITeacherAccessReader _access;
     private readonly ITeacherService _teacherService;
     private readonly IClassroomRealtimeService _realtimeService;
     private readonly IExcelExportService _excelExportService;
@@ -22,8 +27,9 @@ public class TeacherController : ControllerBase
         ITeacherService teacherService,
         IClassroomRealtimeService realtimeService,
         IExcelExportService excelExportService,
-        IAiAssistantService aiAssistantService)
+        IAiAssistantService aiAssistantService, ITeacherAccessReader access)
     {
+        _access = access;
         _teacherService = teacherService;
         _realtimeService = realtimeService;
         _excelExportService = excelExportService;
@@ -38,7 +44,7 @@ public class TeacherController : ControllerBase
     [HttpGet("workspace")]
     public async Task<ActionResult<TeacherWorkspaceDto>> GetWorkspace([FromQuery] int teacherId, [FromQuery] DateOnly? weekStart, CancellationToken ct)
     {
-        var result = await _teacherService.GetTeacherWorkspaceAsync(teacherId, weekStart, ct);
+        var result = await _teacherService.GetTeacherWorkspaceAsync(Actor, weekStart, ct);
         return Ok(result);
     }
 
@@ -48,7 +54,7 @@ public class TeacherController : ControllerBase
     [HttpGet("classes")]
     public async Task<ActionResult<List<TeacherClassSummaryDto>>> GetClasses([FromQuery] int teacherId, CancellationToken ct)
     {
-        var result = await _teacherService.GetTeacherClassesAsync(teacherId, ct);
+        var result = await _teacherService.GetTeacherClassesAsync(Actor, ct);
         return Ok(result);
     }
 
@@ -60,6 +66,7 @@ public class TeacherController : ControllerBase
     [HttpGet("attendance/{sessionId:int}")]
     public async Task<ActionResult<ClassAttendanceSessionDto>> GetSessionAttendance([FromRoute] int sessionId, CancellationToken ct)
     {
+        if (!await _access.CanAccess(Actor, "session", sessionId, ct)) return Forbid();
         var result = await _teacherService.GetSessionAttendanceAsync(sessionId, ct);
         return Ok(result);
     }
@@ -70,7 +77,9 @@ public class TeacherController : ControllerBase
     [HttpPost("attendance/update")]
     public async Task<ActionResult> UpdateAttendance([FromBody] UpdateClassAttendanceRequest request, [FromQuery] int teacherId, CancellationToken ct)
     {
-        var success = await _teacherService.UpdateSessionAttendanceAsync(request, teacherId, ct);
+        if (!await _access.CanAccess(Actor, "session", request.SessionId, ct)) return Forbid();
+        foreach (var item in request.AttendanceList) if (!await _access.Enrolled(request.SessionId, item.StudentId, ct)) return Forbid();
+        var success = await _teacherService.UpdateSessionAttendanceAsync(request, Actor, ct);
         return Ok(new { success, message = "Cập nhật điểm danh thành công." });
     }
 
@@ -80,6 +89,7 @@ public class TeacherController : ControllerBase
     [HttpPost("attendance/sync-workstation")]
     public async Task<ActionResult> SyncWorkstationCheckIn([FromQuery] int sessionId, [FromQuery] int studentId, [FromQuery] string workstationIp, CancellationToken ct)
     {
+        if (!await _access.CanAccess(Actor, "session", sessionId, ct) || !await _access.Enrolled(sessionId, studentId, ct)) return Forbid();
         var success = await _teacherService.SyncWorkstationCheckInAsync(sessionId, studentId, workstationIp, ct);
         return Ok(new { success, message = "Đã đồng bộ máy trạm thành công." });
     }
@@ -90,7 +100,7 @@ public class TeacherController : ControllerBase
     [HttpGet("makeup")]
     public async Task<ActionResult<List<MakeupRequestItemDto>>> GetMakeupRequests([FromQuery] int teacherId, CancellationToken ct)
     {
-        var result = await _teacherService.GetMakeupRequestsAsync(teacherId, ct);
+        var result = await _teacherService.GetMakeupRequestsAsync(Actor, ct);
         return Ok(result);
     }
 
@@ -100,7 +110,8 @@ public class TeacherController : ControllerBase
     [HttpPost("makeup/review")]
     public async Task<ActionResult> ReviewMakeupRequest([FromBody] ReviewMakeupRequestDto request, [FromQuery] int teacherId, CancellationToken ct)
     {
-        var success = await _teacherService.ReviewMakeupRequestAsync(request, teacherId, ct);
+        if (!await _access.CanAccess(Actor, "makeup", request.MakeupId, ct)) return Forbid();
+        var success = await _teacherService.ReviewMakeupRequestAsync(request, Actor, ct);
         return Ok(new { success, message = "Đã xử lý đơn học bù thành công." });
     }
 
@@ -112,6 +123,7 @@ public class TeacherController : ControllerBase
     [HttpPost("classroom/{classId:int}/focus-mode")]
     public async Task<ActionResult> ToggleFocusMode([FromRoute] int classId, [FromQuery] bool isLocked, [FromQuery] string? message, CancellationToken ct)
     {
+        if (!await _access.CanAccess(Actor, "class", classId, ct)) return Forbid();
         await _realtimeService.BroadcastFocusModeLockAsync(classId, isLocked, message, ct);
         return Ok(new { success = true, isLocked, message = isLocked ? "Đã khóa màn hình phòng Lab." : "Đã mở khóa màn hình phòng Lab." });
     }
@@ -122,6 +134,7 @@ public class TeacherController : ControllerBase
     [HttpPost("classroom/{classId:int}/spotlight")]
     public async Task<ActionResult> BroadcastSpotlight([FromRoute] int classId, [FromQuery] int studentId, [FromQuery] string studentName, [FromBody] string screenPayload, CancellationToken ct)
     {
+        if (!await _access.CanAccess(Actor, "class", classId, ct)) return Forbid();
         await _realtimeService.BroadcastSpotlightAsync(classId, studentId, studentName, screenPayload, ct);
         return Ok(new { success = true, message = $"Đã phát sóng bài làm của {studentName} lên máy chiếu và máy trạm phòng Lab." });
     }
@@ -134,7 +147,7 @@ public class TeacherController : ControllerBase
     [HttpPost("maps")]
     public async Task<ActionResult<int>> CreateStemMap([FromBody] CreateStemMapRequest request, [FromQuery] int teacherId, CancellationToken ct)
     {
-        var mapId = await _teacherService.CreateStemMapAsync(request, teacherId, ct);
+        var mapId = await _teacherService.CreateStemMapAsync(request, Actor, ct);
         return Ok(new { mapId, message = "Tạo bản đồ sa bàn thành công." });
     }
 
@@ -156,7 +169,7 @@ public class TeacherController : ControllerBase
     [HttpGet("submissions")]
     public async Task<ActionResult<List<GradingQueueItemDto>>> GetGradingQueue([FromQuery] int teacherId, [FromQuery] int? classId, CancellationToken ct)
     {
-        var result = await _teacherService.GetGradingQueueAsync(teacherId, classId, ct);
+        var result = await _teacherService.GetGradingQueueAsync(Actor, classId, ct);
         return Ok(result);
     }
 
@@ -166,7 +179,8 @@ public class TeacherController : ControllerBase
     [HttpPost("grade")]
     public async Task<ActionResult<SubmissionGradingResultDto>> GradeSubmission([FromBody] GradeSubmissionRequest request, [FromQuery] int teacherId, CancellationToken ct)
     {
-        var result = await _teacherService.GradeSubmissionAsync(request, teacherId, ct);
+        if (!await _access.CanAccess(Actor, "submission", request.SubmissionId, ct)) return Forbid();
+        var result = await _teacherService.GradeSubmissionAsync(request, Actor, ct);
         return Ok(result);
     }
 
@@ -178,6 +192,7 @@ public class TeacherController : ControllerBase
     [HttpGet("analytics/{classId:int}")]
     public async Task<ActionResult<ClassPerformanceAnalyticsDto>> GetClassAnalytics([FromRoute] int classId, CancellationToken ct)
     {
+        if (!await _access.CanAccess(Actor, "class", classId, ct)) return Forbid();
         var result = await _teacherService.GetClassPerformanceAnalyticsAsync(classId, ct);
         return Ok(result);
     }
@@ -188,6 +203,7 @@ public class TeacherController : ControllerBase
     [HttpGet("export-excel/{classId:int}")]
     public async Task<IActionResult> ExportGradebookExcel([FromRoute] int classId, CancellationToken ct)
     {
+        if (!await _access.CanAccess(Actor, "class", classId, ct)) return Forbid();
         var fileBytes = await _excelExportService.ExportClassGradebookAsync(classId, ct);
         var fileName = $"Bang_Diem_TEKY_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);

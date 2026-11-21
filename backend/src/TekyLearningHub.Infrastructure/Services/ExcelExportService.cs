@@ -100,4 +100,39 @@ public class ExcelExportService(ITeacherRepository repository) : IExcelExportSer
         workbook.SaveAs(stream);
         return stream.ToArray();
     }
+
+    /// <summary>Mẫu Excel cho quản trị viên điền danh sách nhân sự rồi nhập hàng loạt.</summary>
+    public async Task<byte[]> BuildStaffImportTemplateAsync(CancellationToken cancellationToken = default)
+    {
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.Worksheets.Add("Nhân sự");
+        sheet.Cell(1, 1).Value = "Email";
+        sheet.Cell(1, 2).Value = "Họ tên";
+        sheet.Cell(2, 1).Value = "giao.vien@example.edu.vn";
+        sheet.Cell(2, 2).Value = "Nguyễn Văn A";
+        sheet.Column(1).Width = 36;
+        sheet.Column(2).Width = 28;
+        sheet.Row(1).Style.Font.SetBold(true);
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return await Task.FromResult(stream.ToArray());
+    }
+
+    /// <summary>Đọc cột Email và Họ tên từ sheet đầu tiên của file Excel.</summary>
+    public async Task<(string Email, string? FullName)[]> ReadStaffImportAsync(Stream content, CancellationToken cancellationToken = default)
+    {
+        using var workbook = new XLWorkbook(content);
+        var sheet = workbook.Worksheets.FirstOrDefault()
+            ?? throw new InvalidOperationException("File Excel không có trang tính nào.");
+        var rows = new List<(string, string?)>();
+        foreach (var row in sheet.RowsUsed().Skip(1))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var email = row.Cell(1).GetString().Trim();
+            if (email.Length == 0) continue;
+            var name = row.Cell(2).GetString().Trim();
+            rows.Add((email, name.Length == 0 ? null : name));
+        }
+        return await Task.FromResult(rows.ToArray());
+    }
 }
