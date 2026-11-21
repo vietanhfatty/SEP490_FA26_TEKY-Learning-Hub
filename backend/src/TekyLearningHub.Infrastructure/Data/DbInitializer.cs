@@ -125,6 +125,8 @@ public static class DbInitializer
 
         await context.SaveChangesAsync();
         await context.Database.ExecuteSqlRawAsync("EXEC dbo.SeedDemoStudentParent;");
+        // Demo staff accounts appointed to every job title of the two-department organisation.
+        await context.Database.ExecuteSqlInterpolatedAsync($"EXEC dbo.SeedDemoOrgAccounts @PasswordHash={defaultPasswordHash};");
     }
 }
 
